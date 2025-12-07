@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id          String     @id @default(cuid())
+  name        String
+  subdomain   String     @unique
+  description String?
+  heroImage   String?
+  companies   Company[]
+  categories  Category[]
+  createdAt   DateTime   @default(now())
+}
+
+enum Plan {
+  FREE
+  PREMIUM
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  name        String
+  slug        String
+  address     String
+  city        String
+  zip         String
+
+  phone       String?
+  email       String?
+  website     String?
+  description String?
+  logo        String?
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  plan        Plan     @default(FREE)
+  isVerified  Boolean  @default(false)
+  
+  // --- TU JEST POPRAWNE MIEJSCE ---
+  leads       Lead[]   
+
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, city])
+  @@index([tenantId, categoryId])
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  companies Company[]
+
+  @@unique([tenantId, slug])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  companyId   String
+  // To pole wymaga relacji zwrotnej w modelu Company (powyżej)
+  company     Company  @relation(fields: [companyId], references: [id])
+  
+  contactName String   
+  phone       String   
+  email       String   
+  status      String   @default("NEW") 
+  
+  createdAt   DateTime @default(now())
+}
