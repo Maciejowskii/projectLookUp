@@ -11,7 +11,7 @@ DB_NAME = "wenet"
 DB_USER = "postgres"
 DB_PASS = "wenet123"
 
-USER_AGENT = "moj_katalog_firm_v2_fix"
+USER_AGENT = "ProjectLookUp-Geocoder/1.0 (szkolmt@gmail.com)"
 
 def connect_db():
     conn = psycopg2.connect(
@@ -106,10 +106,10 @@ def main():
                     break # Sukces, przerywamy pętlę prób
                 else:
                     print("❌")
-                time.sleep(1.1) # Szacunek dla API
+                time.sleep(3.1) # Szacunek dla API
             except Exception as e:
                 print(f"⚠️ Błąd API: {e}")
-                time.sleep(2)
+                time.sleep(3)
 
         if found_location:
             cur.execute(
