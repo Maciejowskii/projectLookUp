@@ -1,39 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const config = {
+  // Matcher łapie wszystko OPRÓCZ plików statycznych, api, _next
   matcher: ["/((?!api/|_next/|_static/|[\\w-]+\\.\\w+).*)"],
 };
 
-export default async function middleware(req: NextRequest) {
+export default function middleware(req: NextRequest) {
   const url = req.nextUrl;
+  const pathname = url.pathname;
 
-  // Pobieramy hosta, a jeśli jest null, używamy pustego stringa (bezpiecznik)
+  // --- 1. OCHRONA PANELU ADMINA (Basic Auth) ---
+  // Jeśli ścieżka zaczyna się od /admin, wymuszamy logowanie
+  if (pathname.startsWith("/admin")) {
+    const basicAuth = req.headers.get("authorization");
+
+    if (basicAuth) {
+      const authValue = basicAuth.split(" ")[1];
+      const [user, pwd] = atob(authValue).split(":");
+
+      const validUser = process.env.ADMIN_USER || "admin";
+      const validPass = process.env.ADMIN_PASSWORD || "admin";
+
+      if (user === validUser && pwd === validPass) {
+        return NextResponse.next();
+      }
+    }
+
+    return new NextResponse("Dostęp zabroniony. Wymagane logowanie.", {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": 'Basic realm="Secure Admin Area"',
+      },
+    });
+  }
+
+  // --- 2. OBSŁUGA SUBDOMEN (Multi-Tenancy) ---
   const hostHeader = req.headers.get("host") || "";
+  // Usuwamy port i "www."
+  const hostname = hostHeader.replace(":3000", "").replace("www.", "");
 
-  // Usuwamy port z hosta (np. :3000) dla czystości
-  const hostname = hostHeader.replace(":3000", "");
+  // Domeny główne, które NIE są subdomenami tenantów
+  // Dodaj tu swoją domenę produkcyjną, np. "projectlookup.com"
+  const mainDomains = ["localhost", "projectlookup.com", "lookup.pl"];
 
-  console.log("Middleware -> Host:", hostname, "Path:", url.pathname);
-
-  // Lista domen, które traktujemy jako "główne" (bez subdomen)
-  const mainDomains = ["localhost", "twojadomena.pl", "www.twojadomena.pl"];
-
-  // Jeśli to domena główna lub pusta -> puszczamy standardowo
+  // Jeśli to domena główna -> puszczamy ruch normalnie (np. na Landing Page)
   if (mainDomains.includes(hostname) || !hostname) {
     return NextResponse.next();
   }
 
-  // --- LOGIKA SUBDOMEN ---
-  // Wyciągamy pierwszy człon (np. "mechanicy" z "mechanicy.localhost")
+  // Jeśli to subdomena (np. "mechanicy.localhost" lub "mechanicy.projectlookup.com")
+  // Wyciągamy subdomenę
   const subdomain = hostname.split(".")[0];
 
-  // Budujemy nową ścieżkę wewnętrzną
-  const searchParams = url.searchParams.toString();
-  const path = `${url.pathname}${
-    searchParams.length > 0 ? `?${searchParams}` : ""
-  }`;
-
-  // Przepisujemy URL na strukturę folderów: src/app/[domain]/...
-  // Np. mechanicy.localhost:3000/ -> wewnątrz staje się -> /mechanicy/
-  return NextResponse.rewrite(new URL(`/${subdomain}${path}`, req.url));
+  // Przepisujemy URL wewnętrznie na strukturę: /app/[domain]/...
+  // Np. mechanicy.localhost/kontakt -> /mechanicy/kontakt
+  return NextResponse.rewrite(
+    new URL(`/${subdomain}${pathname}${url.search}`, req.url)
+  );
 }
