@@ -34,6 +34,9 @@ model Company {
   city        String
   zip         String
 
+  lat         Float?   
+  lng         Float?
+
   phone       String?
   email       String?
   website     String?
