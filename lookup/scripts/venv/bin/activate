@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/mactyr/Documents/LookUp/projectLookUp/wenet-app/scripts/venv"
+VIRTUAL_ENV="/Users/mactyr/Documents/LookUp/projectLookUp/lookup/scripts/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
