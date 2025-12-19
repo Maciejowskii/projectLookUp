@@ -1,59 +1,39 @@
 "use client";
 
-import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { useDebouncedCallback } from "use-debounce"; // Zaraz to doinstalujemy
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { Search } from "lucide-react"; // upewnij się, że masz lucide-react
 
-export default function SearchBar() {
+export const SearchBar = () => {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const { replace } = useRouter();
+  const [query, setQuery] = useState(searchParams.get("q") || "");
 
-  // Funkcja debounced - uruchamia się dopiero jak przestaniesz pisać (żeby nie katować bazy co literę)
-  const handleSearch = useDebouncedCallback(
-    (term: string, type: "q" | "city") => {
-      const params = new URLSearchParams(searchParams);
-
-      if (term) {
-        params.set(type, term);
-      } else {
-        params.delete(type);
-      }
-
-      // Resetujemy paginację przy nowym szukaniu (jak zrobisz paginację w przyszłości)
-      // params.set('page', '1');
-
-      replace(`${pathname}?${params.toString()}`);
-    },
-    300
-  );
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      router.push(`/szukaj?q=${encodeURIComponent(query)}`);
+    }
+  };
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 mb-8 bg-white p-4 rounded-lg shadow-sm border">
-      <div className="flex-1">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Czego szukasz?
-        </label>
+    <form onSubmit={handleSearch} className="relative w-full max-w-2xl mx-auto">
+      <div className="relative flex items-center">
+        <Search className="absolute left-4 text-gray-400 w-5 h-5" />
         <input
           type="text"
-          placeholder="Np. opony, wymiana oleju..."
-          className="w-full border rounded-md p-2 outline-none focus:ring-2 focus:ring-blue-500"
-          defaultValue={searchParams.get("q")?.toString()}
-          onChange={(e) => handleSearch(e.target.value, "q")}
+          placeholder="Czego szukasz? Np. mechanik, hydraulik, nazwa firmy..."
+          className="w-full py-4 pl-12 pr-4 rounded-full border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
         />
+        <button
+          type="submit"
+          className="absolute right-2 bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition-colors"
+        >
+          Szukaj
+        </button>
       </div>
-
-      <div className="flex-1">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Miasto
-        </label>
-        <input
-          type="text"
-          placeholder="Np. Warszawa"
-          className="w-full border rounded-md p-2 outline-none focus:ring-2 focus:ring-blue-500"
-          defaultValue={searchParams.get("city")?.toString()}
-          onChange={(e) => handleSearch(e.target.value, "city")}
-        />
-      </div>
-    </div>
+    </form>
   );
-}
+};

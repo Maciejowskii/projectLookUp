@@ -1,4 +1,4 @@
-#!/Users/mactyr/Documents/LookUp/projectLookUp/wenet-app/scripts/venv/bin/python3
+#!/Users/mactyr/Documents/LookUp/projectLookUp/lookup/scripts/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

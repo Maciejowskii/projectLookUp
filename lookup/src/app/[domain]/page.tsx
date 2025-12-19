@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import SearchBar from "@/components/SearchBar";
+import { SearchBar } from "@/components/SearchBar";
 import MapWrapper from "@/components/MapWrapper";
 import { MapPin, Star, ShieldCheck, Phone } from "lucide-react";
 
@@ -21,6 +21,23 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
   const decodedDomain = decodeURIComponent(domain)
     .replace(".localhost:3000", "")
     .replace(".localhost", "");
+
+  const slugifyCity = (city: string) =>
+    city
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-") // Zamień spacje na myślniki
+      .replace(/[^a-z0-9-]/g, "") // Usuń znaki specjalne (np. polskie ogonki jeśli nie są obsłużone wcześniej)
+      // Opcjonalnie: obsługa polskich znaków (warto dodać dla miast typu 'Łódź' -> 'lodz')
+      .replace(/ą/g, "a")
+      .replace(/ć/g, "c")
+      .replace(/ę/g, "e")
+      .replace(/ł/g, "l")
+      .replace(/ń/g, "n")
+      .replace(/ó/g, "o")
+      .replace(/ś/g, "s")
+      .replace(/ź/g, "z")
+      .replace(/ż/g, "z");
 
   const tenant = await prisma.tenant.findUnique({
     where: { subdomain: decodedDomain },
@@ -125,7 +142,7 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
               companies.map((company) => (
                 <Link
                   key={company.id}
-                  href={`/${company.slug}`}
+                  href={`/${slugifyCity(company.city)}/${company.slug}`}
                   className="group block bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-blue-400 transition-all duration-200 relative overflow-hidden"
                 >
                   {/* Pasek Premium */}

@@ -1,7 +1,5 @@
 import Link from "next/link";
 import {
-  Search,
-  MapPin,
   ShieldCheck,
   TrendingUp,
   ArrowRight,
@@ -11,45 +9,23 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { HomeSearchBar } from "@/components/HomeSearchBar"; // Importujemy nowy komponent
+import { Footer } from "@/components/Footer";
+import { Navbar } from "@/components/Navbar"; // Jeśli chcesz tu Navbar --- IGNORE ---
 
 export default async function LandingPage() {
-  // Statystyki "na żywo" budują zaufanie
+  // Statystyki
   const stats = await prisma.$transaction([
     prisma.company.count(),
-    prisma.tenant.count(),
+    prisma.tenant.count(), // lub count kategorii, jeśli tenantów masz mało
   ]);
 
-  const [companyCount, categoryCount] = stats;
+  const [companyCount, tenantCount] = stats;
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
       {/* --- NAVBAR --- */}
-      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="text-2xl font-extrabold tracking-tighter flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg skew-x-[-10deg]"></div>
-            LookUp<span className="text-blue-600">.</span>
-          </div>
-          <div className="flex gap-6 text-sm font-medium text-gray-600">
-            <Link href="/kategorie" className="hover:text-black transition">
-              Kategorie
-            </Link>
-            <Link href="/cennik" className="hover:text-black transition">
-              Dla Firm
-            </Link>
-            <Link href="/admin" className="hover:text-black transition">
-              Strefa Partnera
-            </Link>
-          </div>
-          <Link
-            href="/dodaj-firme"
-            className="hidden md:block bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-gray-800 transition"
-          >
-            Dodaj firmę za darmo
-          </Link>
-        </div>
-      </nav>
-
+      <Navbar />
       {/* --- HERO SECTION --- */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden">
         {/* Dekoracyjne tło */}
@@ -75,33 +51,11 @@ export default async function LandingPage() {
             <span className="font-bold text-gray-900">
               {companyCount.toLocaleString()}
             </span>{" "}
-            zweryfikowanych firm w{" "}
-            <span className="font-bold text-gray-900">{categoryCount}</span>{" "}
-            branżach.
+            zweryfikowanych firm.
           </p>
 
-          {/* Duży SearchBar - Kieruje do "globalnego szukania" (lub na tenanta jeśli zrobimy logikę) */}
-          <div className="bg-white p-2 rounded-2xl shadow-xl border border-gray-200 flex flex-col md:flex-row gap-2 max-w-2xl mx-auto">
-            <div className="flex-1 flex items-center px-4 h-14 bg-gray-50 rounded-xl">
-              <Search className="text-gray-400 mr-3" />
-              <input
-                type="text"
-                placeholder="Usługa, np. Hydraulik"
-                className="bg-transparent w-full outline-none font-medium"
-              />
-            </div>
-            <div className="flex-1 flex items-center px-4 h-14 bg-gray-50 rounded-xl">
-              <MapPin className="text-gray-400 mr-3" />
-              <input
-                type="text"
-                placeholder="Miasto, np. Warszawa"
-                className="bg-transparent w-full outline-none font-medium"
-              />
-            </div>
-            <button className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-200">
-              Szukaj
-            </button>
-          </div>
+          {/* TU JEST ZMIANA: Używamy działającego komponentu Client Side */}
+          <HomeSearchBar />
         </div>
       </section>
 
@@ -113,30 +67,30 @@ export default async function LandingPage() {
           </h2>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Karty kategorii - linkują do subdomen */}
+            {/* Linkujemy do wewnętrznych stron kategorii */}
             <CategoryCard
               icon={<Wrench />}
               title="Mechanika"
               count="12,400+"
-              href="http://mechanicy.localhost:3000" // Zmień na domenę prod
+              href="/kategoria/mechanika-pojazdowa"
             />
             <CategoryCard
               icon={<Calculator />}
               title="Księgowość"
               count="8,200+"
-              href="http://ksiegowi.localhost:3000"
+              href="/kategoria/biura-rachunkowe"
             />
             <CategoryCard
               icon={<Building2 />}
               title="Budownictwo"
               count="15,100+"
-              href="http://budowlanka.localhost:3000"
+              href="/kategorie"
             />
             <CategoryCard
               icon={<Stethoscope />}
               title="Medycyna"
               count="5,300+"
-              href="http://lekarze.localhost:3000"
+              href="/kategorie"
             />
           </div>
         </div>
@@ -163,14 +117,9 @@ export default async function LandingPage() {
               >
                 Dodaj firmę teraz <ArrowRight size={18} />
               </Link>
-              <div className="flex items-center gap-2 px-6 py-4 border border-gray-700 rounded-xl text-gray-300">
-                <ShieldCheck size={20} className="text-green-400" />{" "}
-                Zweryfikowany profil
-              </div>
             </div>
           </div>
 
-          {/* Atrapa interfejsu (Visual) */}
           <div className="relative z-10 bg-white/10 backdrop-blur p-6 rounded-2xl border border-white/10 w-full max-w-sm rotate-3 hover:rotate-0 transition-transform duration-500">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-blue-500 rounded-full"></div>
@@ -187,19 +136,11 @@ export default async function LandingPage() {
       </section>
 
       {/* --- FOOTER --- */}
-      <footer className="bg-white border-t border-gray-100 py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-xl font-bold tracking-tighter">LookUp.</div>
-          <div className="text-sm text-gray-500">
-            &copy; 2025 Project LookUp Inc. Wszystkie prawa zastrzeżone.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
 
-// Komponent pomocniczy karty kategorii
 function CategoryCard({
   icon,
   title,
