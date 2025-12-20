@@ -2,8 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { checkAdminAuth } from "@/lib/adminAuth";
 
 export async function approveClaim(claimId: string) {
+  await checkAdminAuth();
   // 1. Pobierz zgłoszenie
   const claim = await prisma.claimRequest.findUnique({
     where: { id: claimId },
@@ -32,6 +34,7 @@ export async function approveClaim(claimId: string) {
 }
 
 export async function rejectClaim(claimId: string) {
+  await checkAdminAuth();
   await prisma.claimRequest.update({
     where: { id: claimId },
     data: { status: "REJECTED" },
@@ -40,6 +43,7 @@ export async function rejectClaim(claimId: string) {
 }
 
 export async function deleteReview(reviewId: string) {
+  await checkAdminAuth();
   await prisma.review.delete({
     where: { id: reviewId },
   });
@@ -51,6 +55,7 @@ export async function deleteReview(reviewId: string) {
 // --- KATEGORIE ---
 
 export async function createCategory(formData: FormData) {
+  await checkAdminAuth();
   const name = formData.get("name") as string;
   const tenantId = "default"; // Lub pobierz z konfiguracji, jeśli masz multitenancy
 
@@ -84,6 +89,7 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function deleteCategory(id: string) {
+  await checkAdminAuth();
   // Opcjonalnie: sprawdź czy kategoria nie ma firm przed usunięciem
   await prisma.category.delete({ where: { id } });
   revalidatePath("/admin/categories");
@@ -92,6 +98,7 @@ export async function deleteCategory(id: string) {
 // --- USTAWIENIA GLOBALNE ---
 
 export async function updateSettings(formData: FormData) {
+  await checkAdminAuth();
   // Pobieramy wszystkie pola z formularza
   const entries = Array.from(formData.entries());
 

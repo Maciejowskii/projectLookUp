@@ -65,6 +65,8 @@ model Company {
   createdAt   DateTime @default(now())
   updatedAt   DateTime? @updatedAt
 
+  users       User[]
+
   @@index([tenantId, city])
   @@index([nip])
   @@index([tenantId, categoryId])
@@ -122,4 +124,16 @@ model ClaimRequest {
 model Setting {
   key   String @id
   value String
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Zahaszowane hasło
+  
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

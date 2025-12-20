@@ -1,60 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const config = {
-  // Matcher łapie wszystko OPRÓCZ plików statycznych, api, _next
-  matcher: ["/((?!api/|_next/|_static/|[\\w-]+\\.\\w+).*)"],
+  matcher: ["/admin/:path*"],
 };
 
-export default function middleware(req: NextRequest) {
+export function middleware(req: NextRequest) {
+  const basicAuth = req.headers.get("authorization");
   const url = req.nextUrl;
-  const pathname = url.pathname;
 
-  // --- 1. OCHRONA PANELU ADMINA (Basic Auth) ---
-  // Jeśli ścieżka zaczyna się od /admin, wymuszamy logowanie
-  if (pathname.startsWith("/admin")) {
-    const basicAuth = req.headers.get("authorization");
+  const adminUser = process.env.ADMIN_USER;
+  const adminPass = process.env.ADMIN_PASSWORD;
 
+  if (url.pathname.startsWith("/admin")) {
     if (basicAuth) {
       const authValue = basicAuth.split(" ")[1];
       const [user, pwd] = atob(authValue).split(":");
 
-      const validUser = process.env.ADMIN_USER || "admin";
-      const validPass = process.env.ADMIN_PASSWORD || "admin";
-
-      if (user === validUser && pwd === validPass) {
-        return NextResponse.next();
+      if (user === adminUser && pwd === adminPass) {
+        // SUKCES: Puszczamy dalej, ale dodajemy header/cookie
+        const response = NextResponse.next();
+        // Ustawiamy ciasteczko sesji admina (ważne 1h)
+        // Dzięki temu Server Action będzie mógł sprawdzić, czy user przeszedł przez ten auth
+        response.cookies.set("is_admin_authenticated", "true", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 3600, // 1 godzina
+        });
+        return response;
       }
     }
 
-    return new NextResponse("Dostęp zabroniony. Wymagane logowanie.", {
+    return new NextResponse("Auth Required", {
       status: 401,
       headers: {
-        "WWW-Authenticate": 'Basic realm="Secure Admin Area"',
+        "WWW-Authenticate": 'Basic realm="Secure Area"',
       },
     });
   }
 
-  // --- 2. OBSŁUGA SUBDOMEN (Multi-Tenancy) ---
-  const hostHeader = req.headers.get("host") || "";
-  // Usuwamy port i "www."
-  const hostname = hostHeader.replace(":3000", "").replace("www.", "");
-
-  // Domeny główne, które NIE są subdomenami tenantów
-  // Dodaj tu swoją domenę produkcyjną, np. "projectlookup.com"
-  const mainDomains = ["localhost", "projectlookup.com", "lookup.pl"];
-
-  // Jeśli to domena główna -> puszczamy ruch normalnie (np. na Landing Page)
-  if (mainDomains.includes(hostname) || !hostname) {
-    return NextResponse.next();
-  }
-
-  // Jeśli to subdomena (np. "mechanicy.localhost" lub "mechanicy.projectlookup.com")
-  // Wyciągamy subdomenę
-  const subdomain = hostname.split(".")[0];
-
-  // Przepisujemy URL wewnętrznie na strukturę: /app/[domain]/...
-  // Np. mechanicy.localhost/kontakt -> /mechanicy/kontakt
-  return NextResponse.rewrite(
-    new URL(`/${subdomain}${pathname}${url.search}`, req.url)
-  );
+  return NextResponse.next();
 }
