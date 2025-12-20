@@ -69,9 +69,10 @@ export default async function SearchPage({
         {/* Grid Wyników */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {companies.map((company) => (
-            <div
+            <Link // <--- DODAJEMY LINK TUTAJ
+              href={`/firma/${company.slug}`}
               key={company.id}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all"
+              className="block bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all group" // 'group' pozwala na stylowanie dzieci przy hoverze
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
@@ -79,7 +80,7 @@ export default async function SearchPage({
                 </div>
               </div>
 
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
+              <h2 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
                 {company.name}
               </h2>
               <p className="text-sm text-gray-500 mb-4 line-clamp-2">
@@ -89,11 +90,12 @@ export default async function SearchPage({
               <div className="space-y-1 text-sm text-gray-600">
                 {company.city && (
                   <div className="flex items-center gap-2">
-                    <MapPin size={14} /> {company.city}
+                    <MapPin size={14} className="text-gray-400" />{" "}
+                    {company.city}
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 

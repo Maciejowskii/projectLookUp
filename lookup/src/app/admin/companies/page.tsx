@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { ShieldCheck, MapPin, Search } from "lucide-react";
+import {
+  ShieldCheck,
+  MapPin,
+  Search,
+  MoreHorizontal,
+  Globe,
+} from "lucide-react";
+import Link from "next/link";
 
 export default async function CompaniesPage({
   searchParams,
@@ -8,123 +15,148 @@ export default async function CompaniesPage({
 }) {
   const { q } = await searchParams;
 
-  // Pobieramy firmy (max 50 najnowszych, żeby nie zamulić przeglądarki)
-  // Jeśli jest parametr ?q=..., filtrujemy
   const companies = await prisma.company.findMany({
-    where: q
-      ? {
-          name: { contains: q, mode: "insensitive" },
-        }
-      : undefined,
+    where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
     take: 50,
     orderBy: { createdAt: "desc" },
-    include: {
-      tenant: true,
-      category: true,
-    },
+    include: { tenant: true, category: true },
   });
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Zarządzanie Firmami
-        </h2>
+  const totalCompanies = await prisma.company.count();
 
-        {/* Prosta wyszukiwarka (Formularz GET) */}
-        <form className="flex gap-2">
+  return (
+    <div className="space-y-6">
+      {/* HEADER & SEARCH */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            Baza Firm
+          </h1>
+          <p className="text-sm text-gray-500">
+            Zarządzasz łącznie{" "}
+            <strong className="text-gray-900">{totalCompanies}</strong> firmami.
+          </p>
+        </div>
+
+        <form className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search
+              size={16}
+              className="text-gray-400 group-focus-within:text-blue-500 transition-colors"
+            />
+          </div>
           <input
             name="q"
             defaultValue={q}
-            placeholder="Szukaj firmy..."
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Szukaj po nazwie..."
+            className="pl-10 pr-4 py-2.5 w-full md:w-80 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
           />
-          <button
-            type="submit"
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
-          >
-            <Search size={18} />
-          </button>
         </form>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3">Nazwa Firmy</th>
-              <th className="px-6 py-3">Tenant (Branża)</th>
-              <th className="px-6 py-3">Status</th>
-              <th className="px-6 py-3">Lokalizacja</th>
-              <th className="px-6 py-3 text-right">Akcje</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {companies.map((company) => (
-              <tr key={company.id} className="hover:bg-gray-50 group">
-                <td className="px-6 py-4">
-                  <div className="font-bold text-gray-900">{company.name}</div>
-                  <div className="text-xs text-gray-500">
-                    {company.category.name}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium">
-                    {company.tenant.name}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1 items-start">
-                    {company.plan === "PREMIUM" ? (
-                      <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-                        PREMIUM
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                        FREE
-                      </span>
-                    )}
-
-                    {company.isVerified && (
-                      <span className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
-                        <ShieldCheck size={12} /> Zweryfikowana
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <MapPin size={14} />
-                    {company.city}
-                  </div>
-                  <div className="text-xs pl-5 truncate max-w-[150px]">
-                    {company.address}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-blue-600 hover:underline font-medium text-xs mr-3">
-                    Edytuj
-                  </button>
-                  <button className="text-red-500 hover:underline font-medium text-xs">
-                    Usuń
-                  </button>
-                </td>
-              </tr>
-            ))}
-
-            {companies.length === 0 && (
+      {/* TABELA */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50/50 text-gray-500 border-b border-gray-100">
               <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-400">
-                  Nie znaleziono firm.
-                </td>
+                <th className="px-6 py-4 font-semibold">Firma</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold">Kategoria</th>
+                <th className="px-6 py-4 font-semibold">Lokalizacja</th>
+                <th className="px-6 py-4 font-semibold text-right">
+                  Zarządzaj
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {companies.map((company) => (
+                <tr
+                  key={company.id}
+                  className="hover:bg-gray-50/80 transition-colors group"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-4">
+                      {/* Logo Placeholder - Initials */}
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0">
+                        {company.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">
+                          {company.name}
+                        </div>
+                        {company.website && (
+                          <a
+                            href={company.website}
+                            target="_blank"
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                          >
+                            <Globe size={10} />{" "}
+                            {new URL(company.website).hostname}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-2 items-start">
+                      {company.isVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                          <ShieldCheck size={12} /> Zweryfikowana
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                          Niezweryfikowana
+                        </span>
+                      )}
 
-      <div className="mt-4 text-center text-xs text-gray-400">
-        Pokazuję 50 najnowszych firm. Użyj wyszukiwarki, aby znaleźć konkretną.
+                      {company.plan === "PREMIUM" && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                          PREMIUM
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-gray-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 text-xs">
+                      {company.category.name}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={14} className="text-gray-400" />
+                      <span className="truncate max-w-[150px]">
+                        {company.city}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <Link
+                      href={`/firma/${company.slug}`}
+                      className="text-gray-400 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg inline-block"
+                    >
+                      <MoreHorizontal size={20} />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+
+              {companies.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="py-12 text-center text-gray-500 bg-gray-50/30"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Search size={32} className="text-gray-300" />
+                      <p>Nie znaleziono firm spełniających kryteria.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
