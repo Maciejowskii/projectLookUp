@@ -42,9 +42,9 @@ model Company {
   description String?  @db.Text
   shortDesc   String?  // Krótki opis do listy (meta description)
   slug        String
-  address     String
-  city        String
-  zip         String
+  address     String?
+  city        String?
+  zip         String?
 
   lat         Float?   
   lng         Float?

@@ -306,8 +306,14 @@ if __name__ == "__main__":
     
     # Podaj tu swoje URL
     urls = [
-        "https://panoramafirm.pl/mechanika_pojazdowa",
-        "https://panoramafirm.pl/biura_rachunkowe"
+        # "https://panoramafirm.pl/mechanika_pojazdowa",
+        # "https://panoramafirm.pl/biura_rachunkowe",
+        "https://panoramafirm.pl/serwis_agd",
+        "https://panoramafirm.pl/informatyka",
+        "https://panoramafirm.pl/fryzjerzy",
+        "https://panoramafirm.pl/adwokaci",
+        "https://panoramafirm.pl/transport_drogowy",
+        "https://panoramafirm.pl/kliniki_medyczne"
     ]
     
     for u in urls:

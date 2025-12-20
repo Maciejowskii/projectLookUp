@@ -97,7 +97,10 @@ export const Footer = () => {
       </div>
       <div className="text-center text-sm text-gray-500 mt-12 pt-8 border-t border-gray-800">
         &copy; {new Date().getFullYear()} ProjectLookUp. Wszelkie prawa
-        zastrzeżone.
+        zastrzeżone. Zrealizowane prrzez{" "}
+        <a href="http://digitay.pl" className="text-blue-600 hover:underline">
+          Digitay
+        </a>
       </div>
     </footer>
   );
