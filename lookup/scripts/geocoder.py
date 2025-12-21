@@ -3,13 +3,17 @@ from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 import time
 import re
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # ===== KONFIGURACJA =====
-DB_HOST = "127.0.0.1"
-DB_PORT = "5433"
-DB_NAME = "wenet"
-DB_USER = "postgres"
-DB_PASS = "wenet123"
+DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_PORT = os.getenv("DB_PORT", "5433")
+DB_NAME = os.getenv("DB_NAME", "wenet")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASS = os.getenv("DB_PASS", "wenet123")
 
 USER_AGENT = "Projectkatalogo-Geocoder/1.0 (szkolmt@gmail.com)"
 

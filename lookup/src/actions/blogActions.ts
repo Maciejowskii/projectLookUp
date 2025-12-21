@@ -5,6 +5,8 @@ import { checkAdminAuth } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Inicjalizacja klienta Gemini
+// Używamy zmiennej z Twojego .env (GOOGLE_AI_KEY)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || "");
 
 async function fetchPexelsImage(query: string): Promise<string | null> {
@@ -35,9 +37,9 @@ export async function createPost(formData: FormData) {
   const title = formData.get("title") as string;
   const content = formData.get("content") as string;
   const excerpt = formData.get("excerpt") as string;
-  const image = formData.get("image") as string; // URL z UploadThing (opcjonalne)
+  const image = formData.get("image") as string;
 
-  // Prosty slugify
+  // Slugify
   const slug = title
     .toLowerCase()
     .replace(/ł/g, "l")
@@ -82,110 +84,123 @@ export async function generatePostAI(formData: FormData) {
   const topic = formData.get("topic") as string;
 
   if (!process.env.GOOGLE_AI_KEY) {
-    throw new Error("Brak klucza API Google Gemini");
+    throw new Error("Brak klucza API Google Gemini (GOOGLE_AI_KEY)");
   }
 
-  // 1. Instrukcja dla AI
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // 1. Konfiguracja modelu z WYMUSZENIEM JSON (responseMimeType)
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json", // <--- To kluczowa zmiana!
+    },
+  });
 
   const prompt = `
       Napisz artykuł blogowy pod SEO na temat: "${topic}".
       
       Wymagania:
       1. Tytuł (Title).
-      2. Krótki wstęp (Excerpt).
-      3. Treść HTML (Content): Używaj <h2>, <p>, <ul>. 
-         WAŻNE: W połowie tekstu i na końcu wstaw tag <img src="IMAGE_PLACEHOLDER" alt="Tematyczne zdjęcie" /> - ja potem podmienię ten placeholder na prawdziwe zdjęcie.
+      2. Krótki wstęp (Excerpt) - max 2 zdania.
+      3. Treść HTML (Content): Używaj znaczników <h2>, <p>, <ul>, <li>. Nie używaj <h1> ani <html>/<body>.
+         WAŻNE: W połowie tekstu oraz na samym końcu wstaw tag: <img src="IMAGE_PLACEHOLDER" alt="Tematyczne zdjęcie" />
       4. Słowo kluczowe do wyszukiwania zdjęcia (PhotoQuery) po angielsku (np. "plumber", "modern house").
   
-      Format JSON:
+      Struktura JSON:
       {
-        "title": "...",
-        "excerpt": "...",
-        "content": "...",
-        "photoQuery": "..."
+        "title": "string",
+        "excerpt": "string",
+        "content": "string",
+        "photoQuery": "string"
       }
     `;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
-  const cleanJson = text.replace(/``````/g, "").trim();
-
-  let data;
   try {
-    data = JSON.parse(cleanJson);
-  } catch (e) {
-    throw new Error("Błąd JSON z AI.");
-  }
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-  // 2. Pobieramy zdjęcia z Pexels
-  // Główne (Okładka)
-  const mainImage =
-    (await fetchPexelsImage(data.photoQuery)) ||
-    "https://placehold.co/800x400?text=No+Image";
+    // 2. Pancerne czyszczenie JSONa (wycinamy wszystko od pierwszego { do ostatniego })
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
 
-  // Dodatkowe (do treści) - szukamy czegoś innego lub tego samego (dla uproszczenia pobierzmy 3 zdjęcia od razu)
-  // W wersji prostej: podmieniamy IMAGE_PLACEHOLDER na to samo zdjęcie, ale lepiej pobrać więcej.
-
-  // Ulepszone pobieranie (3 zdjęcia)
-  let extraImages: string[] = [];
-  if (process.env.PEXELS_API_KEY) {
-    const res = await fetch(
-      `https://api.pexels.com/v1/search?query=${data.photoQuery}&per_page=3`,
-      {
-        headers: { Authorization: process.env.PEXELS_API_KEY },
-      }
-    );
-    const pexelsData = await res.json();
-    if (pexelsData.photos) {
-      extraImages = pexelsData.photos.map((p: any) => p.src.medium);
+    if (firstBrace === -1 || lastBrace === -1) {
+      console.error("AI Raw Response:", text);
+      throw new Error("AI nie zwróciło poprawnego obiektu JSON.");
     }
+
+    const cleanJson = text.substring(firstBrace, lastBrace + 1);
+
+    let data;
+    try {
+      data = JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("JSON Parse Error:", e);
+      throw new Error("Błąd parsowania danych od AI.");
+    }
+
+    // --- Reszta kodu bez zmian (Pexels, Zapis) ---
+    let extraImages: string[] = [];
+    if (process.env.PEXELS_API_KEY) {
+      try {
+        const res = await fetch(
+          `https://api.pexels.com/v1/search?query=${encodeURIComponent(
+            data.photoQuery
+          )}&per_page=3&locale=en-US`,
+          { headers: { Authorization: process.env.PEXELS_API_KEY } }
+        );
+        const pexelsData = await res.json();
+        if (pexelsData.photos)
+          extraImages = pexelsData.photos.map((p: any) => p.src.medium);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const mainImage =
+      extraImages[0] || "https://placehold.co/800x400?text=No+Image";
+    let finalContent = data.content;
+
+    if (extraImages[1])
+      finalContent = finalContent.replace(
+        'src="IMAGE_PLACEHOLDER"',
+        `src="${extraImages[1]}" class="w-full h-auto rounded-2xl my-8 object-cover shadow-sm"`
+      );
+    else
+      finalContent = finalContent.replace(
+        'src="IMAGE_PLACEHOLDER"',
+        `src="https://placehold.co/800x400?text=Blog+Image+1" class="w-full h-auto rounded-2xl my-8"`
+      );
+
+    if (extraImages[2])
+      finalContent = finalContent.replace(
+        'src="IMAGE_PLACEHOLDER"',
+        `src="${extraImages[2]}" class="w-full h-auto rounded-2xl my-8 object-cover shadow-sm"`
+      );
+    else
+      finalContent = finalContent.replace(
+        'src="IMAGE_PLACEHOLDER"',
+        `src="https://placehold.co/800x400?text=Blog+Image+2" class="w-full h-auto rounded-2xl my-8"`
+      );
+
+    const slug =
+      data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") +
+      "-" +
+      Date.now().toString().slice(-4);
+
+    await prisma.post.create({
+      data: {
+        title: data.title,
+        slug,
+        excerpt: data.excerpt,
+        content: finalContent,
+        published: true,
+        image: mainImage,
+      },
+    });
+
+    revalidatePath("/admin/blog");
+  } catch (error: any) {
+    console.error("Błąd AI:", error);
+    throw new Error(error.message);
   }
-
-  // Podmieniamy placeholdery w treści na prawdziwe zdjęcia
-  let finalContent = data.content;
-  if (extraImages.length > 1) {
-    // Pierwszy placeholder -> drugie zdjęcie (pierwsze idzie na okładkę)
-    finalContent = finalContent.replace(
-      'src="IMAGE_PLACEHOLDER"',
-      `src="${extraImages[1]}" class="w-full rounded-2xl my-8"`
-    );
-    // Drugi placeholder -> trzecie zdjęcie
-    finalContent = finalContent.replace(
-      'src="IMAGE_PLACEHOLDER"',
-      `src="${
-        extraImages[2] || extraImages[0]
-      }" class="w-full rounded-2xl my-8"`
-    );
-  } else {
-    // Fallback jeśli Pexels nie oddał zdjęć
-    finalContent = finalContent.replace(
-      /src="IMAGE_PLACEHOLDER"/g,
-      `src="https://placehold.co/600x400?text=Blog+Image" class="w-full rounded-2xl my-8"`
-    );
-  }
-
-  // 3. Slugify
-  const slug =
-    data.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") +
-    "-" +
-    Date.now().toString().slice(-4);
-
-  // 4. Zapis
-  await prisma.post.create({
-    data: {
-      title: data.title,
-      slug,
-      excerpt: data.excerpt,
-      content: finalContent,
-      published: true,
-      image: extraImages[0] || mainImage, // Okładka
-    },
-  });
-
-  revalidatePath("/admin/blog");
 }
