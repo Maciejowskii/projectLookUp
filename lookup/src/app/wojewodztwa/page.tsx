@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Map } from "lucide-react";
 
 export const metadata = {
-  title: "Baza Firm według Województw | LookUp",
+  title: "Baza Firm według Województw | katalogo",
   description:
     "Znajdź najlepsze firmy w swoim województwie. Przeglądaj katalog lokalnych usługodawców.",
 };

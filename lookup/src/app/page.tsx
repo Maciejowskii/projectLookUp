@@ -49,7 +49,7 @@ export default async function LandingPage() {
           </h1>
 
           <p className="text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-            LookUp to nowoczesna wyszukiwarka łącząca klientów z lokalnymi
+            katalogo to nowoczesna wyszukiwarka łącząca klientów z lokalnymi
             ekspertami. Przeszukaj{" "}
             <span className="font-bold text-gray-900">
               {companyCount.toLocaleString()}
@@ -141,7 +141,7 @@ export default async function LandingPage() {
               Prowadzisz firmę?
             </h2>
             <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-              Dołącz do LookUp i daj się znaleźć tysiącom nowych klientów.
+              Dołącz do katalogo i daj się znaleźć tysiącom nowych klientów.
               Darmowa wizytówka to dopiero początek.
             </p>
             <div className="flex flex-wrap gap-4">

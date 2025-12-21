@@ -8,7 +8,7 @@ export default function CookiesPage() {
       <div className="prose prose-blue prose-lg">
         <p className="lead text-xl text-gray-600 mb-8">
           Niniejsza Polityka Cookies wyjaśnia, czym są pliki cookies i jak ich
-          używamy na stronie LookUp.
+          używamy na stronie katalogo.
         </p>
 
         <section className="mb-8">

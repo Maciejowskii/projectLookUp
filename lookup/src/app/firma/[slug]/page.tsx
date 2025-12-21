@@ -33,7 +33,7 @@ export async function generateMetadata({
   });
 
   if (!company) {
-    return { title: "Firma nie znaleziona | LookUp" };
+    return { title: "Firma nie znaleziona | katalogo" };
   }
 
   return {

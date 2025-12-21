@@ -35,7 +35,7 @@ export const CookieBanner = () => {
       </div>
       <p className="text-sm text-gray-600 mb-6 leading-relaxed">
         Używamy plików cookies, aby dostarczać Ci najlepsze doświadczenia na
-        LookUp. Dowiedz się więcej w naszej{" "}
+        katalogo. Dowiedz się więcej w naszej{" "}
         <Link
           href="/legal/cookies"
           className="text-blue-600 underline hover:no-underline"

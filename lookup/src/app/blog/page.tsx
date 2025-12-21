@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { ArrowRight, Calendar } from "lucide-react";
 
 export const metadata = {
-  title: "Blog i Porady | LookUp",
+  title: "Blog i Porady | katalogo",
   description: "Najnowsze artykuły, porady i rankingi firm.",
 };
 

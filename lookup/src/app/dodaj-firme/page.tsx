@@ -97,9 +97,9 @@ export default async function AddCompanyPage() {
 
     try {
       await resend.emails.send({
-        from: "LookUp <onboarding@resend.dev>",
+        from: "katalogo <onboarding@resend.dev>",
         to: rawData.email,
-        subject: "Potwierdź konto - LookUp",
+        subject: "Potwierdź konto - katalogo",
         html: `
           <div style="font-family: sans-serif; padding: 20px;">
             <h1>Dziękujemy za rejestrację!</h1>
@@ -267,7 +267,7 @@ export default async function AddCompanyPage() {
             {/* Treść górna */}
             <div className="relative z-10">
               <h2 className="text-3xl font-bold mb-8 leading-tight">
-                Rozwijaj biznes <br />z LookUp
+                Rozwijaj biznes <br />z katalogo
               </h2>
 
               <ul className="space-y-6">
@@ -302,7 +302,7 @@ export default async function AddCompanyPage() {
                   ))}
                 </div>
                 <p className="text-sm font-medium text-blue-50 leading-relaxed mb-4">
-                  "Dzięki wizytówce w LookUp pozyskałem 3 nowych klientów w
+                  "Dzięki wizytówce w katalogo pozyskałem 3 nowych klientów w
                   pierwszym tygodniu. Polecam!"
                 </p>
                 <div className="flex items-center gap-3">

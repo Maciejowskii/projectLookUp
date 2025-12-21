@@ -34,8 +34,8 @@ export default function ForBusinessPage() {
           </h1>
 
           <p className="text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-            LookUp to nie tylko katalog. To nowoczesna platforma do generowania
-            leadów, budowania reputacji i pozycjonowania w Google.
+            katalogo to nie tylko katalog. To nowoczesna platforma do
+            generowania leadów, budowania reputacji i pozycjonowania w Google.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -41,7 +41,7 @@ export const Navbar = () => {
             className="text-2xl font-extrabold tracking-tighter flex items-center gap-2 group"
           >
             <div className="w-8 h-8 bg-blue-600 rounded-lg skew-x-[-10deg] group-hover:scale-105 transition-transform duration-300 shadow-lg shadow-blue-500/20"></div>
-            <span className="text-gray-900">LookUp</span>
+            <span className="text-gray-900">katalogo</span>
             <span className="text-blue-600">.</span>
           </Link>
 

@@ -17,7 +17,7 @@ export async function generateMetadata({
   if (!post) return { title: "Artykuł nie znaleziony" };
 
   return {
-    title: `${post.title} | Blog LookUp`,
+    title: `${post.title} | Blog katalogo`,
     description: post.excerpt,
     openGraph: {
       images: post.image ? [post.image] : [],

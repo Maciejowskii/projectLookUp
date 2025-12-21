@@ -11,7 +11,7 @@ DB_NAME = "wenet"
 DB_USER = "postgres"
 DB_PASS = "wenet123"
 
-USER_AGENT = "ProjectLookUp-Geocoder/1.0 (szkolmt@gmail.com)"
+USER_AGENT = "Projectkatalogo-Geocoder/1.0 (szkolmt@gmail.com)"
 
 def connect_db():
     conn = psycopg2.connect(

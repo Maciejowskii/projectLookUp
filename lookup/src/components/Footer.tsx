@@ -31,7 +31,7 @@ export const Footer = async () => {
           {/* Kolumna 1: Brand */}
           <div className="space-y-4">
             <h3 className="text-white font-black text-2xl tracking-tight">
-              LookUp<span className="text-blue-600">.</span>
+              katalogo<span className="text-blue-600">.</span>
             </h3>
             <p className="text-sm leading-relaxed opacity-80">
               Największa baza firm i specjalistów w Twojej okolicy. Łączymy
@@ -180,7 +180,7 @@ export const Footer = async () => {
         </div>
 
         <div className="text-center text-xs text-gray-600 mt-8">
-          &copy; {new Date().getFullYear()} LookUp. Realizacja:{" "}
+          &copy; {new Date().getFullYear()} katalogo. Realizacja:{" "}
           <a
             href="http://digitay.pl"
             target="_blank"
