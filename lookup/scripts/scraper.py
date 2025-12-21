@@ -22,7 +22,8 @@ TENANT_MAP = {
     "lekarze": ["lekarz", "medycz", "przychodnia", "stomatolog", "dentysta", "rehabilit", "ginekolog"],
     "fryzjerzy": ["fryzjer", "kosmety", "salon urody", "spa", "wizaż"],
     "prawnicy": ["adwokat", "prawn", "notariusz", "radca", "kancelaria"],
-    "transport": ["transport", "przewóz", "spedycja", "logistyk", "kurier", "przeprowadzki"]
+    "transport": ["transport", "przewóz", "spedycja", "logistyk", "kurier", "przeprowadzki"],
+    "serwis_agd": ["agd", "pralka", "lodowka", "zmywarka", "naprawa", "serwis"]
 }
 
 DEFAULT_TENANT_SUBDOMAIN = "katalog"
@@ -79,14 +80,54 @@ def get_or_create_category(conn, tenant_id, name):
     cur.close()
     return cat_id
 
-# ===== PARSER DANYCH Z JS =====
-def extract_data_from_js(html_content):
-    pattern = r'var company = ({.*?});'
-    match = re.search(pattern, html_content, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except: return None
+# ===== PARSER DANYCH Z JS (NOWY, LEPSZY) =====
+def extract_company_variable(html_content):
+    """
+    Wyciąga obiekt JSON ze zmiennej 'var company = { ... };' w HTML,
+    radząc sobie z zagnieżdżonymi klamrami.
+    """
+    start_marker = "var company ="
+    start_idx = html_content.find(start_marker)
+    
+    if start_idx == -1:
+        return None
+    
+    # Przesuwamy wskaźnik na początek obiektu JSON (pierwsza klamra {)
+    json_start = html_content.find("{", start_idx)
+    if json_start == -1:
+        return None
+
+    # Algorytm liczenia nawiasów, aby znaleźć koniec obiektu
+    bracket_count = 0
+    in_string = False
+    escape = False
+    
+    for i in range(json_start, len(html_content)):
+        char = html_content[i]
+        
+        if char == '"' and not escape:
+            in_string = not in_string
+        
+        if not in_string:
+            if char == '{':
+                bracket_count += 1
+            elif char == '}':
+                bracket_count -= 1
+                # Jeśli licznik wrócił do zera, znaleźliśmy zamykającą klamrę całego obiektu
+                if bracket_count == 0:
+                    json_str = html_content[json_start:i+1]
+                    try:
+                        return json.loads(json_str)
+                    except json.JSONDecodeError as e:
+                        print(f"Błąd dekodowania JSON: {e}")
+                        return None
+        
+        # Obsługa escape znaków w stringach (np. \")
+        if char == '\\' and not escape:
+            escape = True
+        else:
+            escape = False
+            
     return None
 
 def clean_html_text(html_text):
@@ -94,7 +135,7 @@ def clean_html_text(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
     return soup.get_text(separator="\n").strip()
 
-# ===== LISTING SCRAPER (POPRAWIONY) =====
+# ===== LISTING SCRAPER =====
 def scrape_category_listing(listing_url, pages=1):
     results = []
     category_name = listing_url.strip("/").split("/")[-1].replace("_", " ").title()
@@ -111,51 +152,27 @@ def scrape_category_listing(listing_url, pages=1):
             if resp.status_code != 200: break
             soup = BeautifulSoup(resp.text, "html.parser")
             
-            # NOWA METODA: Szukamy kafelków firm w HTML, bo JSON-LD bywa zawodny z URLami
-            # PanoramaFirm ma linki w <h2><a href="...">
-            company_links = soup.select("h2 a.company-name") # Przykładowy selektor, sprawdzamy uniwersalny 'a'
+            # Pobieramy linki z kafelków
+            company_links = soup.select("h2 a.company-name")
             if not company_links:
                  company_links = soup.select("a.company-name")
             
-            # Jeśli selektory CSS zawiodą, fallback do JSON-LD ale z ostrożnością
-            if not company_links:
-                scripts = soup.find_all("script", type="application/ld+json")
-                for s in scripts:
-                    if not s.string: continue
-                    try:
-                        data = json.loads(s.string)
-                        items = data if isinstance(data, list) else [data]
-                        for item in items:
-                            if (item.get("@type") == "LocalBusiness" or item.get("address")) and item.get("url"):
-                                # Sprawdzamy czy URL nie jest URLem kategorii
-                                if item.get("url") != listing_url and "firmy," not in item.get("url"):
-                                    results.append({
-                                        "name": item.get("name"),
-                                        "url": item.get("url"),
-                                        "address": item.get("address", {}).get("streetAddress"),
-                                        "city": item.get("address", {}).get("addressLocality"),
-                                        "zip": item.get("address", {}).get("postalCode"),
-                                        "category_name": category_name
-                                    })
-                    except: pass
-            else:
-                # Parsowanie z HTML (pewniejsze dla URLi)
-                for link in company_links:
-                    href = link.get('href')
-                    name = link.get_text(strip=True)
-                    if href:
-                        results.append({
-                            "name": name,
-                            "url": href,
-                            "category_name": category_name
-                        })
+            for link in company_links:
+                href = link.get('href')
+                name = link.get_text(strip=True)
+                if href:
+                    results.append({
+                        "name": name,
+                        "url": href,
+                        "category_name": category_name
+                    })
                         
         except Exception as e: 
             print(f"Błąd listingu: {e}")
             pass
         time.sleep(1)
     
-    # Usuwanie duplikatów z listy wyników
+    # Deduplikacja URLi
     unique_results = []
     seen_urls = set()
     for r in results:
@@ -170,56 +187,89 @@ def enrich_company_from_profile(basic_company):
     url = basic_company.get("url")
     if not url: return basic_company
     
-    # Obsługa URLi względnych i bezwzględnych
     if not url.startswith("http"): 
         url = BASE_URL + "/" + url.lstrip("/")
         
-    # Upewniamy się, że nie wchodzimy na stronę kategorii
     if "/firmy," in url or url.endswith("/szukaj"):
-        print(f"      ⚠️ Pomijam błędny URL: {url}")
         return basic_company
-
-    # print(f"      🌍 Pobieram profil: {url}")
 
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
-        # Jeśli przekierowało nas na listing, to znaczy że profil nie istnieje lub blokada
         if "firmy," in resp.url or "/szukaj" in resp.url: 
             return basic_company
         resp.raise_for_status()
     except Exception:
         return basic_company
 
-    # 1. Próba wyciągnięcia z JS (Złoty Standard)
-    js_data = extract_data_from_js(resp.text)
+    # --- 1. Wyciągamy Główny Obiekt JSON ---
+    js_data = extract_company_variable(resp.text)
     
     if js_data:
         # NIP
         if js_data.get("nip"): 
-            basic_company["nip"] = js_data["nip"]
+            basic_company["nip"] = str(js_data["nip"]) # Konwersja na string
             print(f"      🔹 Mamy NIP: {basic_company['nip']}")
 
-        # OPIS
-        desc_raw = js_data.get("products") or js_data.get("summary") or js_data.get("about")
-        if desc_raw:
-            basic_company["desc"] = clean_html_text(desc_raw)
-            # print(f"      🔹 Mamy Opis: {len(basic_company['desc'])} znaków")
+        # --- OPIS (ŁĄCZENIE PÓŁ) ---
+        # W twoim HTML są 3 ważne pola tekstowe:
+        # 1. announcementBrief (Krótki opis na górze)
+        # 2. products (Główny opis produktów i usług)
+        # 3. summary (Krótkie podsumowanie)
+        
+        parts = []
+        if js_data.get("announcementBrief"):
+            parts.append(clean_html_text(js_data["announcementBrief"]))
+        
+        if js_data.get("products"):
+            parts.append(clean_html_text(js_data["products"]))
+            
+        if not parts and js_data.get("summary"):
+             parts.append(clean_html_text(js_data["summary"]))
 
-        # Kontakt
+        if parts:
+            full_desc = "\n\n".join(parts)
+            basic_company["desc"] = full_desc
+            print(f"      📝 Mamy Opis: {len(full_desc)} znaków")
+
+        # --- DANE KONTAKTOWE ---
         contact = js_data.get("contact", {})
         if contact.get("email"): basic_company["email"] = contact["email"]
         if contact.get("www"): basic_company["website"] = contact["www"]
-        if contact.get("phone") and contact["phone"].get("number"): 
-            basic_company["phone"] = contact["phone"]["number"]
+        if contact.get("phone") and isinstance(contact["phone"], dict): 
+            basic_company["phone"] = contact["phone"].get("formatted") or contact["phone"].get("number")
             
-        # Adres (jeśli brakowało z listingu)
-        addr = js_data.get("address", {})
-        if not basic_company.get("city") and addr.get("city"): basic_company["city"] = addr["city"]
-        if not basic_company.get("address") and addr.get("street"): basic_company["address"] = addr["street"]
-        if not basic_company.get("zip") and addr.get("postalCode"): basic_company["zip"] = addr["postalCode"]
+        # --- ADRES (POPRAWIONE) ---
+        # Struktura w JSON: location: { city: {name: ...}, street: {name: ..., number: ...}, zip: ... }
+        loc = js_data.get("location", {})
+        
+        # Miasto
+        if loc.get("city") and isinstance(loc["city"], dict):
+            basic_company["city"] = loc["city"].get("name")
+        elif loc.get("city"):
+             basic_company["city"] = str(loc.get("city"))
+
+        # Ulica + Numer
+        street_part = ""
+        if loc.get("street") and isinstance(loc["street"], dict):
+             street_name = loc["street"].get("normalizedName") or loc["street"].get("name")
+             street_num = loc["street"].get("number")
+             if street_name:
+                 street_part = f"{street_name} {street_num}" if street_num else street_name
+        
+        if street_part:
+            basic_company["address"] = street_part
+        
+        # Kod pocztowy
+        if loc.get("zip"):
+            basic_company["zip"] = loc["zip"]
+            
+        # Koordynaty (Opcjonalnie)
+        if loc.get("coordinates"):
+            basic_company["lat"] = loc["coordinates"].get("lat")
+            basic_company["lng"] = loc["coordinates"].get("lon")
 
     else:
-        # Fallback Regex na NIP w tekście
+        # Fallback Regex na NIP jeśli JSON zawiódł
         if not basic_company.get("nip"):
             text = BeautifulSoup(resp.text, "html.parser").get_text()
             nip_match = re.search(r'\b(\d{3}[- ]?\d{3}[- ]?\d{2}[- ]?\d{2})\b|\b(\d{10})\b', text)
@@ -255,6 +305,9 @@ def save_to_db(conn, companies):
 
         cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
 
+        # Budowanie opisu do zapisu (może być pusty)
+        desc_val = c.get("desc")
+        
         if existing_id:
             # === UPDATE ===
             try:
@@ -268,11 +321,14 @@ def save_to_db(conn, companies):
                         website = COALESCE(website, %s),
                         address = COALESCE(address, %s),
                         city = COALESCE(city, %s),
-                        zip = COALESCE(zip, %s)
+                        zip = COALESCE(zip, %s),
+                        lat = COALESCE(lat, %s),
+                        lng = COALESCE(lng, %s)
                     WHERE id = %s
                 """, (
-                    c.get("nip"), c.get("desc"), c.get("phone"), c.get("email"), 
+                    c.get("nip"), desc_val, c.get("phone"), c.get("email"), 
                     c.get("website"), c.get("address"), c.get("city"), c.get("zip"),
+                    c.get("lat"), c.get("lng"),
                     existing_id
                 ))
                 updated += 1
@@ -283,13 +339,13 @@ def save_to_db(conn, companies):
             # === INSERT ===
             try:
                 cur.execute("""
-                    INSERT INTO "Company" (id, "tenantId", name, slug, address, city, zip, phone, email, website, description, "categoryId", plan, "isVerified", nip)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s)
+                    INSERT INTO "Company" (id, "tenantId", name, slug, address, city, zip, phone, email, website, description, "categoryId", plan, "isVerified", nip, lat, lng)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s)
                 """, (
                     str(uuid.uuid4()), tenant_id, c["name"], slug, 
                     c.get("address"), c.get("city"), c.get("zip"),
                     c.get("phone"), c.get("email"), c.get("website"),
-                    c.get("desc"), cat_id, c.get("nip")
+                    desc_val, cat_id, c.get("nip"), c.get("lat"), c.get("lng")
                 ))
                 inserted += 1
                 print(f"   ✅ [->{sub}] Dodano: {c['name']}")
@@ -306,23 +362,20 @@ if __name__ == "__main__":
     
     # Podaj tu swoje URL
     urls = [
-        # "https://panoramafirm.pl/mechanika_pojazdowa",
-        # "https://panoramafirm.pl/biura_rachunkowe",
         "https://panoramafirm.pl/serwis_agd",
-        "https://panoramafirm.pl/informatyka",
         "https://panoramafirm.pl/fryzjerzy",
-        "https://panoramafirm.pl/adwokaci",
-        "https://panoramafirm.pl/transport_drogowy",
-        "https://panoramafirm.pl/kliniki_medyczne"
+        "https://panoramafirm.pl/ksiegowi",
+        "https://panoramafirm.pl/mechanicy",
+        "https://panoramafirm.pl/budowlanka"
     ]
     
     for u in urls:
         print(f"\n🚀 Start kategoria: {u}")
-        basic_list = scrape_category_listing(u, pages=1) # Na start 1 strona
+        basic_list = scrape_category_listing(u, pages=1)
         
         enriched_list = []
         for i, item in enumerate(basic_list, 1):
-            print(f"[{i}/{len(basic_list)}] Pobieram szczegóły: {item['name']}")
+            print(f"[{i}/{len(basic_list)}] Pobieram: {item['name']}")
             enriched_list.append(enrich_company_from_profile(item))
             
         save_to_db(conn, enriched_list)

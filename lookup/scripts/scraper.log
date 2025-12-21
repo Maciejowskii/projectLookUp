@@ -1,0 +1,270 @@
+2025-12-21 14:15:16,866 INFO Listing https://panoramafirm.pl/serwis_agd
+2025-12-21 14:15:19,645 INFO Listing https://panoramafirm.pl/serwis_agd/firmy,2.html
+2025-12-21 14:15:22,479 INFO Listing https://panoramafirm.pl/informatyka
+2025-12-21 14:15:24,936 INFO Listing https://panoramafirm.pl/informatyka/firmy,2.html
+2025-12-21 14:15:28,148 INFO Listing https://panoramafirm.pl/hydraulik
+2025-12-21 14:15:31,414 INFO Listing https://panoramafirm.pl/hydraulik/firmy,2.html
+2025-12-21 14:15:34,577 INFO Listing https://panoramafirm.pl/mechanika_pojazdowa
+2025-12-21 14:15:37,615 INFO Listing https://panoramafirm.pl/mechanika_pojazdowa/firmy,2.html
+2025-12-21 14:15:39,902 INFO Listing https://panoramafirm.pl/biuro_rachunkowe
+2025-12-21 14:15:43,334 INFO Listing https://panoramafirm.pl/biuro_rachunkowe/firmy,2.html
+2025-12-21 14:18:50,434 INFO Listing https://panoramafirm.pl/serwis_agd
+2025-12-21 14:18:53,130 INFO Listing https://panoramafirm.pl/serwis_agd/firmy,2.html
+2025-12-21 14:20:00,030 INFO SKIP Jan-Rok Serwis AGD Janusz Rokicki (exists)
+2025-12-21 14:20:00,031 INFO SKIP Jan-Rok. Serwis AGD. Rokicki J. (exists)
+2025-12-21 14:20:00,032 INFO SKIP Zakład naprawy AGD (exists)
+2025-12-21 14:20:00,033 INFO SKIP Wojtech Serwis Wojciech Żyła (exists)
+2025-12-21 14:20:00,033 INFO SKIP Super Serwis Agd Aleksander Witek (exists)
+2025-12-21 14:20:00,034 INFO SKIP Expert System Tomasz Czuba (exists)
+2025-12-21 14:20:00,035 INFO SKIP Serwis NaprawaPro.pl Yevhen Yenin (exists)
+2025-12-21 14:20:00,035 INFO SKIP Mariusz Paw Naprawa Sprzętu AGD (exists)
+2025-12-21 14:20:00,036 INFO SKIP Pogotowie AGD Orzesze Serwis Mikołów Żory || Bosch, Nivona, Jura (exists)
+2025-12-21 14:20:00,036 INFO SKIP Andrzej Jankowski Serwis agd (exists)
+2025-12-21 14:20:00,037 INFO SKIP ZUH Agd Chłodnictwo I Klimatyzacja Andrzej Barszcz (exists)
+2025-12-21 14:20:00,038 INFO SKIP Jacek Lorenz Serwis AGD Elektonarzędzia (exists)
+2025-12-21 14:20:00,039 INFO SKIP Autoryzowany Serwis AGD w Bydgoszczy Kobyliński Mariusz (exists)
+2025-12-21 14:20:00,039 INFO SKIP Darmar (exists)
+2025-12-21 14:20:00,040 INFO SKIP Sklep Atka.naprawa Agd Beata Bigus (exists)
+2025-12-21 14:20:00,041 INFO SKIP Serwis Agd Łukasz Maciaszek (exists)
+2025-12-21 14:20:00,041 INFO SKIP Dor-Mat Serwis Agd Dorota Jaszkiewicz (exists)
+2025-12-21 14:20:00,042 INFO SKIP Paweł Skwara Naprawa sprzętu gospodarstwa domowego (exists)
+2025-12-21 14:20:00,043 INFO SKIP Mobilny serwis AGD (exists)
+2025-12-21 14:20:00,045 INFO SKIP Sprzedaż AGD Poznań Pralk, lodówki, ekspresy do kawy Poznań AGD BULAJ (exists)
+2025-12-21 14:20:00,045 INFO SKIP Serwis i naprawa AGD 24h (exists)
+2025-12-21 14:20:00,046 INFO SKIP Grzegorz Grotyński (exists)
+2025-12-21 14:20:00,046 INFO SKIP TechCare serwis Piotr Nadbrzeżny (exists)
+2025-12-21 14:20:00,047 INFO SKIP Agd Service Sontag (exists)
+2025-12-21 14:20:00,048 INFO SKIP Waldemar Chendyński Naprawa lodówek i zamrażarek (exists)
+2025-12-21 14:20:00,049 INFO INSERT AGD Serwis Grzegorz Krawczyk [katalog]
+2025-12-21 14:20:00,050 INFO INSERT TR Serwis AGD [katalog]
+2025-12-21 14:20:00,051 INFO INSERT Mocha Adam, Finex Serwis Adam Mocha [katalog]
+2025-12-21 14:20:00,052 INFO INSERT Naprawa Lodówek i Zamrażarek Mirosław Szymański [katalog]
+2025-12-21 14:20:00,053 INFO INSERT Agd Usługi Naprawa sprzętu gospodarstwa domowego Wiesław Sałyga [katalog]
+2025-12-21 14:20:00,054 INFO INSERT Złota Rączka Robert Norko [katalog]
+2025-12-21 14:20:00,055 INFO INSERT Ireneusz Ojrzeński A-tech [katalog]
+2025-12-21 14:20:00,056 INFO INSERT Elektromechanika Michał Kosmala, Robert Wietrzyński [katalog]
+2025-12-21 14:20:00,056 INFO INSERT Coffee & Copy Tomasz Górski [katalog]
+2025-12-21 14:20:00,057 INFO INSERT Naprawa rowerów - Fixbike [katalog]
+2025-12-21 14:20:00,058 INFO INSERT Mc Serwis Plus [katalog]
+2025-12-21 14:20:00,059 INFO INSERT Cendrowski Piotr Zakład Handlowo-Usługowy AGD [katalog]
+2025-12-21 14:20:00,060 INFO INSERT Tom-Serwis Tomasz Barzon [katalog]
+2025-12-21 14:20:00,061 INFO INSERT Złota rączka - Naprawa - ZrobieToSam24h [katalog]
+2025-12-21 14:20:00,062 INFO INSERT Elektrofix Naprawa-Serwis Arkadiusz Insadowski [katalog]
+2025-12-21 14:20:00,063 INFO INSERT Jan Duda Mobilny Ekspres Serwis [katalog]
+2025-12-21 14:20:00,065 INFO INSERT Montaż Klimatyzacji Fach-Mar Marian Jania [katalog]
+2025-12-21 14:20:00,066 INFO SKIP Montaż Klimatyzacji Fach-Mar Marian Jania (exists)
+2025-12-21 14:20:00,067 INFO INSERT Jp Serwis Piotr Zbrzeźniak [katalog]
+2025-12-21 14:20:00,068 INFO INSERT Montaż i Sprzedaż Anten R-TV-SAT oraz Naprawa AGD Wojciech Maseli [katalog]
+2025-12-21 14:20:00,068 INFO INSERT Coolbix Tomasz Kulbicki [katalog]
+2025-12-21 14:20:00,069 INFO INSERT Mateusz Gancarczyk "GAMA" Naprawa Sprzętu Agd I Elektronarzędzi [katalog]
+2025-12-21 14:20:00,070 INFO INSERT Parolvip [katalog]
+2025-12-21 14:20:00,071 INFO INSERT Dom-Serwis Marta Suwińska [katalog]
+2025-12-21 14:20:00,072 INFO INSERT Naprawiam w Krakowie Grzegorz Małozięć [katalog]
+2025-12-21 14:20:00,073 INFO Listing https://panoramafirm.pl/informatyka
+2025-12-21 14:20:03,768 INFO Listing https://panoramafirm.pl/informatyka/firmy,2.html
+2025-12-21 14:21:14,131 INFO SKIP Miranet Systems Mirosław Fuczko (exists)
+2025-12-21 14:21:14,137 INFO SKIP Fox Computer Service Michał Lis (exists)
+2025-12-21 14:21:14,139 INFO SKIP Zaoczne Liceum Ogólnokształcące dla Dorosłych York (exists)
+2025-12-21 14:21:14,141 INFO SKIP Zaoczne Liceum Ogólnokształcące dla Dorosłych York (exists)
+2025-12-21 14:21:14,142 INFO SKIP Zaoczne Liceum Ogólnokształcące dla Dorosłych York (exists)
+2025-12-21 14:21:14,144 INFO SKIP Zakład usług telekomunikacyjnych Tel-Raf Rafał Kasica (exists)
+2025-12-21 14:21:14,146 INFO SKIP Zakład usług telekomunikacyjnych Tel-Raf Rafał Kasica (exists)
+2025-12-21 14:21:14,147 INFO SKIP Zakład usług telekomunikacyjnych Tel-Raf Rafał Kasica (exists)
+2025-12-21 14:21:14,149 INFO SKIP Zakład usług telekomunikacyjnych Tel-Raf Rafał Kasica (exists)
+2025-12-21 14:21:14,150 INFO SKIP Sklep komputerowy - Komputrex (exists)
+2025-12-21 14:21:14,152 INFO SKIP IT-R.PL Usługi Informatyczne Obsługa informatyczna dla Twojej firmy (exists)
+2025-12-21 14:21:14,153 INFO SKIP Rete s.c. (exists)
+2025-12-21 14:21:14,154 INFO SKIP Miho Systemy Informatyczne. Mikołaj Hofman (exists)
+2025-12-21 14:21:14,155 INFO SKIP Mobilne Pogotowie Komputerowe (exists)
+2025-12-21 14:21:14,156 INFO SKIP Esynerga Sp.z.o.o. W.A. Kuberka (exists)
+2025-12-21 14:21:14,157 INFO SKIP Exigen - Usługi Informatyczne, Pogotowie Komputerowe (exists)
+2025-12-21 14:21:14,159 INFO SKIP Szkoła Podstawowa Niepubliczna nr 39 (exists)
+2025-12-21 14:21:14,160 INFO SKIP Katronic Kamil Strzelecki (exists)
+2025-12-21 14:21:14,161 INFO SKIP Skoczek Komputery Sp. z o. o. (exists)
+2025-12-21 14:21:14,162 INFO SKIP ITmafia (exists)
+2025-12-21 14:21:14,163 INFO SKIP Programo Expert Robert Adamiak (exists)
+2025-12-21 14:21:14,163 INFO SKIP Talentum.pl Marta Wnuk (exists)
+2025-12-21 14:21:14,165 INFO SKIP PC Serwis Usługi informatyczne, montaż kamer, instalacje alarmowe Paweł Gałązka (exists)
+2025-12-21 14:21:14,165 INFO SKIP Pro Bit Comp (exists)
+2025-12-21 14:21:14,166 INFO SKIP Kontny Elektronik Service Sp.J. (exists)
+2025-12-21 14:21:14,168 INFO INSERT Mariusz Makowiecki Zakład Usługowy Radiowo - Telewizyjny Zurt [informatyka]
+2025-12-21 14:21:14,169 INFO INSERT Tres Centrum Oprogramowania Jerzy Dworzecki [informatyka]
+2025-12-21 14:21:14,170 INFO INSERT Sklep i serwis urządzeń Apple | Byte Up [informatyka]
+2025-12-21 14:21:14,172 INFO INSERT Janowski Jarosław Tonbit [informatyka]
+2025-12-21 14:21:14,173 INFO INSERT Knowbit Andrzej Knapek [informatyka]
+2025-12-21 14:21:14,174 INFO INSERT Mrux - strony internetowe [informatyka]
+2025-12-21 14:21:14,175 INFO INSERT Usługi Informatyczne On-IT Patryk Malowany [informatyka]
+2025-12-21 14:21:14,177 INFO INSERT Edsoft [informatyka]
+2025-12-21 14:21:14,178 INFO INSERT Inten Sp. z o.o. [informatyka]
+2025-12-21 14:21:14,179 INFO INSERT Safe Center Sp. z o. o. [informatyka]
+2025-12-21 14:21:14,180 INFO INSERT Serwkom Gawroński Jacek [informatyka]
+2025-12-21 14:21:14,181 INFO INSERT Sunflower [informatyka]
+2025-12-21 14:21:14,182 INFO INSERT Net-Serwis Usługi Komputerowe Marek Kiełbowski [informatyka]
+2025-12-21 14:21:14,183 INFO INSERT eltraKON Komputery Wojciech P. Kowalczyk [informatyka]
+2025-12-21 14:21:14,184 INFO INSERT Network-Engineering Dawid Wizor [informatyka]
+2025-12-21 14:21:14,185 INFO INSERT 1 .  Firma Handlowo-Usługowa 'Komptel' 2 . Wydawnictwo "Ida" Tomasz Patalan [informatyka]
+2025-12-21 14:21:14,186 INFO INSERT 1. Andrzej Wartalski Usługi Informatyczne 2. Andrzej Wartalski Hektor [informatyka]
+2025-12-21 14:21:14,187 INFO INSERT 1. Cupido Dariusz Malinowski 2. Single Relax Dariusz Malinowski [informatyka]
+2025-12-21 14:21:14,188 INFO INSERT 1. Enlive Michał Michańczyk 2. Foody24 Michał Michańczyk Wspólnik Spółki Cywilnej [informatyka]
+2025-12-21 14:21:14,189 INFO INSERT 1 Opercom Wojciech Ilczyszyn; 2 Jwk-Soft Wojciech Ilczyszyn Wspólnik Spółki Cywilnej [informatyka]
+2025-12-21 14:21:14,190 INFO INSERT 1. PHU Pakris Przemysław Mikołajczyk 2. Jakpo S.C. Przemysław Mikołajczyk Paweł Hulaj [informatyka]
+2025-12-21 14:21:14,191 INFO INSERT 1. Softech Ryszard Gronowski 2. Ryszard Gronowski Wspólnik Spółki Cywilnej "Gronowscy S.C" [informatyka]
+2025-12-21 14:21:14,192 INFO INSERT 10 Million Customers Sp. z o.o. [informatyka]
+2025-12-21 14:21:14,193 INFO INSERT 10 Minut Marketing Kamil Łęcki [informatyka]
+2025-12-21 14:21:14,194 INFO INSERT ****-100 Sp. z o.o. [informatyka]
+2025-12-21 14:21:14,195 INFO Listing https://panoramafirm.pl/hydraulik
+2025-12-21 14:21:16,587 INFO Listing https://panoramafirm.pl/hydraulik/firmy,2.html
+2025-12-21 14:22:24,382 INFO INSERT Hydraulik Jacek Kustra [budowlanka]
+2025-12-21 14:22:24,386 INFO INSERT Karso Instalacje sanitarne i obsługa sieci wodno-kanalizacyjnych Karolina Sobczyk [budowlanka]
+2025-12-21 14:22:24,389 INFO INSERT Vero [budowlanka]
+2025-12-21 14:22:24,391 INFO INSERT Krzysztof Kubaś Hydraulik pogotowie wodno-kanalizacyjne [budowlanka]
+2025-12-21 14:22:24,395 INFO INSERT Dariusz Dąbroś Usługi hydrauliczne [budowlanka]
+2025-12-21 14:22:24,397 INFO INSERT Usługi hydrauliczne Kwiatkowski Dariusz [budowlanka]
+2025-12-21 14:22:24,399 INFO INSERT Hyd-Bud Paweł Brzeszkiewicz [budowlanka]
+2025-12-21 14:22:24,402 INFO INSERT Pogotowie Kanalizcyjne Adam Kołota Udrażnainie Rur, WUKO, Kamerowanie Kanalizacji [budowlanka]
+2025-12-21 14:22:24,403 INFO INSERT Dźwigaz - Kompleksowe usługi instalacyjne, pogotowie techniczne [budowlanka]
+2025-12-21 14:22:24,405 INFO INSERT WGD Instal Spółka z ograniczoną odpowiedzialnością [budowlanka]
+2025-12-21 14:22:24,406 INFO INSERT Zakład Instalacyjno Budowlany s.c. Anna i Mariusz Feszter [budowlanka]
+2025-12-21 14:22:24,407 INFO INSERT Andrzej Kuliś Hydro-Kul Pogotowie hydrauliczne Pogotowie hydrauliczne [budowlanka]
+2025-12-21 14:22:24,409 INFO INSERT Datko Adam [budowlanka]
+2025-12-21 14:22:24,410 INFO INSERT All Instal Sławomir Kurek [budowlanka]
+2025-12-21 14:22:24,412 INFO INSERT Grasza Sebastian Usługi instalacyjne hydrauliczno-gazowe [budowlanka]
+2025-12-21 14:22:24,413 INFO SKIP Grasza Sebastian Usługi instalacyjne hydrauliczno-gazowe (exists)
+2025-12-21 14:22:24,414 INFO INSERT Jakub Gielniak Zakład Instalacyjny Wod-Kan C.O.Gaz [budowlanka]
+2025-12-21 14:22:24,416 INFO INSERT Mariusz Pawłoś Usługi Hydrauliczne [budowlanka]
+2025-12-21 14:22:24,417 INFO INSERT Stopa-Instal Instalacje Co Wod-Kan i Gaz [budowlanka]
+2025-12-21 14:22:24,418 INFO INSERT Arkadiusz Płaszewski Hydropure [budowlanka]
+2025-12-21 14:22:24,420 INFO INSERT Spec Przedsiębiorstwo produkcyjno-usługo-handlowe s.c. Artur Śliwa i Wiesław Zawłocki [budowlanka]
+2025-12-21 14:22:24,421 INFO INSERT Ilmar Technika Grzewcza Jerzy Ilków [budowlanka]
+2025-12-21 14:22:24,422 INFO INSERT Hydro-Tech Paweł Waszczykowski [budowlanka]
+2025-12-21 14:22:24,424 INFO INSERT Pol Team sc Włodzimierz i Maciej Król [budowlanka]
+2025-12-21 14:22:24,425 INFO INSERT Robert Rosłoniec Usługi hydrauliczne [budowlanka]
+2025-12-21 14:22:24,426 INFO INSERT Aquateam Łukasz Czajęcki Instalacje Wodno-Kanalizacyjne [budowlanka]
+2025-12-21 14:22:24,428 INFO INSERT Eko Instalacje Robert Lasota [budowlanka]
+2025-12-21 14:22:24,429 INFO INSERT Instalbox Łukasz Kacperak [budowlanka]
+2025-12-21 14:22:24,430 INFO INSERT Install-Plumbing [budowlanka]
+2025-12-21 14:22:24,431 INFO INSERT Marek Pobikrowski Instal [budowlanka]
+2025-12-21 14:22:24,432 INFO INSERT Hyd-Rom Instalatorstwo hydrauliczne [budowlanka]
+2025-12-21 14:22:24,434 INFO INSERT Gk-Instal Grzegorz Kowalczyk [budowlanka]
+2025-12-21 14:22:24,435 INFO INSERT Maciej Bukrejewski [budowlanka]
+2025-12-21 14:22:24,436 INFO INSERT Bartłomiej Matera Serwisnow [budowlanka]
+2025-12-21 14:22:24,438 INFO INSERT Mariusz Magdziarek Ins-Mario [budowlanka]
+2025-12-21 14:22:24,439 INFO INSERT Sklep Hydrauliczno Instalacyjny Września Ad-Mar Plus [budowlanka]
+2025-12-21 14:22:24,440 INFO INSERT Hydraulik Mazury Łukasz Cimoch [budowlanka]
+2025-12-21 14:22:24,442 INFO INSERT HapioSystem Bud.Pogotowie hydrauliczne 24 h [budowlanka]
+2025-12-21 14:22:24,443 INFO INSERT Arohydro Arkadiusz Trzankowski [budowlanka]
+2025-12-21 14:22:24,444 INFO INSERT Instalacje hydrauliczne grzewcze gazowe -Hyd-Rafi Rafał Zadróżniak [budowlanka]
+2025-12-21 14:22:24,445 INFO INSERT Usługi Wod Kan Instalacja Ogrzewania Jakub Lewandowski [budowlanka]
+2025-12-21 14:22:24,446 INFO INSERT "Cieplutko" Instalatorstwo Sanitarne Piotr Przyborek [budowlanka]
+2025-12-21 14:22:24,447 INFO INSERT M&N Mykhailo Zyhmunt [budowlanka]
+2025-12-21 14:22:24,447 INFO INSERT Krystian Pałasz Usługi Hydrauliczne [budowlanka]
+2025-12-21 14:22:24,448 INFO INSERT Kam-Dor Kamil Adamiak [budowlanka]
+2025-12-21 14:22:24,449 INFO INSERT Hydro-Instal Instalacje Grzewcze i Sanitarne Marcin Lisowski [budowlanka]
+2025-12-21 14:22:24,451 INFO INSERT Usługi hydrauliczne, Instalacje hydrauliczne Jacek Baca [budowlanka]
+2025-12-21 14:22:24,452 INFO INSERT Tgis-Instalacje Usługi Hydrauliczne Marcin Szczepański Projektowanie i montaż instalacji hydraulicznych - ogrzewanie, kanalizacja. [budowlanka]
+2025-12-21 14:22:24,453 INFO INSERT Pro Mar Mariusz Mrozek [budowlanka]
+2025-12-21 14:22:24,455 INFO INSERT Instal-work Usługi hydrauliczne Mariusz Franczak [budowlanka]
+2025-12-21 14:22:24,455 INFO Listing https://panoramafirm.pl/mechanika_pojazdowa
+2025-12-21 14:22:26,873 INFO Listing https://panoramafirm.pl/mechanika_pojazdowa/firmy,2.html
+2025-12-21 14:23:37,224 INFO INSERT Warsztat samochodowy - ZLK Motors [mechanicy]
+2025-12-21 14:23:37,228 INFO INSERT ShopOnService Robert Budzisz [mechanicy]
+2025-12-21 14:23:37,231 INFO INSERT Amaj Serwis mechanik samochodowy i wulkanizacja [mechanicy]
+2025-12-21 14:23:37,234 INFO INSERT Mechanika pojazdowa Motonora Kamil Maciaszczyk [mechanicy]
+2025-12-21 14:23:37,237 INFO INSERT Mayday Audio [mechanicy]
+2025-12-21 14:23:37,238 INFO INSERT MOTOMAR Sp. z o.o. Pogwarancyjny Serwis Volvo [mechanicy]
+2025-12-21 14:23:37,240 INFO INSERT Delta Krokowa Sp. z o.o. Sp.j. [mechanicy]
+2025-12-21 14:23:37,240 INFO SKIP Delta Krokowa Sp. z o.o. Sp.j. (exists)
+2025-12-21 14:23:37,241 INFO INSERT Toma-Cars Eurowarsztat - Okręgowa Stacja Kontroli Pojazdów [mechanicy]
+2025-12-21 14:23:37,242 INFO INSERT Auto-Servis Samerek Vasily Samerek [mechanicy]
+2025-12-21 14:23:37,243 INFO INSERT Przem-Car PHU Przemysław Jędrowiak [mechanicy]
+2025-12-21 14:23:37,244 INFO INSERT Alins Tech Sp. z o.o. [mechanicy]
+2025-12-21 14:23:37,245 INFO INSERT Warsztat samochodowy Kurek Auto Serwis - mechanika pojazdowa i klimatyzacja samochodowa [mechanicy]
+2025-12-21 14:23:37,246 INFO INSERT Hol Trans Pomoc drogowa Wojciech Kulik [mechanicy]
+2025-12-21 14:23:37,247 INFO INSERT Soltrade [mechanicy]
+2025-12-21 14:23:37,248 INFO SKIP Soltrade (exists)
+2025-12-21 14:23:37,248 INFO INSERT Mechanika I Wulkanizacja KM [mechanicy]
+2025-12-21 14:23:37,249 INFO SKIP Mechanika I Wulkanizacja KM (exists)
+2025-12-21 14:23:37,250 INFO INSERT Robert Lech Mechanika pojazdowa [mechanicy]
+2025-12-21 14:23:37,251 INFO INSERT Getrybe Piotr Stelmaszewski [mechanicy]
+2025-12-21 14:23:37,252 INFO INSERT Stacja Kontroli Pojazdów Warsztat Juro-Trans [mechanicy]
+2025-12-21 14:23:37,253 INFO INSERT Rago Kasacja samochodów, Stacja kontroli pojazdów [mechanicy]
+2025-12-21 14:23:37,253 INFO SKIP Rago Kasacja samochodów, Stacja kontroli pojazdów (exists)
+2025-12-21 14:23:37,254 INFO INSERT Mechanika Pojazdowa Patryk Nowacki [mechanicy]
+2025-12-21 14:23:37,254 INFO SKIP Mechanika Pojazdowa Patryk Nowacki (exists)
+2025-12-21 14:23:37,255 INFO INSERT Andrzej Sas Palety [mechanicy]
+2025-12-21 14:23:37,256 INFO INSERT Rc Auto Serwis Rafał Choszcz [mechanicy]
+2025-12-21 14:23:37,256 INFO INSERT Auto Serwis Ochowiak Dawid w Chociczy [mechanicy]
+2025-12-21 14:23:37,257 INFO INSERT Speed Power Grzegorz Lechański [mechanicy]
+2025-12-21 14:23:37,257 INFO INSERT Zodiak Grzegorz Hetmaniak [mechanicy]
+2025-12-21 14:23:37,258 INFO INSERT Auto Idol. Mechanika Pojazdowa, Warsztat Samochodowy, Diagnostyka Komputerowa. Rafał Ryśnik [mechanicy]
+2025-12-21 14:23:37,259 INFO INSERT Auto Centrum Widok Piotr Młodzianowski [mechanicy]
+2025-12-21 14:23:37,259 INFO SKIP Auto Centrum Widok Piotr Młodzianowski (exists)
+2025-12-21 14:23:37,260 INFO INSERT Auto Klinika Nosarzewski [mechanicy]
+2025-12-21 14:23:37,261 INFO SKIP Auto Klinika Nosarzewski (exists)
+2025-12-21 14:23:37,261 INFO INSERT Darpol PW Dariusz i Alicja Szyszko Sp. j. [mechanicy]
+2025-12-21 14:23:37,262 INFO SKIP Darpol PW Dariusz i Alicja Szyszko Sp. j. (exists)
+2025-12-21 14:23:37,263 INFO INSERT PHF Serwis Zakład samochodowy Spółka z ograniczoną odpowiedzialnością [mechanicy]
+2025-12-21 14:23:37,264 INFO INSERT IG Dawid Makowski [mechanicy]
+2025-12-21 14:23:37,264 INFO INSERT Szymek PPHU Waldemar Szymański [mechanicy]
+2025-12-21 14:23:37,265 INFO INSERT Profit-Plus Stacja Paliw Stacja Kontroli Pojazdów Myjnia Sklep [mechanicy]
+2025-12-21 14:23:37,266 INFO SKIP Profit-Plus Stacja Paliw Stacja Kontroli Pojazdów Myjnia Sklep (exists)
+2025-12-21 14:23:37,267 INFO INSERT Oktay Auto-Serwis [mechanicy]
+2025-12-21 14:23:37,268 INFO INSERT AUTO-ACORD s.c. Mechanika Samochodowa, Wulkanizacja, Wymiana Opon, Renowacja Pojazdów [mechanicy]
+2025-12-21 14:23:37,269 INFO INSERT Auto Serwis Zbigniew Roskosz [mechanicy]
+2025-12-21 14:23:37,270 INFO INSERT M.m. Auto Serwis Mariana Khudiak [mechanicy]
+2025-12-21 14:23:37,271 INFO INSERT Samli Fhu Arkadiusz Lip [mechanicy]
+2025-12-21 14:23:37,272 INFO INSERT Auto Serwis Jacek Stępiński [mechanicy]
+2025-12-21 14:23:37,273 INFO INSERT Auto Check Pro - Grzegorz Jasiński [mechanicy]
+2025-12-21 14:23:37,274 INFO INSERT Auto Naprawa Łukasz Kula [mechanicy]
+2025-12-21 14:23:37,275 INFO Listing https://panoramafirm.pl/biuro_rachunkowe
+2025-12-21 14:23:40,018 INFO Listing https://panoramafirm.pl/biuro_rachunkowe/firmy,2.html
+2025-12-21 14:24:50,799 INFO INSERT Global Accounting Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,801 INFO INSERT Heureza sp.j. Biuro rachunkowe M.Wencel B.Wencel [ksiegowi]
+2025-12-21 14:24:50,803 INFO INSERT Biuro rachunkowe SALDO Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,804 INFO INSERT AJ-Tax Aleksandra Łozyk [ksiegowi]
+2025-12-21 14:24:50,806 INFO INSERT Pimag Biuro Rachunkowe [ksiegowi]
+2025-12-21 14:24:50,807 INFO INSERT Plus Biuro rachunkowo-księgowe Wioletta Wojciech [ksiegowi]
+2025-12-21 14:24:50,809 INFO INSERT Cracow Union Spółka z ograniczoną odpowiedzialnością [ksiegowi]
+2025-12-21 14:24:50,810 INFO INSERT Beata Pieczonka-Maziarka Doradca podatkowy [ksiegowi]
+2025-12-21 14:24:50,811 INFO INSERT Duet s.c. [ksiegowi]
+2025-12-21 14:24:50,812 INFO SKIP Duet s.c. (exists)
+2025-12-21 14:24:50,813 INFO INSERT Bur Doradztwo Podatkowe Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,814 INFO INSERT Biuro Rachunkowe EW Ewelina Wieczorek [ksiegowi]
+2025-12-21 14:24:50,815 INFO INSERT Status Biuro Rachunkowe Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,816 INFO INSERT Bona Fisco Biuro rachunkowe Alina Wiśniewska, Anna Kowalska s.c. [ksiegowi]
+2025-12-21 14:24:50,817 INFO INSERT Abacus Jadwiga Adamus [ksiegowi]
+2025-12-21 14:24:50,817 INFO SKIP Abacus Jadwiga Adamus (exists)
+2025-12-21 14:24:50,818 INFO INSERT Tls Doradztwo Podatkowe Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,819 INFO INSERT Luka Biuro Rachunkowe s.c. [ksiegowi]
+2025-12-21 14:24:50,820 INFO INSERT Essa Biuro Rachunkowe sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,821 INFO INSERT Perfecta Biuro Rachunkowe Małgorzata Ruszkowska [ksiegowi]
+2025-12-21 14:24:50,822 INFO INSERT Biuro Rachunkowe Bilans Anna Czapp-Treder [ksiegowi]
+2025-12-21 14:24:50,822 INFO INSERT Biuro Księgowo-Podatkowe sp. z o. o. [ksiegowi]
+2025-12-21 14:24:50,823 INFO INSERT Biuro Rachunkowe Katarzyna Matera [ksiegowi]
+2025-12-21 14:24:50,824 INFO INSERT Biuro Rachunkowe i Doradcze Agnieszka Gunerka [ksiegowi]
+2025-12-21 14:24:50,825 INFO INSERT Joanna Braumann Centrum księgowe [ksiegowi]
+2025-12-21 14:24:50,826 INFO INSERT Adamis Biuro Usług Księgowych [ksiegowi]
+2025-12-21 14:24:50,827 INFO INSERT Praktyk s.c. [ksiegowi]
+2025-12-21 14:24:50,828 INFO INSERT Konto Biuro rachunkowe Magdalena Wanatowicz [ksiegowi]
+2025-12-21 14:24:50,828 INFO INSERT Biuro Rachunkowe eF-Ka Bogumiła Romanowicz Ewa Marszał [ksiegowi]
+2025-12-21 14:24:50,829 INFO INSERT Novum s.c. [ksiegowi]
+2025-12-21 14:24:50,830 INFO INSERT Omnibus Kancelaria Doradztwa Podatkowego Barbara Marciniak-Marecka [ksiegowi]
+2025-12-21 14:24:50,831 INFO INSERT Honney Money Biuro Rachunkowe [ksiegowi]
+2025-12-21 14:24:50,832 INFO INSERT Biuro Rachunkowe Tchórowski Sp. z o.o. [ksiegowi]
+2025-12-21 14:24:50,833 INFO INSERT Bilans Biuro rachunkowe Marta Jabłońska [ksiegowi]
+2025-12-21 14:24:50,833 INFO INSERT Wynik Biuro Rachunkowe Ewa Florek [ksiegowi]
+2025-12-21 14:24:50,834 INFO INSERT Spectrum Magdalena Gubała [ksiegowi]
+2025-12-21 14:24:50,835 INFO INSERT E&M Biuro księgowe Sp. z o. o. [ksiegowi]
+2025-12-21 14:24:50,836 INFO INSERT Progres Biuro Rachunkowe Ewa Kurasińska-Kowalska [ksiegowi]
+2025-12-21 14:24:50,837 INFO INSERT Eurobilans Biuro Rachunkowe Aneta Kneisel [ksiegowi]
+2025-12-21 14:24:50,838 INFO INSERT Epb Finance Edyta Pilszak-Bukowska [ksiegowi]
+2025-12-21 14:24:50,838 INFO INSERT Wini Biuro rachunkowe Wiesław Bultrowicz [ksiegowi]
+2025-12-21 14:24:50,839 INFO INSERT Danacco Biuro rachunkowe Magdalena Daniłoś [ksiegowi]
+2025-12-21 14:24:50,840 INFO INSERT Biuro Rachunkowe Zomer Księgi Handlowe [ksiegowi]
+2025-12-21 14:24:50,841 INFO INSERT Agnieszka Korpała Biuro Rachunkowe Viktoria [ksiegowi]
+2025-12-21 14:24:50,841 INFO INSERT Eurofinanse Spółka cywilna Kancelaria rachunkowo-podatkowa Iwona Duraj, Irena Lach [ksiegowi]
+2025-12-21 14:24:50,842 INFO SKIP Bilans Biuro rachunkowe Anna Czapp-Treder (exists)
+2025-12-21 14:24:50,843 INFO INSERT Lukan Biuro Rachunkowe [ksiegowi]
+2025-12-21 14:24:50,843 INFO SKIP Lukan Biuro Rachunkowe (exists)
+2025-12-21 14:24:50,844 INFO INSERT Renata Pempera Biuro Rachunkowe [ksiegowi]
+2025-12-21 14:24:50,845 INFO INSERT Abak Biuro rachunkowo-konsultacyjne Marcin Sadoch, Regina Sadoch-Czyżewska [ksiegowi]

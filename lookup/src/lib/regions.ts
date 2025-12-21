@@ -68,3 +68,7 @@ export const VOIVODESHIPS = [
     cities: ["Szczecin", "Koszalin"],
   },
 ];
+
+export function getRegionBySlug(slug: string) {
+  return VOIVODESHIPS.find((r) => r.slug === slug);
+}

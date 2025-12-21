@@ -149,7 +149,7 @@ model Post {
   excerpt   String?  @db.Text // Krótki opis na listę
   content   String   @db.Text // Treść HTML
   image     String?  // URL do okładki
-  published Boolean  @default(true)
+  published Boolean  @default(true) 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
