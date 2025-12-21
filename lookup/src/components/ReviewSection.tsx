@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, User, MessageSquarePlus } from "lucide-react";
+import { Star, MessageSquarePlus, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { addReview } from "@/actions/addReview";
 
@@ -66,7 +66,6 @@ export const ReviewSection = ({
           action={handleSubmit}
           className="bg-white p-8 rounded-3xl mb-10 border border-gray-200 shadow-lg animate-in fade-in slide-in-from-top-4 relative overflow-hidden"
         >
-          {/* Dekoracyjny pasek na górze */}
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
 
           <h3 className="text-xl font-bold text-gray-900 mb-6">
@@ -105,6 +104,54 @@ export const ReviewSection = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* NOWE POLA: EMAIL I TELEFON */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="relative">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 ml-1">
+                Email (Wymagany)
+              </label>
+              <div className="relative">
+                <Mail
+                  className="absolute left-4 top-3.5 text-gray-400"
+                  size={18}
+                />
+                <input
+                  name="userEmail"
+                  type="email"
+                  required
+                  placeholder="twoj@email.pl"
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900"
+                />
+              </div>
+            </div>
+            <div className="relative">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 ml-1">
+                Telefon (Wymagany)
+              </label>
+              <div className="relative">
+                <Phone
+                  className="absolute left-4 top-3.5 text-gray-400"
+                  size={18}
+                />
+                <input
+                  name="userPhone"
+                  type="tel"
+                  required
+                  placeholder="123 456 789"
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 p-4 rounded-xl mb-6 text-sm text-blue-700 flex items-start gap-2 border border-blue-100">
+            <div className="mt-0.5">ℹ️</div>
+            <p>
+              Twój email i telefon są potrzebne tylko do weryfikacji
+              wiarygodności opinii. Nie będą one publicznie widoczne na stronie.
+            </p>
           </div>
 
           <div className="mb-6">

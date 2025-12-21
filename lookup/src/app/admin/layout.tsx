@@ -9,6 +9,7 @@ import {
   Terminal,
   Settings,
 } from "lucide-react";
+import { PenTool } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -108,6 +109,16 @@ export default function AdminLayout({
               className="group-hover:scale-110 transition-transform"
             />
             Leady Użytkowników
+          </Link>
+          <Link
+            href="/admin/blog"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all text-gray-600 hover:text-blue-600 font-medium group"
+          >
+            <PenTool
+              size={20}
+              className="group-hover:scale-110 transition-transform"
+            />
+            Blog & AI
           </Link>
 
           {/* SEKCJA: SYSTEM */}

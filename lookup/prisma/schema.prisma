@@ -44,6 +44,7 @@ model Company {
   slug        String
   address     String?
   city        String?
+  province    String?
   zip         String?
 
   lat         Float?   
@@ -102,6 +103,8 @@ model Review {
   rating    Int      // 1-5
   comment   String?  @db.Text
   userName  String   // Np. "Jan K."
+  userEmail String
+  userPhone String
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
@@ -134,6 +137,18 @@ model User {
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
   
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  excerpt   String?  @db.Text // Krótki opis na listę
+  content   String   @db.Text // Treść HTML
+  image     String?  // URL do okładki
+  published Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

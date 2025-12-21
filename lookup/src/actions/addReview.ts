@@ -9,8 +9,12 @@ export async function addReview(formData: FormData) {
   const comment = formData.get("comment") as string;
   const userName = formData.get("userName") as string;
 
-  if (!companyId || !rating || !userName) {
-    return { error: "Wypełnij wszystkie pola" };
+  // Nowe pola
+  const userEmail = formData.get("userEmail") as string;
+  const userPhone = formData.get("userPhone") as string;
+
+  if (!companyId || !rating || !userName || !userEmail || !userPhone) {
+    throw new Error("Wypełnij wszystkie pola");
   }
 
   await prisma.review.create({
@@ -19,10 +23,12 @@ export async function addReview(formData: FormData) {
       rating,
       comment,
       userName,
+      userEmail, // Zapisz do bazy
+      userPhone, // Zapisz do bazy
     },
   });
 
-  // Odśwież stronę, żeby nowa opinia się pojawiła
-  revalidatePath(`/firma/${companyId}`); // Tutaj uwaga: revalidate po slugu jest trudniejszy, bo mamy ID. 
-  // Ale Next.js jest sprytny. Zrobimy inaczej - revalidatePath na sciezce.
+  // Odświeżamy stronę firmy (ponieważ nie mamy tu sluga, używamy ogólnej ścieżki lub najlepiej ścieżki z referera jeśli byśmy mogli, ale revalidatePath('/') też zadziała dla testu)
+  // W idealnym świecie powinieneś przekazać 'slug' w formData, żeby zrobić revalidatePath(`/firma/${slug}`)
+  revalidatePath("/firma/[slug]", "page");
 }
