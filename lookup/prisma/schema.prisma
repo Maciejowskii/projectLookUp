@@ -133,6 +133,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String   // Zahaszowane hasło
+  emailVerified DateTime?
   
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
@@ -151,4 +152,12 @@ model Post {
   published Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String   // Email użytkownika
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

@@ -12,6 +12,7 @@ import {
   Calendar,
   FileText,
   CheckCircle,
+  ChevronRight, // <--- Nowa ikona do breadcrumbs
 } from "lucide-react";
 import { ReviewSection } from "@/components/ReviewSection";
 import { PhoneRevealButton } from "@/components/PhoneRevealButton";
@@ -45,12 +46,12 @@ export async function generateMetadata({
     },
     robots: {
       index: true,
-      follow: true, // <--- Zgodnie z życzeniem
+      follow: true,
     },
     openGraph: {
       title: company.name,
       description: company.description?.slice(0, 100),
-      images: company.logo ? [company.logo] : [], // <--- Prawdziwe logo w social media
+      images: company.logo ? [company.logo] : [],
     },
   };
 }
@@ -98,7 +99,7 @@ export default async function CompanyProfilePage({
     name: company.name,
     image: company.logo
       ? [company.logo]
-      : ["https://placehold.co/600x600?text=Logo"], // <--- Prawdziwe logo
+      : ["https://placehold.co/600x600?text=Logo"],
     address: {
       "@type": "PostalAddress",
       streetAddress: company.address,
@@ -112,7 +113,7 @@ export default async function CompanyProfilePage({
       company.description ||
       `Profil firmy ${company.name} w miejscowości ${company.city}.`,
     priceRange: "PLN",
-    openingHours: ["Mo-Fr 08:00-17:00"], // Możesz to wziąć z bazy jeśli dodasz pola
+    openingHours: ["Mo-Fr 08:00-17:00"],
     ...(reviewCount > 0 && {
       aggregateRating: {
         "@type": "AggregateRating",
@@ -124,7 +125,6 @@ export default async function CompanyProfilePage({
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Wstrzyknięcie Schema do HEAD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -157,8 +157,32 @@ export default async function CompanyProfilePage({
         } pb-12`}
       >
         <div className="container mx-auto px-4 max-w-5xl">
+          {/* --- 1. BREADCRUMBS (SEO) --- */}
+          <nav className="flex flex-wrap items-center text-sm text-gray-500 mb-6 gap-2">
+            <Link href="/" className="hover:text-blue-600 hover:underline">
+              Strona główna
+            </Link>
+            <ChevronRight size={14} className="text-gray-400" />
+
+            <Link
+              href={`/kategoria/${company.category.id}`}
+              className="hover:text-blue-600 hover:underline"
+            >
+              {company.category.name}
+            </Link>
+            <ChevronRight size={14} className="text-gray-400" />
+
+            {/* Opcjonalnie: Link do miasta, jeśli będziesz miał taką stronę */}
+            <span className="text-gray-700">{company.city}</span>
+            <ChevronRight size={14} className="text-gray-400" />
+
+            <span className="font-semibold text-gray-900 truncate max-w-[200px]">
+              {company.name}
+            </span>
+          </nav>
+
           <div className="flex flex-col md:flex-row gap-8">
-            {/* LOGO FIRMY (Logika: Logo z bazy LUB Inicjały) */}
+            {/* LOGO */}
             <div className="flex-shrink-0">
               {company.logo ? (
                 <div className="w-32 h-32 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
@@ -179,9 +203,13 @@ export default async function CompanyProfilePage({
             {/* DANE GŁÓWNE */}
             <div className="flex-grow">
               <div className="flex flex-wrap gap-3 mb-3">
-                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100">
+                {/* --- 2. KATEGORIA JAKO LINK (SEO) --- */}
+                <Link
+                  href={`/kategoria/${company.category.id}`}
+                  className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                >
                   {company.category.name}
-                </span>
+                </Link>
 
                 {company.nip && (
                   <span className="bg-gray-50 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border border-gray-200 text-gray-600">
@@ -219,7 +247,7 @@ export default async function CompanyProfilePage({
               </div>
             </div>
 
-            {/* AKCJE (Telefon/Email) */}
+            {/* AKCJE */}
             <div className="bg-gray-50 p-6 rounded-2xl min-w-[280px] border border-gray-100 h-fit">
               {company.phone && (
                 <PhoneRevealButton
@@ -250,6 +278,13 @@ export default async function CompanyProfilePage({
             <div className="prose prose-blue text-gray-600 leading-relaxed whitespace-pre-line">
               {company.description ||
                 "Ta firma nie dodała jeszcze szczegółowego opisu swojej działalności."}
+
+              {/* --- 3. SEO TEXT INJECTION --- */}
+              <p className="mt-6 text-gray-500 italic text-sm border-t pt-4 border-gray-100">
+                Świadczymy usługi w lokalizacji {company.city} i okolicach.
+                Zapraszamy do kontaktu telefonicznego lub mailowego w celu
+                ustalenia szczegółów współpracy.
+              </p>
             </div>
           </section>
 

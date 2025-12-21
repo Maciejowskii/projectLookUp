@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { prisma } from "@/lib/prisma";
-import { GoogleTagManager, GoogleAnalytics } from "@next/third-parties/google"; // <--- Import
+import { GoogleTagManager, GoogleAnalytics } from "@next/third-parties/google";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,8 +16,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(BASE_URL),
     title: {
-      template: `%s ${suffix}`,
-      default: `Znajdź najlepszych fachowców ${suffix}`,
+      default: "Katalogo.pl - Znajdź najlepszych fachowców",
+      template: "%s | Katalogo.pl",
     },
     description: "Największa baza firm i fachowców w Twojej okolicy.",
     openGraph: {
