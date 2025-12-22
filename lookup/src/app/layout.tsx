@@ -27,12 +27,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const metadata = {
-  verification: {
-    google: "R0MW3WRCSSCE16yT_qqSOZS7_rjXALBA96sFfwMUsbA",
-  },
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
