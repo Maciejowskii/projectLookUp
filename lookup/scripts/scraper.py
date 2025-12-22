@@ -375,17 +375,17 @@ if __name__ == "__main__":
     conn = connect_db()
     urls = [
         "https://panoramafirm.pl/serwis_agd",
-        "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
-        "https://panoramafirm.pl/biura_rachunkowe",
-        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
-        "https://panoramafirm.pl/serwis_komputer%C3%B3w",
-        "https://panoramafirm.pl/sieci_komputerowe_i_integracja_system%C3%B3w",
-        "https://panoramafirm.pl/sprzeda%C5%BC_komputer%C3%B3w",
-        "https://panoramafirm.pl/oprogramowanie_komputerowe"
+        # "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
+        # "https://panoramafirm.pl/biura_rachunkowe",
+        # "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
+        # "https://panoramafirm.pl/serwis_komputer%C3%B3w",
+        # "https://panoramafirm.pl/sieci_komputerowe_i_integracja_system%C3%B3w",
+        # "https://panoramafirm.pl/sprzeda%C5%BC_komputer%C3%B3w",
+        # "https://panoramafirm.pl/oprogramowanie_komputerowe"
     ]
     for u in urls:
         print(f"\n🚀 Start kategoria: {u}")
-        basic_list = scrape_category_listing(u, pages=4) 
+        basic_list = scrape_category_listing(u, pages=1) 
         enriched_list = []
         for i, item in enumerate(basic_list, 1):
             print(f"[{i}/{len(basic_list)}] Pobieram: {item['name']}")
