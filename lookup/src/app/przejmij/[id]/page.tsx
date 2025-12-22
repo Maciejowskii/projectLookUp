@@ -5,6 +5,8 @@ import { Footer } from "@/components/Footer";
 import { ShieldCheck, CheckCircle2 } from "lucide-react";
 import { submitClaimRequest } from "@/actions/claimProfile";
 
+export const dynamic = "force-dynamic";
+
 export default async function ClaimPage({
   params,
 }: {
