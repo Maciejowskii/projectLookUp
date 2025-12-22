@@ -391,7 +391,8 @@ def save_to_db(conn, companies):
 if __name__ == "__main__":
     conn = connect_db()
     urls = [
-        "https://panoramafirm.pl/serwis_agd",
+        # "https://panoramafirm.pl/serwis_agd",
+        "https://panoramafirm.pl/biura_rachunkowe",
         # kolejne kategorie jak chcesz
     ]
     for u in urls:
