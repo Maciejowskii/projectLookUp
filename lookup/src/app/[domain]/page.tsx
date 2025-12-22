@@ -142,7 +142,7 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
               companies.map((company) => (
                 <Link
                   key={company.id}
-                  href={`/${slugifyCity(company.city)}/${company.slug}`}
+                  href={`/${slugifyCity(company.city ?? "")}/${company.slug}`}
                   className="group block bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-blue-400 transition-all duration-200 relative overflow-hidden"
                 >
                   {/* Pasek Premium */}

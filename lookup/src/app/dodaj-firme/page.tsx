@@ -16,6 +16,7 @@ import { Resend } from "resend";
 import crypto from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+export const dynamic = "force-dynamic";
 
 export default async function AddCompanyPage() {
   const categories = await prisma.category.findMany({
