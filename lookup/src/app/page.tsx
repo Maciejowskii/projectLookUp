@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { TrendingUp, ArrowRight, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";

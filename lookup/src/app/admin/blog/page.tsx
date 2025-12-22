@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { createPost, deletePost, generatePostAI } from "@/actions/blogActions";
 import { Trash2, Sparkles, PenTool, Eye } from "lucide-react";

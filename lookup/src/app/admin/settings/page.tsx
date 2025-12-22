@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { updateSettings } from "@/actions/adminActions";
 import { Save, Settings, DollarSign, Phone, Mail } from "lucide-react";

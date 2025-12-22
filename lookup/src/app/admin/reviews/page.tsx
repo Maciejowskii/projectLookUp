@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { deleteReview } from "@/actions/adminActions";
 import { Star, Trash2, MessageSquare } from "lucide-react";

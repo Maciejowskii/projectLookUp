@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { createCategory, deleteCategory } from "@/actions/adminActions";
 import { FolderPlus, Trash2, Layers } from "lucide-react";

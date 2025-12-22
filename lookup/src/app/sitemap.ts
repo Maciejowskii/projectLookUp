@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { VOIVODESHIPS } from "@/lib/regions"; // <--- Importujemy regiony

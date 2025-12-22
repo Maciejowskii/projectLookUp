@@ -1,3 +1,5 @@
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { approveClaim, rejectClaim } from "@/actions/adminActions";
 import { Check, X, Clock, Building2, User } from "lucide-react";
