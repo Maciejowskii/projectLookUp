@@ -2,7 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 import psycopg2
 import time
-import random
 import json
 import uuid
 import re
@@ -14,8 +13,9 @@ load_dotenv()
 
 # ===== KONFIGURACJA AI (OLLAMA) =====
 USE_OLLAMA = os.getenv("USE_OLLAMA", "0") == "1"
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollamarunai:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+MAX_INPUT_CHARS = 2000  # ograniczamy długość wejścia, żeby model szybciej odpowiadał
 
 # ===== KONFIGURACJA BAZY =====
 DB_HOST = os.getenv("DB_HOST")
@@ -186,6 +186,8 @@ def rewrite_description_with_ai(original_text, company_name, city):
     if not USE_OLLAMA or not original_text or len(original_text) < 50:
         return original_text
 
+    src = original_text[:MAX_INPUT_CHARS]
+
     prompt = f"""
 Twoim zadaniem jest przerobić poniższy opis firmy tak, aby:
 
@@ -203,7 +205,7 @@ Twoim zadaniem jest przerobić poniższy opis firmy tak, aby:
 Dane wejściowe:
 
 Opis źródłowy:
-{original_text}
+{src}
 
 Nazwa firmy:
 {company_name}
@@ -225,16 +227,16 @@ Wynik:
             "stream": False
         }
 
-        resp = requests.post(url, json=payload, timeout=120)
+        # dłuższy timeout, bo lokalny model może liczyć długo
+        resp = requests.post(url, json=payload, timeout=300)
         resp.raise_for_status()
 
-        # Przy stream=false powinna przyjść pojedyncza odpowiedź JSON
         data = resp.json()
         text = data.get("response", "").strip()
         return text or original_text
 
     except Exception as e:
-        print(f"      ⚠️ Błąd Ollama: {e}")
+        print(f"      ⚠️ Błąd Ollama: {type(e).__name__}: {e}")
         return original_text
 
 
@@ -275,7 +277,7 @@ def enrich_company_from_profile(basic_company):
         # AI REWRITE
         if raw_desc:
             print(f"      🤖 Generuję opis AI ({len(raw_desc)} znaków)...")
-            time.sleep(4)  # Rate limiting
+            time.sleep(4)  # prosty rate limiting
             basic_company["desc"] = rewrite_description_with_ai(
                 raw_desc,
                 basic_company['name'],
@@ -393,7 +395,6 @@ if __name__ == "__main__":
     urls = [
         # "https://panoramafirm.pl/serwis_agd",
         "https://panoramafirm.pl/biura_rachunkowe",
-        # kolejne kategorie jak chcesz
     ]
     for u in urls:
         print(f"\n🚀 Start kategoria: {u}")
