@@ -286,15 +286,17 @@ def enrich_company_from_profile(basic_company):
         else:
             basic_company["desc"] = ""
 
-        contact = js_data.get("contact", {})
-        if contact.get("email"):
-            basic_company["email"] = contact["email"]
-        if contact.get("www"):
-            basic_company["website"] = contact["www"]
-        if contact.get("phone") and isinstance(contact["phone"], dict):
-            basic_company["phone"] = contact["phone"].get("formatted") or contact["phone"].get("number")
+        contact = js_data.get("contact") or {}
+        if isinstance(contact, dict):
+            if contact.get("email"):
+                basic_company["email"] = contact["email"]
+            if contact.get("www"):
+                basic_company["website"] = contact["www"]
+            if contact.get("phone") and isinstance(contact["phone"], dict):
+                basic_company["phone"] = contact["phone"].get("formatted") or contact["phone"].get("number")
 
-        loc = js_data.get("location", {})
+
+        loc = js_data.get("location") or {}
         if loc.get("city") and isinstance(loc["city"], dict):
             basic_company["city"] = loc["city"].get("name")
         elif loc.get("city"):
