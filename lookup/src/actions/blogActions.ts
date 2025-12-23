@@ -4,9 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { checkAdminAuth } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { toast } from "react-hot-toast";
 
+interface FormState {
+  message?: string;
+}
 // Inicjalizacja klienta Gemini
-// Używamy zmiennej z Twojego .env (GOOGLE_AI_KEY)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || "");
 
 async function fetchPexelsImage(query: string): Promise<string | null> {
@@ -23,7 +26,7 @@ async function fetchPexelsImage(query: string): Promise<string | null> {
     );
     const data = await res.json();
     if (data.photos && data.photos.length > 0) {
-      return data.photos[0].src.landscape; // Bierzemy wersję poziomą
+      return data.photos[0].src.landscape;
     }
   } catch (e) {
     console.error("Pexels error:", e);
@@ -54,7 +57,7 @@ export async function createPost(formData: FormData) {
     .replace(/[^a-z0-9]/g, "-")
     .replace(/-+/g, "-");
 
-  await prisma.post.create({
+  const post = await prisma.post.create({
     data: {
       title,
       slug,
@@ -67,6 +70,7 @@ export async function createPost(formData: FormData) {
 
   revalidatePath("/admin/blog");
   revalidatePath("/blog");
+  // ✅ NIE ZWRACA NIC - dla formularza
 }
 
 export async function deletePost(id: string) {
@@ -76,9 +80,8 @@ export async function deletePost(id: string) {
   revalidatePath("/blog");
 }
 
-// --- GENERATOR AI ---
-
-export async function generatePostAI(formData: FormData) {
+// --- GENERATOR AI DLA CRON (ZWRACA ID) ---
+export async function generatePostAI(formData: FormData): Promise<string> {
   await checkAdminAuth();
 
   const topic = formData.get("topic") as string;
@@ -87,11 +90,10 @@ export async function generatePostAI(formData: FormData) {
     throw new Error("Brak klucza API Google Gemini (GOOGLE_AI_KEY)");
   }
 
-  // 1. Konfiguracja modelu z WYMUSZENIEM JSON (responseMimeType)
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     generationConfig: {
-      responseMimeType: "application/json", // <--- To kluczowa zmiana!
+      responseMimeType: "application/json",
     },
   });
 
@@ -119,7 +121,6 @@ export async function generatePostAI(formData: FormData) {
     const response = await result.response;
     const text = response.text();
 
-    // 2. Pancerne czyszczenie JSONa (wycinamy wszystko od pierwszego { do ostatniego })
     const firstBrace = text.indexOf("{");
     const lastBrace = text.lastIndexOf("}");
 
@@ -138,7 +139,6 @@ export async function generatePostAI(formData: FormData) {
       throw new Error("Błąd parsowania danych od AI.");
     }
 
-    // --- Reszta kodu bez zmian (Pexels, Zapis) ---
     let extraImages: string[] = [];
     if (process.env.PEXELS_API_KEY) {
       try {
@@ -187,7 +187,7 @@ export async function generatePostAI(formData: FormData) {
       "-" +
       Date.now().toString().slice(-4);
 
-    await prisma.post.create({
+    const post = await prisma.post.create({
       data: {
         title: data.title,
         slug,
@@ -199,8 +199,97 @@ export async function generatePostAI(formData: FormData) {
     });
 
     revalidatePath("/admin/blog");
+    revalidatePath("/blog");
+
+    return post.id; // ✅ ZWRACA ID dla cron
   } catch (error: any) {
     console.error("Błąd AI:", error);
     throw new Error(error.message);
   }
+}
+
+// --- DLA FORMULARZA (NIE ZWRACA NIC) ---
+export async function generatePostAIForm(formData: FormData) {
+  await generatePostAI(formData); // wywołuje główną funkcję
+  revalidatePath("/admin/blog");
+}
+
+export async function schedulePost(formData: FormData) {
+  const topic = formData.get("topic")?.toString();
+  const date = formData.get("date")?.toString();
+  const time = formData.get("time")?.toString() || "08:00";
+
+  if (!topic || !date) return;
+
+  const scheduledAt = new Date(`${date}T${time}`); // ✅ DATA + GODZINA!
+
+  await prisma.scheduledPost.create({
+    data: {
+      topic,
+      scheduledAt,
+      status: "scheduled", // ✅ Domyślny status
+    },
+  });
+
+  revalidatePath("/admin/blog");
+}
+
+export async function updatePost(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const id = formData.get("id")?.toString();
+  const title = formData.get("title")?.toString() ?? "";
+  const excerpt = formData.get("excerpt")?.toString() ?? "";
+  const content = formData.get("content")?.toString() ?? "";
+
+  if (!id) {
+    return { message: "❌ Brak ID posta!" };
+  }
+
+  await prisma.post.update({
+    where: { id },
+    data: { title, excerpt, content },
+  });
+
+  revalidatePath("/admin/blog");
+  revalidatePath("/blog");
+
+  return { message: "✅ Zmiany zapisane pomyślnie!" };
+}
+
+// DODAJ te 2 funkcje:
+export async function publishScheduledPost(formData: FormData) {
+  const id = formData.get("id")?.toString();
+  if (!id) return;
+
+  const job = await prisma.scheduledPost.findUnique({ where: { id } });
+  if (!job) return;
+
+  await prisma.scheduledPost.update({
+    where: { id },
+    data: { status: "processing" },
+  });
+
+  const formDataAI = new FormData();
+  formDataAI.set("topic", job.topic);
+  const postId = await generatePostAI(formDataAI);
+
+  await prisma.scheduledPost.update({
+    where: { id },
+    data: { status: "done", executedAt: new Date(), postId },
+  });
+
+  revalidatePath("/admin/blog");
+}
+
+export async function cancelScheduledPost(formData: FormData) {
+  const id = formData.get("id")?.toString();
+  if (!id) return;
+
+  await prisma.scheduledPost.update({
+    where: { id },
+    data: { status: "cancelled" },
+  });
+  revalidatePath("/admin/blog");
 }

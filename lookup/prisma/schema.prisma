@@ -24,49 +24,49 @@ enum Plan {
 }
 
 model Company {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  claims      ClaimRequest[]
+  id       String         @id @default(cuid())
+  tenantId String
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  claims   ClaimRequest[]
 
-  reviews     Review[] 
+  reviews Review[]
 
-  name        String
-  
+  name String
+
   // POLA URZĘDOWE
-  nip         String?
-  regon       String?
-  krs         String?
-  
+  nip   String?
+  regon String?
+  krs   String?
+
   // OPIS I SEO
-  description String?  @db.Text
-  shortDesc   String?  // Krótki opis do listy (meta description)
+  description String? @db.Text
+  shortDesc   String? // Krótki opis do listy (meta description)
   slug        String
   address     String?
   city        String?
   province    String?
   zip         String?
 
-  lat         Float?   
-  lng         Float?
+  lat Float?
+  lng Float?
 
-  phone       String?
-  email       String?
-  website     String?
-  logo        String?
+  phone   String?
+  email   String?
+  website String?
+  logo    String?
 
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
 
-  plan        Plan     @default(FREE)
-  isVerified  Boolean  @default(false)
-  
-  leads       Lead[]   
+  plan       Plan    @default(FREE)
+  isVerified Boolean @default(false)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime? @updatedAt
+  leads Lead[]
 
-  users       User[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  users User[]
 
   @@index([tenantId, city])
   @@index([nip])
@@ -85,24 +85,24 @@ model Category {
 }
 
 model Lead {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  
-  contactName String   
-  phone       String   
-  email       String   
-  status      String   @default("NEW") 
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  contactName String
+  phone       String
+  email       String
+  status      String @default("NEW")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Review {
   id        String   @id @default(cuid())
-  rating    Int      // 1-5
+  rating    Int // 1-5
   comment   String?  @db.Text
-  userName  String   // Np. "Jan K."
+  userName  String // Np. "Jan K."
   userEmail String
   userPhone String
   companyId String
@@ -111,16 +111,16 @@ model Review {
 }
 
 model ClaimRequest {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id])
-  
-  fullName  String
-  email     String
-  phone     String
-  message   String?
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  
+  company   Company @relation(fields: [companyId], references: [id])
+
+  fullName String
+  email    String
+  phone    String
+  message  String?
+  status   String  @default("PENDING") // PENDING, APPROVED, REJECTED
+
   createdAt DateTime @default(now())
 }
 
@@ -130,34 +130,52 @@ model Setting {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // Zahaszowane hasło
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String // Zahaszowane hasło
   emailVerified DateTime?
-  
+
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id])
-  
+  company   Company @relation(fields: [companyId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  title     String
-  slug      String   @unique
-  excerpt   String?  @db.Text // Krótki opis na listę
-  content   String   @db.Text // Treść HTML
-  image     String?  // URL do okładki
-  published Boolean  @default(true) 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(cuid())
+  title          String
+  slug           String          @unique
+  excerpt        String?         @db.Text // Krótki opis na listę
+  content        String          @db.Text // Treść HTML
+  image          String? // URL do okładki
+  published      Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  scheduledPosts ScheduledPost[]
+
+  @@map("posts")
 }
 
 model VerificationToken {
-  identifier String   // Email użytkownika
+  identifier String // Email użytkownika
   token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model ScheduledPost {
+  id          String    @id @default(cuid())
+  topic       String
+  scheduledAt DateTime
+  status      String    @default("scheduled")
+  executedAt  DateTime?
+  postId      String? // Foreign key
+  post        Post?     @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("scheduled_posts")
 }
