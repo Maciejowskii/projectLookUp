@@ -395,7 +395,7 @@ if __name__ == "__main__":
     urls = [
         # "https://panoramafirm.pl/serwis_agd",
         # "https://panoramafirm.pl/biura_rachunkowe",
-        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
+        # "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
         "https://panoramafirm.pl/akcesoria_do_komputer%C3%B3w",
         "https://panoramafirm.pl/cz%C4%99%C5%9Bci_komputerowe",
         "https://panoramafirm.pl/blacharstwo_i_lakiernictwo",
