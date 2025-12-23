@@ -395,10 +395,17 @@ if __name__ == "__main__":
     urls = [
         # "https://panoramafirm.pl/serwis_agd",
         "https://panoramafirm.pl/biura_rachunkowe",
+        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
+        "https://panoramafirm.pl/akcesoria_do_komputer%C3%B3w",
+        "https://panoramafirm.pl/cz%C4%99%C5%9Bci_komputerowe",
+        "https://panoramafirm.pl/blacharstwo_i_lakiernictwo",
+        "https://panoramafirm.pl/dealerzy_i_sprzeda%C5%BC_samochod%C3%B3w",
+        "https://panoramafirm.pl/biura_podr%C3%B3%C5%BCy_i_agencje_turystyczne",
+        "https://panoramafirm.pl/hotele"
     ]
     for u in urls:
         print(f"\n🚀 Start kategoria: {u}")
-        basic_list = scrape_category_listing(u, pages=1)
+        basic_list = scrape_category_listing(u, pages=4)
         enriched_list = []
         for i, item in enumerate(basic_list, 1):
             print(f"[{i}/{len(basic_list)}] Pobieram: {item['name']}")
