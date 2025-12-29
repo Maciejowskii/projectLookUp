@@ -1,6 +1,10 @@
-FROM node:20-alpine
+# Zmieniamy na slim, żeby naprawić błędy OpenSSL i Prisma
+FROM node:20-slim
 
 WORKDIR /app
+
+# Instalujemy openssl (wymagane przez Prisma w obrazach slim/debian)
+RUN apt-get update -y && apt-get install -y openssl
 
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -10,9 +14,7 @@ RUN npx prisma generate
 
 COPY . .
 
-ENV TURBOPACK=0
-ENV NEXT_PRIVATE_TURBOPACK=0
-
+# Budujemy standardowym Webpackiem (domyślny w Next 15)
 RUN npx next build
 
 EXPOSE 3000
