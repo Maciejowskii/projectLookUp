@@ -52,7 +52,7 @@ def init_ai():
         import google.generativeai as genai
         genai.configure(api_key=GOOGLE_API_KEY)
         # Używamy flash, jest szybki i tani/darmowy
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         return True
     except Exception as e:
         print(f"⚠️ AI niedostępne (błąd importu lub klucza): {e}")
