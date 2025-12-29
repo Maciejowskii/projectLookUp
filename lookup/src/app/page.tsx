@@ -40,7 +40,7 @@ export default async function LandingPage() {
 
 					<h1 className='text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-[1.1]'>
 						Znajdź{' '}
-						<span className='text-transparent bg-clip-text bg-gradient-to-red from-blue-600 to-indigo-600'>
+						<span className='text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600'>
 							najlepszych
 						</span>{' '}
 						<br />
