@@ -35,7 +35,7 @@ ai_usage_counter = 0
 
 model = None
 
-print(f"🟢 Tryb: {SCRAPER_MODE} | Kategorie: {'AUTO' if SCRAPE_ALL_CATEGORIES else 'RĘCZNE'} | AI: {'✓' if USE_AI_REWRITE else '✗'}")
+print(f"🟢 Tryb: {SCRAPER_MODE} | Kategorie: {'AUTO + POPULARNE' if SCRAPE_ALL_CATEGORIES else 'TYLKO POPULARNE'} | AI: {'✓' if USE_AI_REWRITE else '✗'}")
 print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań (zatrzymanie po osiągnięciu)")
 
 # Konfiguracja AI (lazy loading)
@@ -93,6 +93,19 @@ def slugify(text):
         text = text.replace(k, v)
     text = re.sub(r'[^a-z0-9\s-]', '', text)
     return re.sub(r'[\s-]+', '-', text).strip('-')[:50]
+
+def company_exists(conn, slug):
+    """Sprawdza czy firma o danym slugu już istnieje w bazie (Company lub RawCompany)"""
+    cur = conn.cursor()
+    
+    # Sprawdź w głównej tabeli Company
+    cur.execute('SELECT 1 FROM "Company" WHERE slug = %s', (slug,))
+    if cur.fetchone():
+        cur.close()
+        return True
+        
+    cur.close()
+    return False
 
 def get_tenant_id_by_category(conn, category_name):
     cat_lower = category_name.lower()
@@ -159,42 +172,61 @@ def clean_html_text(html_text):
     return soup.get_text(separator="\n").strip()
 
 def scrape_all_categories():
-    print("🔍 Pobieram kategorie...")
-    try:
-        resp = requests.get("https://panoramafirm.pl/biuro", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        categories = []
+    categories = []
+    
+    # 1. ZAWSZE dodaj popularne
+    popular = [
+        "https://panoramafirm.pl/serwis_agd",
+        "https://panoramafirm.pl/biura_rachunkowe", 
+        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
+        "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
+        "https://panoramafirm.pl/warsztaty_samochodowe",
+        "https://panoramafirm.pl/mechanicy",
+        "https://panoramafirm.pl/hydraulicy",
+        "https://panoramafirm.pl/elektrycy",
+        "https://panoramafirm.pl/adwokaci"
+    ]
+    for url in popular:
+        categories.append({"name": os.path.basename(url.rstrip("/")).replace("_", " ").title(), "url": url})
         
-        # Dropdown
-        for link in soup.select("a.dropdown-item[href*='/branze.html']"):
-            href = link.get("href", "")
-            title = link.get_text(strip=True)
-            if href and title:
-                categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
-        
-        # A-Z
-        for link in soup.select("a[href^='/'][href$='/']"):
-            href = link.get("href", "").rstrip("/")
-            title = link.get_text(strip=True)
-            if href and len(href) > 3 and title and any(kw in href for kw in ['serwis_', 'meble_', 'ksero']):
-                categories.append({"name": title.replace("_", " ").title(), "url": f"{BASE_URL}{href}"})
-        
-        # Popularne
-        for url in ["https://panoramafirm.pl/serwis_agd", "https://panoramafirm.pl/mechanicy"]:
-            categories.append({"name": os.path.basename(url.rstrip("/")).replace("_", " ").title(), "url": url})
-        
-        seen = set()
-        unique = []
-        for cat in categories:
-            if cat['url'] not in seen:
-                seen.add(cat['url'])
-                unique.append(cat)
-        
+    # 2. Jeśli włączono AUTO scrapowanie, dobierz resztę
+    if SCRAPE_ALL_CATEGORIES:
+        print("🔍 Pobieram dodatkowe kategorie z A-Z...")
+        try:
+            resp = requests.get("https://panoramafirm.pl/biuro", headers=HEADERS, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            
+            # Dropdown
+            for link in soup.select("a.dropdown-item[href*='/branze.html']"):
+                href = link.get("href", "")
+                title = link.get_text(strip=True)
+                if href and title:
+                    categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
+            
+            # A-Z (wybrane słowa kluczowe)
+            for link in soup.select("a[href^='/'][href$='/']"):
+                href = link.get("href", "").rstrip("/")
+                title = link.get_text(strip=True)
+                if href and len(href) > 3 and title and any(kw in href for kw in ['serwis_', 'meble_', 'ksero']):
+                    categories.append({"name": title.replace("_", " ").title(), "url": f"{BASE_URL}{href}"})
+                    
+        except Exception as e:
+            print(f"⚠️ Błąd pobierania kategorii A-Z: {e}")
+
+    # Usuń duplikaty
+    seen = set()
+    unique = []
+    for cat in categories:
+        if cat['url'] not in seen:
+            seen.add(cat['url'])
+            unique.append(cat)
+    
+    # Jeśli tryb AUTO, przytnij do limitu. Jeśli nie, zwróć wszystkie popularne.
+    if SCRAPE_ALL_CATEGORIES:
         return unique[:MAX_CATEGORIES]
-    except Exception as e:
-        print(f"⚠️ Fallback: {e}")
-        return [{"name": "Serwis AGD", "url": "https://panoramafirm.pl/serwis_agd"}]
+    else:
+        return unique # Zwracamy wszystkie popularne
 
 def scrape_category_listing(listing_url, pages=1):
     pages = min(pages, MAX_PAGES_PER_CATEGORY)
@@ -236,8 +268,16 @@ Miasto: {city}"""
         return response.text.strip()[:1200]
     except: return original_text[:1000]
 
-def enrich_company_from_profile(basic_company):
+def enrich_company_from_profile(conn, basic_company):
     global ai_usage_counter
+    
+    # 1. SPRAWDZENIE CZY FIRMA JUŻ ISTNIEJE W BAZIE
+    # Generujemy slug tak, jak byśmy go zapisywali
+    potential_slug = slugify(basic_company["name"])
+    if company_exists(conn, potential_slug):
+        print(f"      ⏭️  Pomijam (już istnieje): {basic_company['name'][:30]}")
+        return None # Zwracamy None, żeby pominąć w pętli głównej
+
     url = basic_company.get("url")
     if not url: return basic_company
     if not url.startswith("http"): url = BASE_URL + "/" + url.lstrip("/")
@@ -251,7 +291,16 @@ def enrich_company_from_profile(basic_company):
     if not js_data: return basic_company
     
     nip = js_data.get("nip")
-    if nip: basic_company["nip"] = str(nip)
+    if nip: 
+        # Dodatkowe sprawdzenie po NIPie (dla pewności)
+        cur = conn.cursor()
+        cur.execute('SELECT 1 FROM "Company" WHERE nip = %s', (str(nip),))
+        if cur.fetchone():
+            print(f"      ⏭️  Pomijam (NIP istnieje): {nip}")
+            cur.close()
+            return None
+        cur.close()
+        basic_company["nip"] = str(nip)
     
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
@@ -315,7 +364,7 @@ def save_to_db(conn, companies):
         slug = slugify(c["name"])
         cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
         
-        # Check existing
+        # Check existing (jako ostateczne zabezpieczenie)
         existing_id = None
         if c.get("nip"):
             cur.execute('SELECT id FROM "Company" WHERE nip = %s', (c["nip"],))
@@ -329,8 +378,8 @@ def save_to_db(conn, companies):
         desc = c.get("desc") or c.get("raw_desc", "")[:1000]
         
         if existing_id:
-            cur.execute("""UPDATE "Company" SET nip=COALESCE(nip,%s), description=COALESCE(description,%s) WHERE id=%s""", 
-                        (c.get("nip"), desc, existing_id))
+            # POMIJAMY UPDATE - ZAKŁADAMY ŻE ISTNIEJĄCE SĄ OK
+            pass 
         else:
             cur.execute("""INSERT INTO "Company" (id, "tenantId", name, slug, address, city, zip, phone, email, website, description, "categoryId", plan, "isVerified", nip, lat, lng) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s)""", 
                         (str(uuid.uuid4()), tenant_id, c["name"], slug, c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), c.get("email"), c.get("website"), desc, cat_id, c.get("nip"), c.get("lat"), c.get("lng")))
@@ -343,8 +392,10 @@ def save_to_db(conn, companies):
 if __name__ == "__main__":
     conn = connect_db()
     total_firms = 0
-    categories = scrape_all_categories() if SCRAPE_ALL_CATEGORIES else [{"name": "Serwis AGD", "url": "https://panoramafirm.pl/serwis_agd"}]
+    categories = scrape_all_categories()
     stop_signal = False
+
+    print(f"📊 Do przeszukania: {len(categories)} kategorii")
 
     for i, cat in enumerate(categories, 1):
         if stop_signal: break
@@ -359,8 +410,13 @@ if __name__ == "__main__":
             
             print(f"   [{j}/{len(companies)}] {company['name'][:50]}...")
             company["category_name"] = cat["name"]
-            processed = enrich_company_from_profile(company)
             
+            # Przekazujemy conn do sprawdzenia duplikatów
+            processed = enrich_company_from_profile(conn, company)
+            
+            if processed is None:
+                continue # Firma istnieje, pomijamy
+
             if processed.get("_STOP_SCRAPER"):
                 print("\n🛑 LIMIT AI OSIĄGNIĘTY (Func). STOP.")
                 stop_signal = True; break
