@@ -13,12 +13,11 @@ export async function generateMetadata(): Promise<Metadata> {
 	const settings = await prisma.setting.findMany()
 	const get = (key: string) => settings.find(s => s.key === key)?.value
 
-	// Pobierz nazwę serwisu lub użyj domyślnej "Katalogo"
 	const siteName = get('site_name') || 'Katalogo'
 
 	return {
 		metadataBase: new URL(BASE_URL),
-		applicationName: siteName, // <-- WAŻNE: To podpowiada Google nazwę aplikacji
+		applicationName: siteName,
 		title: {
 			default: 'Katalogo.pl - Znajdź najlepszych fachowców',
 			template: `%s | ${siteName}`, // Np. "Hydraulik | Katalogo" wygląda czyściej

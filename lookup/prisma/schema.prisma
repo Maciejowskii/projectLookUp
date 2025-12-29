@@ -68,6 +68,7 @@ model Company {
 
   users User[]
 
+  @@unique([tenantId, slug])
   @@index([tenantId, city])
   @@index([nip])
   @@index([tenantId, categoryId])

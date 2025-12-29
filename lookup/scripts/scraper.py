@@ -42,13 +42,16 @@ print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań (zatrzymanie po osiągnięciu)
 def init_ai():
     global model, USE_AI_REWRITE
     if not USE_AI_REWRITE: return False
+    # Jeśli model już jest zainicjalizowany, nie rób nic
+    if model: return True
+    
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        from google import genai
+        # Inicjalizacja klienta
+        model = genai.Client(api_key=GOOGLE_API_KEY)
         return True
-    except:
-        print("⚠️ AI niedostępne")
+    except Exception as e:
+        print(f"⚠️ AI niedostępne (błąd importu lub klucza): {e}")
         USE_AI_REWRITE = False
         return False
 
@@ -106,6 +109,27 @@ def company_exists(conn, slug):
         
     cur.close()
     return False
+
+def get_unique_slug(conn, base_name, tenant_id):
+    """Generuje unikalny slug, dodając licznik jeśli zajęty"""
+    base_slug = slugify(base_name)
+    slug = base_slug
+    counter = 1
+    
+    cur = conn.cursor()
+    while True:
+        # Sprawdź czy taki slug istnieje w TYM Tenancie
+        cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
+        if not cur.fetchone():
+            break # Slug wolny!
+        
+        # Slug zajęty, próbujemy kolejny
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    
+    cur.close()
+    return slug
+
 
 def get_tenant_id_by_category(conn, category_name):
     cat_lower = category_name.lower()
@@ -255,18 +279,25 @@ def scrape_category_listing(listing_url, pages=1):
 
 def rewrite_description_with_ai(original_text, company_name, city):
     global ai_usage_counter
-    # STOPJEŚLI LIMIT OSIĄGNIĘTY
+    # STOP JEŚLI LIMIT OSIĄGNIĘTY
     if ai_usage_counter >= MAX_AI_REQUESTS: return None
     
     prompt = f"""Przerób opis firmy (700-1200 znaków, unikalny, SEO, polski):
 Źródło: {original_text[:2000]}
 Nazwa: {company_name}
 Miasto: {city}"""
+
     try:
-        response = model.generate_content(prompt)
+        # NOWA SKŁADNIA dla google-genai
+        response = model.models.generate_content(
+            model='gemini-2.0-flash', # Zalecany nowszy model, lub 'gemini-1.5-flash'
+            contents=prompt
+        )
         ai_usage_counter += 1
         return response.text.strip()[:1200]
-    except: return original_text[:1000]
+    except Exception as e:
+        print(f"⚠️ Błąd AI: {e}")
+        return original_text[:1000]
 
 def enrich_company_from_profile(conn, basic_company):
     global ai_usage_counter
@@ -358,36 +389,66 @@ def enrich_company_from_profile(conn, basic_company):
 def save_to_db(conn, companies):
     cur = conn.cursor()
     inserted = 0
+    updated = 0
+    
     for c in companies:
         if not c.get("name"): continue
+        
         tenant_id, subdomain = get_tenant_id_by_category(conn, c.get("category_name", "Inne"))
-        slug = slugify(c["name"])
         cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
         
-        # Check existing (jako ostateczne zabezpieczenie)
         existing_id = None
+        
+        # 1. NAJPIERW szukamy TYLKO po NIP (to twardy dowód, że to ta sama firma)
         if c.get("nip"):
             cur.execute('SELECT id FROM "Company" WHERE nip = %s', (c["nip"],))
             row = cur.fetchone()
             if row: existing_id = row[0]
-        if not existing_id:
-            cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
-            row = cur.fetchone()
-            if row: existing_id = row[0]
             
         desc = c.get("desc") or c.get("raw_desc", "")[:1000]
-        
+
         if existing_id:
-            # POMIJAMY UPDATE - ZAKŁADAMY ŻE ISTNIEJĄCE SĄ OK
-            pass 
+            # === UPDATE (Tylko jak znaleźliśmy po NIP) ===
+            cur.execute("""
+                UPDATE "Company" SET 
+                    description=COALESCE(description, %s),
+                    phone=COALESCE(phone, %s), 
+                    email=COALESCE(email, %s),
+                    website=COALESCE(website, %s), 
+                    address=COALESCE(address, %s),
+                    city=COALESCE(city, %s), 
+                    zip=COALESCE(zip, %s),
+                    lat=COALESCE(lat, %s), 
+                    lng=COALESCE(lng, %s),
+                    "updatedAt" = NOW()
+                WHERE id = %s
+            """, (desc, c.get("phone"), c.get("email"), c.get("website"),
+                  c.get("address"), c.get("city"), c.get("zip"), 
+                  c.get("lat"), c.get("lng"), existing_id))
+            updated += 1
+            # print(f"   🔄 UPDATE: {c['name'][:30]}")
+            
         else:
-            cur.execute("""INSERT INTO "Company" (id, "tenantId", name, slug, address, city, zip, phone, email, website, description, "categoryId", plan, "isVerified", nip, lat, lng) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s)""", 
-                        (str(uuid.uuid4()), tenant_id, c["name"], slug, c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), c.get("email"), c.get("website"), desc, cat_id, c.get("nip"), c.get("lat"), c.get("lng")))
+            # === INSERT (Nowa firma) ===
+            # Tutaj generujemy unikalny slug, żeby nie było kolizji z inną firmą o tej samej nazwie
+            unique_slug = get_unique_slug(conn, c["name"], tenant_id)
+            
+            cur.execute("""
+                INSERT INTO "Company" 
+                (id, "tenantId", name, slug, address, city, zip, phone, email, website, 
+                 description, "categoryId", plan, "isVerified", nip, lat, lng, "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s, NOW(), NOW())
+            """, (str(uuid.uuid4()), tenant_id, c["name"], unique_slug, 
+                  c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), 
+                  c.get("email"), c.get("website"), desc, cat_id, 
+                  c.get("nip"), c.get("lat"), c.get("lng")))
             inserted += 1
-            print(f"   ✅ [{subdomain}] {c['name'][:40]}")
+            print(f"   ✅ INSERT [{subdomain}]: {c['name'][:30]} (slug: {unique_slug})")
+
     conn.commit()
     cur.close()
-    print(f"   💾 MAIN: +{inserted} nowych firm")
+    print(f"   💾 BAZA: +{inserted} nowych, {updated} zaktualizowanych")
+
 
 if __name__ == "__main__":
     conn = connect_db()
