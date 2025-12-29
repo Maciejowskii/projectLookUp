@@ -10,7 +10,10 @@ RUN npx prisma generate
 
 COPY . .
 
-RUN npm run build
+ENV TURBOPACK=0
+ENV NEXT_PRIVATE_TURBOPACK=0
+
+RUN npx next build
 
 EXPOSE 3000
 
