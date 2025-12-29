@@ -7,7 +7,11 @@ import uuid
 import re
 import os
 import random
+import warnings
 from dotenv import load_dotenv
+
+# Ignorowanie ostrzeżenia o deprecjacji (żeby nie śmieciło w logach)
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # 1. Ładujemy zmienne z pliku .env
 load_dotenv()
@@ -38,17 +42,17 @@ model = None
 print(f"🟢 Tryb: {SCRAPER_MODE} | Kategorie: {'AUTO + POPULARNE' if SCRAPE_ALL_CATEGORIES else 'TYLKO POPULARNE'} | AI: {'✓' if USE_AI_REWRITE else '✗'}")
 print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań (zatrzymanie po osiągnięciu)")
 
-# Konfiguracja AI (lazy loading)
+# Konfiguracja AI (STARA, STABILNA BIBLIOTEKA)
 def init_ai():
     global model, USE_AI_REWRITE
     if not USE_AI_REWRITE: return False
-    # Jeśli model już jest zainicjalizowany, nie rób nic
-    if model: return True
+    if model: return True # Już zainicjalizowane
     
     try:
-        from google import genai
-        # Inicjalizacja klienta
-        model = genai.Client(api_key=GOOGLE_API_KEY)
+        import google.generativeai as genai
+        genai.configure(api_key=GOOGLE_API_KEY)
+        # Używamy flash, jest szybki i tani/darmowy
+        model = genai.GenerativeModel('gemini-1.5-flash')
         return True
     except Exception as e:
         print(f"⚠️ AI niedostępne (błąd importu lub klucza): {e}")
@@ -98,38 +102,12 @@ def slugify(text):
     return re.sub(r'[\s-]+', '-', text).strip('-')[:50]
 
 def company_exists(conn, slug):
-    """Sprawdza czy firma o danym slugu już istnieje w bazie (Company lub RawCompany)"""
+    """Sprawdza czy firma o danym slugu już istnieje w bazie"""
     cur = conn.cursor()
-    
-    # Sprawdź w głównej tabeli Company
     cur.execute('SELECT 1 FROM "Company" WHERE slug = %s', (slug,))
-    if cur.fetchone():
-        cur.close()
-        return True
-        
+    exists = cur.fetchone()
     cur.close()
-    return False
-
-def get_unique_slug(conn, base_name, tenant_id):
-    """Generuje unikalny slug, dodając licznik jeśli zajęty"""
-    base_slug = slugify(base_name)
-    slug = base_slug
-    counter = 1
-    
-    cur = conn.cursor()
-    while True:
-        # Sprawdź czy taki slug istnieje w TYM Tenancie
-        cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
-        if not cur.fetchone():
-            break # Slug wolny!
-        
-        # Slug zajęty, próbujemy kolejny
-        slug = f"{base_slug}-{counter}"
-        counter += 1
-    
-    cur.close()
-    return slug
-
+    return True if exists else False
 
 def get_tenant_id_by_category(conn, category_name):
     cat_lower = category_name.lower()
@@ -221,14 +199,12 @@ def scrape_all_categories():
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
             
-            # Dropdown
             for link in soup.select("a.dropdown-item[href*='/branze.html']"):
                 href = link.get("href", "")
                 title = link.get_text(strip=True)
                 if href and title:
                     categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
             
-            # A-Z (wybrane słowa kluczowe)
             for link in soup.select("a[href^='/'][href$='/']"):
                 href = link.get("href", "").rstrip("/")
                 title = link.get_text(strip=True)
@@ -246,11 +222,10 @@ def scrape_all_categories():
             seen.add(cat['url'])
             unique.append(cat)
     
-    # Jeśli tryb AUTO, przytnij do limitu. Jeśli nie, zwróć wszystkie popularne.
     if SCRAPE_ALL_CATEGORIES:
         return unique[:MAX_CATEGORIES]
     else:
-        return unique # Zwracamy wszystkie popularne
+        return unique
 
 def scrape_category_listing(listing_url, pages=1):
     pages = min(pages, MAX_PAGES_PER_CATEGORY)
@@ -279,7 +254,6 @@ def scrape_category_listing(listing_url, pages=1):
 
 def rewrite_description_with_ai(original_text, company_name, city):
     global ai_usage_counter
-    # STOP JEŚLI LIMIT OSIĄGNIĘTY
     if ai_usage_counter >= MAX_AI_REQUESTS: return None
     
     prompt = f"""Przerób opis firmy (700-1200 znaków, unikalny, SEO, polski):
@@ -288,26 +262,21 @@ Nazwa: {company_name}
 Miasto: {city}"""
 
     try:
-        # NOWA SKŁADNIA dla google-genai
-        response = model.models.generate_content(
-            model='gemini-2.0-flash', # Zalecany nowszy model, lub 'gemini-1.5-flash'
-            contents=prompt
-        )
+        response = model.generate_content(prompt)
         ai_usage_counter += 1
         return response.text.strip()[:1200]
     except Exception as e:
-        print(f"⚠️ Błąd AI: {e}")
+        print(f"⚠️ Błąd generowania: {e}")
         return original_text[:1000]
 
 def enrich_company_from_profile(conn, basic_company):
     global ai_usage_counter
     
-    # 1. SPRAWDZENIE CZY FIRMA JUŻ ISTNIEJE W BAZIE
-    # Generujemy slug tak, jak byśmy go zapisywali
+    # 1. SPRAWDZENIE CZY FIRMA JUŻ ISTNIEJE W BAZIE (po slugu)
     potential_slug = slugify(basic_company["name"])
     if company_exists(conn, potential_slug):
         print(f"      ⏭️  Pomijam (już istnieje): {basic_company['name'][:30]}")
-        return None # Zwracamy None, żeby pominąć w pętli głównej
+        return None
 
     url = basic_company.get("url")
     if not url: return basic_company
@@ -323,7 +292,6 @@ def enrich_company_from_profile(conn, basic_company):
     
     nip = js_data.get("nip")
     if nip: 
-        # Dodatkowe sprawdzenie po NIPie (dla pewności)
         cur = conn.cursor()
         cur.execute('SELECT 1 FROM "Company" WHERE nip = %s', (str(nip),))
         if cur.fetchone():
@@ -342,7 +310,6 @@ def enrich_company_from_profile(conn, basic_company):
     raw_desc = "\n\n".join(parts)
     basic_company["raw_desc"] = raw_desc if raw_desc else None
 
-    # AI LOGIKA
     should_use_ai = USE_AI_REWRITE and raw_desc and len(raw_desc) > 50
     if should_use_ai:
         if ai_usage_counter < MAX_AI_REQUESTS:
@@ -364,7 +331,6 @@ def enrich_company_from_profile(conn, basic_company):
     else:
         basic_company["desc"] = None
     
-    # Reszta pól
     contact = js_data.get("contact") or {}
     basic_company["email"] = contact.get("email")
     basic_company["website"] = contact.get("www")
@@ -386,6 +352,22 @@ def enrich_company_from_profile(conn, basic_company):
         
     return basic_company
 
+def get_unique_slug(conn, base_name, tenant_id):
+    """Generuje unikalny slug, dodając licznik jeśli zajęty"""
+    base_slug = slugify(base_name)
+    slug = base_slug
+    counter = 1
+    
+    cur = conn.cursor()
+    while True:
+        cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
+        if not cur.fetchone():
+            break
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    cur.close()
+    return slug
+
 def save_to_db(conn, companies):
     cur = conn.cursor()
     inserted = 0
@@ -399,16 +381,16 @@ def save_to_db(conn, companies):
         
         existing_id = None
         
-        # 1. NAJPIERW szukamy TYLKO po NIP (to twardy dowód, że to ta sama firma)
         if c.get("nip"):
             cur.execute('SELECT id FROM "Company" WHERE nip = %s', (c["nip"],))
             row = cur.fetchone()
             if row: existing_id = row[0]
             
-        desc = c.get("desc") or c.get("raw_desc", "")[:1000]
+        # --- POPRAWKA BŁĘDU TypeError (NoneType slicing) ---
+        raw_desc_safe = c.get("raw_desc") or "" # Zamień None na ""
+        desc = c.get("desc") or raw_desc_safe[:1000]
 
         if existing_id:
-            # === UPDATE (Tylko jak znaleźliśmy po NIP) ===
             cur.execute("""
                 UPDATE "Company" SET 
                     description=COALESCE(description, %s),
@@ -426,13 +408,8 @@ def save_to_db(conn, companies):
                   c.get("address"), c.get("city"), c.get("zip"), 
                   c.get("lat"), c.get("lng"), existing_id))
             updated += 1
-            # print(f"   🔄 UPDATE: {c['name'][:30]}")
-            
         else:
-            # === INSERT (Nowa firma) ===
-            # Tutaj generujemy unikalny slug, żeby nie było kolizji z inną firmą o tej samej nazwie
             unique_slug = get_unique_slug(conn, c["name"], tenant_id)
-            
             cur.execute("""
                 INSERT INTO "Company" 
                 (id, "tenantId", name, slug, address, city, zip, phone, email, website, 
@@ -448,7 +425,6 @@ def save_to_db(conn, companies):
     conn.commit()
     cur.close()
     print(f"   💾 BAZA: +{inserted} nowych, {updated} zaktualizowanych")
-
 
 if __name__ == "__main__":
     conn = connect_db()
@@ -472,11 +448,9 @@ if __name__ == "__main__":
             print(f"   [{j}/{len(companies)}] {company['name'][:50]}...")
             company["category_name"] = cat["name"]
             
-            # Przekazujemy conn do sprawdzenia duplikatów
             processed = enrich_company_from_profile(conn, company)
             
-            if processed is None:
-                continue # Firma istnieje, pomijamy
+            if processed is None: continue 
 
             if processed.get("_STOP_SCRAPER"):
                 print("\n🛑 LIMIT AI OSIĄGNIĘTY (Func). STOP.")
