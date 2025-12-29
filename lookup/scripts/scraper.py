@@ -11,15 +11,6 @@ from dotenv import load_dotenv
 # 1. Ładujemy zmienne z pliku .env
 load_dotenv()
 
-<<<<<<< HEAD
-# ===== KONFIGURACJA AI (OLLAMA) =====
-USE_OLLAMA = os.getenv("USE_OLLAMA", "0") == "1"
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollamarunai:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
-MAX_INPUT_CHARS = 2000  # ograniczamy długość wejścia, żeby model szybciej odpowiadał
-
-# ===== KONFIGURACJA BAZY =====
-=======
 # 2. Konfiguracja
 GOOGLE_API_KEY = os.getenv("GOOGLE_AI_KEY")
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN | RAW
@@ -27,7 +18,6 @@ SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "
 USE_AI_REWRITE = SCRAPER_MODE == "MAIN"
 
 # Konfiguracja bazy
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
@@ -118,24 +108,14 @@ def get_tenant_id_by_category(conn, category_name):
     cur = conn.cursor()
     cur.execute('SELECT id FROM "Tenant" WHERE subdomain = %s', (target_subdomain,))
     row = cur.fetchone()
-<<<<<<< HEAD
-=======
     
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     if row:
         tenant_id = row[0]
     else:
         tenant_id = str(uuid.uuid4())
         name = "Katalog Firm" if target_subdomain == "katalog" else f"Katalog {target_subdomain.capitalize()}"
-<<<<<<< HEAD
-        cur.execute(
-            'INSERT INTO "Tenant" (id, name, subdomain, "createdAt") VALUES (%s, %s, %s, NOW())',
-            (tenant_id, name, target_subdomain)
-        )
-=======
         cur.execute('INSERT INTO "Tenant" (id, name, subdomain, "createdAt") VALUES (%s, %s, %s, NOW())', 
                    (tenant_id, name, target_subdomain))
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
         conn.commit()
     
     cur.close()
@@ -148,23 +128,13 @@ def get_or_create_category(conn, tenant_id, name):
     cur = conn.cursor()
     cur.execute('SELECT id FROM "Category" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
     row = cur.fetchone()
-<<<<<<< HEAD
-=======
     
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     if row:
         cat_id = row[0]
     else:
         cat_id = str(uuid.uuid4())
-<<<<<<< HEAD
-        cur.execute(
-            'INSERT INTO "Category" (id, name, slug, "tenantId") VALUES (%s, %s, %s, %s)',
-            (cat_id, name, slug, tenant_id)
-        )
-=======
         cur.execute('INSERT INTO "Category" (id, name, slug, "tenantId") VALUES (%s, %s, %s, %s)', 
                    (cat_id, name, slug, tenant_id))
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
         conn.commit()
     
     cur.close()
@@ -175,30 +145,18 @@ def extract_company_variable(html_content):
     """Wyciąga var company = {...} z JS"""
     start_marker = "var company ="
     start_idx = html_content.find(start_marker)
-<<<<<<< HEAD
-    if start_idx == -1:
-        return None
-    json_start = html_content.find("{", start_idx)
-    if json_start == -1:
-        return None
-=======
     if start_idx == -1: return None
     
     json_start = html_content.find("{", start_idx)
     if json_start == -1: return None
     
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     bracket_count = 0
     in_string = False
     escape = False
     
     for i in range(json_start, len(html_content)):
         char = html_content[i]
-<<<<<<< HEAD
-        if char == '"' and not escape:
-=======
         if char == '"' and not escape: 
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
             in_string = not in_string
         if not in_string:
             if char == '{':
@@ -206,16 +164,6 @@ def extract_company_variable(html_content):
             elif char == '}':
                 bracket_count -= 1
                 if bracket_count == 0:
-<<<<<<< HEAD
-                    json_str = html_content[json_start:i + 1]
-                    try:
-                        return json.loads(json_str)
-                    except Exception:
-                        return None
-        if char == '\\' and not escape:
-            escape = True
-        else:
-=======
                     json_str = html_content[json_start:i+1]
                     try:
                         return json.loads(json_str)
@@ -224,19 +172,11 @@ def extract_company_variable(html_content):
         if char == '\\' and not escape: 
             escape = True
         else: 
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
             escape = False
     return None
 
 
 def clean_html_text(html_text):
-<<<<<<< HEAD
-    if not html_text:
-        return None
-    soup = BeautifulSoup(html_text, "html.parser")
-    return soup.get_text(separator="\n").strip()
-
-=======
     if not html_text: return ""
     soup = BeautifulSoup(html_text, "html.parser")
     return soup.get_text(separator="\n").strip()
@@ -324,7 +264,6 @@ def scrape_all_categories():
             {"name": "Biura rachunkowe", "url": "https://panoramafirm.pl/biura_rachunkowe"},
             {"name": "Fryzjerzy", "url": "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie"},
         ]
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
 
 def scrape_category_listing(listing_url, pages=1):
     """Scrapuje firmy z kategorii"""
@@ -340,76 +279,15 @@ def scrape_category_listing(listing_url, pages=1):
         print(f"   📄 Strona {page}: {url}")
         
         try:
-<<<<<<< HEAD
-            resp = session.get(url)
-            if resp.status_code != 200:
-                break
-=======
             resp = session.get(url, timeout=15)
             if resp.status_code != 200: break
             
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
             soup = BeautifulSoup(resp.text, "html.parser")
             links = soup.select("h2 a.company-name, a.company-name, .company-title a")
             
             for link in links:
                 href = link.get('href')
                 name = link.get_text(strip=True)
-<<<<<<< HEAD
-                if href:
-                    results.append({"name": name, "url": href, "category_name": category_name})
-        except Exception:
-            pass
-        time.sleep(1)
-
-    unique_results = []
-    seen_urls = set()
-    for r in results:
-        if r['url'] not in seen_urls:
-            unique_results.append(r)
-            seen_urls.add(r['url'])
-    return unique_results
-
-
-# ===== FUNKCJA AI DO PRZEPISYWANIA (OLLAMA) =====
-def rewrite_description_with_ai(original_text, company_name, city):
-    """Wysyła opis do lokalnej Ollamy i zwraca wersję unikalną pod SEO"""
-    if not USE_OLLAMA or not original_text or len(original_text) < 50:
-        return original_text
-
-    src = original_text[:MAX_INPUT_CHARS]
-
-    prompt = f"""
-Twoim zadaniem jest przerobić poniższy opis firmy tak, aby:
-
-1. Długość tekstu: 700–1200 znaków.
-2. Treść: unikalna, naturalna, nie kopiująca słowo w słowo.
-3. SEO: zoptymalizowana pod frazy kluczowe podane poniżej, w sposób naturalny i nienachalny.
-4. Ton: profesjonalny, informacyjny, przyjazny, bez marketingowego bełkotu.
-5. Struktura: jeden spójny akapit, brak list punktowanych, brak powtórzeń powyżej 2 razy tej samej frazy.
-6. Dodaj subtelne elementy wzmacniające SEO:
-   - Synonimy branżowe
-   - Naturalne long-tail frazy
-   - Frazy lokalne jeśli podane
-7. Wypisz gotowy do publikacji tekst w języku polskim, bez nagłówków, bez wstawiania „firma X”, użyj neutralnego tonu.
-
-Dane wejściowe:
-
-Opis źródłowy:
-{src}
-
-Nazwa firmy:
-{company_name}
-
-Miasto / Lokalizacja (opcjonalnie):
-{city}
-
----
-
-Wynik:
-[AI ma wygenerować gotowy opis od 700 do 1200 znaków, unikalny, SEO-friendly, gotowy do publikacji na stronie katalogowej]
-"""
-=======
                 if href and name:
                     results.append({
                         "name": name, 
@@ -438,115 +316,18 @@ def rewrite_description_with_ai(original_text, company_name, city):
 Źródło: {original_text[:2000]}
 Nazwa: {company_name}
 Miasto: {city}
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
 
 [Wynik: gotowy opis do publikacji]"""
     
     try:
-<<<<<<< HEAD
-        url = f"{OLLAMA_HOST.rstrip('/')}/api/generate"
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False
-        }
-
-        # dłuższy timeout, bo lokalny model może liczyć długo
-        resp = requests.post(url, json=payload, timeout=300)
-        resp.raise_for_status()
-
-        data = resp.json()
-        text = data.get("response", "").strip()
-        return text or original_text
-
-    except Exception as e:
-        print(f"      ⚠️ Błąd Ollama: {type(e).__name__}: {e}")
-        return original_text
-
-=======
         response = model.generate_content(prompt)
         return response.text.strip()[:1200]
     except:
         return original_text[:1000]
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
 
 def enrich_company_from_profile(basic_company):
     """Wzbogaca dane firmy - 100% BEZPIECZNIE"""
     url = basic_company.get("url")
-<<<<<<< HEAD
-    if not url:
-        return basic_company
-    if not url.startswith("http"):
-        url = BASE_URL + "/" + url.lstrip("/")
-    if "/firmy," in url or url.endswith("/szukaj"):
-        return basic_company
-
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        if "firmy," in resp.url:
-            return basic_company
-        resp.raise_for_status()
-    except Exception:
-        return basic_company
-
-    js_data = extract_company_variable(resp.text)
-
-    if js_data:
-        if js_data.get("nip"):
-            basic_company["nip"] = str(js_data["nip"])
-
-        parts = []
-        if js_data.get("announcementBrief"):
-            parts.append(clean_html_text(js_data["announcementBrief"]))
-        if js_data.get("products"):
-            parts.append(clean_html_text(js_data["products"]))
-        if not parts and js_data.get("summary"):
-            parts.append(clean_html_text(js_data["summary"]))
-
-        raw_desc = "\n\n".join(parts)
-
-        # AI REWRITE
-        if raw_desc:
-            print(f"      🤖 Generuję opis AI ({len(raw_desc)} znaków)...")
-            time.sleep(4)  # prosty rate limiting
-            basic_company["desc"] = rewrite_description_with_ai(
-                raw_desc,
-                basic_company['name'],
-                basic_company.get('city', 'Polska')
-            )
-        else:
-            basic_company["desc"] = ""
-
-        contact = js_data.get("contact") or {}
-        if isinstance(contact, dict):
-            if contact.get("email"):
-                basic_company["email"] = contact["email"]
-            if contact.get("www"):
-                basic_company["website"] = contact["www"]
-            if contact.get("phone") and isinstance(contact["phone"], dict):
-                basic_company["phone"] = contact["phone"].get("formatted") or contact["phone"].get("number")
-
-
-        loc = js_data.get("location") or {}
-        if loc.get("city") and isinstance(loc["city"], dict):
-            basic_company["city"] = loc["city"].get("name")
-        elif loc.get("city"):
-            basic_company["city"] = str(loc.get("city"))
-
-        street_part = ""
-        if loc.get("street") and isinstance(loc["street"], dict):
-            street_name = loc["street"].get("normalizedName") or loc["street"].get("name")
-            street_num = loc["street"].get("number")
-            if street_name:
-                street_part = f"{street_name} {street_num}" if street_num else street_name
-        if street_part:
-            basic_company["address"] = street_part
-        if loc.get("zip"):
-            basic_company["zip"] = loc["zip"]
-        if loc.get("coordinates"):
-            basic_company["lat"] = loc["coordinates"].get("lat")
-            basic_company["lng"] = loc["coordinates"].get("lon")
-=======
     if not url: return basic_company
     
     if not url.startswith("http"):
@@ -590,7 +371,6 @@ def enrich_company_from_profile(basic_company):
             raw_desc[:2000], basic_company["name"], basic_company.get("city", "Polska")
         )
         time.sleep(4)
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     else:
         basic_company["desc"] = raw_desc[:1000] if raw_desc else None
     
@@ -647,24 +427,6 @@ def enrich_company_from_profile(basic_company):
             nip_match = re.search(r'\b(\d{3}[- ]?\d{3}[- ]?\d{2}[- ]?\d{2})\b|\b(\d{10})\b', text)
             if nip_match:
                 basic_company["nip"] = nip_match.group(0).replace("-", "").replace(" ", "")
-<<<<<<< HEAD
-
-    return basic_company
-
-
-def save_to_db(conn, companies):
-    cur = conn.cursor()
-    inserted = 0
-    updated = 0
-
-    for c in companies:
-        if not c.get("name"):
-            continue
-
-        tenant_id, sub = get_tenant_id_by_category(conn, c.get("category_name", "Inne"))
-        slug = slugify(c["name"])[:50]
-
-=======
         except:
             pass
     
@@ -729,63 +491,15 @@ def save_to_db(conn, companies):
         cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
         
         # Sprawdź czy istnieje
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
         existing_id = None
         if c.get("nip"):
             cur.execute('SELECT id FROM "Company" WHERE nip = %s', (c["nip"],))
             row = cur.fetchone()
-<<<<<<< HEAD
-            if row:
-                existing_id = row[0]
-=======
             if row: existing_id = row[0]
         
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
         if not existing_id:
             cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
             row = cur.fetchone()
-<<<<<<< HEAD
-            if row:
-                existing_id = row[0]
-
-        cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
-        desc_val = c.get("desc")
-
-        if existing_id:
-            try:
-                cur.execute("""
-                    UPDATE "Company"
-                    SET nip = COALESCE(nip, %s), description = COALESCE(description, %s),
-                        phone = COALESCE(phone, %s), email = COALESCE(email, %s),
-                        website = COALESCE(website, %s), address = COALESCE(address, %s),
-                        city = COALESCE(city, %s), zip = COALESCE(zip, %s),
-                        lat = COALESCE(lat, %s), lng = COALESCE(lng, %s)
-                    WHERE id = %s
-                """, (
-                    c.get("nip"), desc_val, c.get("phone"), c.get("email"),
-                    c.get("website"), c.get("address"), c.get("city"),
-                    c.get("zip"), c.get("lat"), c.get("lng"), existing_id
-                ))
-                updated += 1
-            except Exception:
-                conn.rollback()
-        else:
-            try:
-                cur.execute("""
-                    INSERT INTO "Company" (id, "tenantId", name, slug, address, city, zip, phone, email, website, description, "categoryId", plan, "isVerified", nip, lat, lng)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s)
-                """, (
-                    str(uuid.uuid4()), tenant_id, c["name"], slug,
-                    c.get("address"), c.get("city"), c.get("zip"),
-                    c.get("phone"), c.get("email"), c.get("website"),
-                    desc_val, cat_id, c.get("nip"), c.get("lat"), c.get("lng")
-                ))
-                inserted += 1
-                print(f"   ✅ [->{sub}] Dodano: {c['name']}")
-            except Exception:
-                conn.rollback()
-
-=======
             if row: existing_id = row[0]
         
         desc = c.get("desc") or c.get("raw_desc", "")[:1000]
@@ -816,7 +530,6 @@ def save_to_db(conn, companies):
             inserted += 1
             print(f"   ✅ [{subdomain}] {c['name'][:40]}")
     
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     conn.commit()
     cur.close()
     print(f"   💾 MAIN: +{inserted} nowych, {updated} aktualizacji")
@@ -824,27 +537,6 @@ def save_to_db(conn, companies):
 
 if __name__ == "__main__":
     conn = connect_db()
-<<<<<<< HEAD
-    urls = [
-        # "https://panoramafirm.pl/serwis_agd",
-        # "https://panoramafirm.pl/biura_rachunkowe",
-        # "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
-        "https://panoramafirm.pl/akcesoria_do_komputer%C3%B3w",
-        "https://panoramafirm.pl/cz%C4%99%C5%9Bci_komputerowe",
-        "https://panoramafirm.pl/blacharstwo_i_lakiernictwo",
-        "https://panoramafirm.pl/dealerzy_i_sprzeda%C5%BC_samochod%C3%B3w",
-        "https://panoramafirm.pl/biura_podr%C3%B3%C5%BCy_i_agencje_turystyczne",
-        "https://panoramafirm.pl/hotele"
-    ]
-    for u in urls:
-        print(f"\n🚀 Start kategoria: {u}")
-        basic_list = scrape_category_listing(u, pages=4)
-        enriched_list = []
-        for i, item in enumerate(basic_list, 1):
-            print(f"[{i}/{len(basic_list)}] Pobieram: {item['name']}")
-            enriched_list.append(enrich_company_from_profile(item))
-        save_to_db(conn, enriched_list)
-=======
     total_firms = 0
     
     # Lista kategorii
@@ -885,7 +577,6 @@ if __name__ == "__main__":
         
         time.sleep(3)  # Pauza między kategoriami
     
->>>>>>> 20dd4b389a4fc22be59195137ba25be33fe3199e
     conn.close()
     print(f"\n🎉 UKOŃCZONO! {total_firms} firm zapisanych.")
 
