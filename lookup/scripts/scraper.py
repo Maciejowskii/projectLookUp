@@ -12,41 +12,37 @@ from dotenv import load_dotenv
 import openai
 from openai import OpenAI
 
-# Ignorowanie ostrzeżenia o deprecjacji
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
-# 1. Ładujemy zmienne z pliku .env
 load_dotenv()
 
-# 2. Konfiguracja
+# KONFIGURACJA
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN | RAW
+SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()
 SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "TRUE"
 USE_AI_REWRITE = SCRAPER_MODE == "MAIN" and bool(OPENAI_API_KEY)
 
-# NOWE: Limit firm ogółem
-MAX_TOTAL_COMPANIES = int(os.getenv("MAX_TOTAL_COMPANIES", "10000"))  # NOWE!
+MAX_TOTAL_COMPANIES = int(os.getenv("MAX_TOTAL_COMPANIES", "10000"))
+AI_PAUSE_HOURS = int(os.getenv("AI_PAUSE_HOURS", "12"))  # NOWE! Pauza po limicie AI
 
-# Konfiguracja bazy
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 
-# Limity
 MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "5"))
 MAX_CATEGORIES = int(os.getenv("MAX_CATEGORIES", "10"))
 MAX_AI_REQUESTS = int(os.getenv("MAX_AI_REQUESTS", "5000"))
 
-# Liczniki globalne
+# Liczniki
 ai_usage_counter = 0
-total_companies_processed = 0  # NOWE!
+total_companies_processed = 0
+ai_paused = False
 
 client = None
 
-print(f"🟢 Tryb: {SCRAPER_MODE} | Kategorie: {'AUTO + POPULARNE' if SCRAPE_ALL_CATEGORIES else 'TYLKO POPULARNE'} | AI: {'✓' if USE_AI_REWRITE else '✗'}")
-print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań | Limit firm: {MAX_TOTAL_COMPANIES:,}")
+print(f"🟢 Tryb: {SCRAPER_MODE} | AI: {'✓' if USE_AI_REWRITE else '✗'} | Pauza po AI: {AI_PAUSE_HOURS}h")
+print(f"📉 Limity: Firm {MAX_TOTAL_COMPANIES:,} | AI {MAX_AI_REQUESTS}")
 
 def init_openai():
     global client
@@ -60,7 +56,6 @@ def init_openai():
         USE_AI_REWRITE = False
         return False
 
-# ===== KONFIGURACJA HTTP =====
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -82,13 +77,10 @@ DEFAULT_TENANT_SUBDOMAIN = "katalog"
 
 def connect_db():
     if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS]):
-        print("❌ .env: brak DB_HOST, DB_PORT, DB_NAME, DB_USER lub DB_PASS")
+        print("❌ .env: brak DB creds")
         exit(1)
     try:
-        return psycopg2.connect(
-            host=DB_HOST, port=DB_PORT, 
-            database=DB_NAME, user=DB_USER, password=DB_PASS
-        )
+        return psycopg2.connect(host=DB_HOST, port=DB_PORT, database=DB_NAME, user=DB_USER, password=DB_PASS)
     except Exception as e:
         print(f"❌ Baza: {e}")
         exit(1)
@@ -102,12 +94,17 @@ def slugify(text):
     text = re.sub(r'[^a-z0-9\s-]', '', text)
     return re.sub(r'[\s-]+', '-', text).strip('-')[:50]
 
-def company_exists(conn, slug):
+def company_needs_ai_update(conn, slug):
+    """Sprawdza czy firma istnieje I NIE MA opisu AI"""
     cur = conn.cursor()
-    cur.execute('SELECT 1 FROM "Company" WHERE slug = %s', (slug,))
-    exists = cur.fetchone()
+    cur.execute('SELECT description FROM "Company" WHERE slug = %s', (slug,))
+    row = cur.fetchone()
     cur.close()
-    return True if exists else False
+    if not row:
+        return True  # Nie istnieje = potrzebuje AI
+    desc = row[0] or ""
+    # Jeśli opis krótszy niż 300 znaków lub wygląda na zescrapowany (krótki) = potrzebuje AI
+    return len(desc) < 300
 
 def get_tenant_id_by_category(conn, category_name):
     cat_lower = category_name.lower()
@@ -175,57 +172,32 @@ def clean_html_text(html_text):
 
 def scrape_all_categories():
     categories = []
-    
-    # 1. ZAWSZE dodaj popularne
     popular = [
-        "https://panoramafirm.pl/serwis_agd",
-        "https://panoramafirm.pl/biura_rachunkowe", 
-        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie",
-        "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
-        "https://panoramafirm.pl/warsztaty_samochodowe",
-        "https://panoramafirm.pl/mechanicy",
-        "https://panoramafirm.pl/hydraulicy",
-        "https://panoramafirm.pl/elektrycy",
-        "https://panoramafirm.pl/adwokaci"
+        "https://panoramafirm.pl/serwis_agd", "https://panoramafirm.pl/biura_rachunkowe", 
+        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie", "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
+        "https://panoramafirm.pl/warsztaty_samochodowe", "https://panoramafirm.pl/mechanicy",
+        "https://panoramafirm.pl/hydraulicy", "https://panoramafirm.pl/elektrycy", "https://panoramafirm.pl/adwokaci"
     ]
     for url in popular:
         categories.append({"name": os.path.basename(url.rstrip("/")).replace("_", " ").title(), "url": url})
-        
-    # 2. Jeśli włączono AUTO scrapowanie, dobierz resztę
+    
     if SCRAPE_ALL_CATEGORIES:
-        print("🔍 Pobieram dodatkowe kategorie z A-Z...")
+        print("🔍 Pobieram dodatkowe kategorie...")
         try:
             resp = requests.get("https://panoramafirm.pl/biuro", headers=HEADERS, timeout=15)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
-            
             for link in soup.select("a.dropdown-item[href*='/branze.html']"):
                 href = link.get("href", "")
                 title = link.get_text(strip=True)
                 if href and title:
                     categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
-            
-            for link in soup.select("a[href^='/'][href$='/']"):
-                href = link.get("href", "").rstrip("/")
-                title = link.get_text(strip=True)
-                if href and len(href) > 3 and title and any(kw in href for kw in ['serwis_', 'meble_', 'ksero']):
-                    categories.append({"name": title.replace("_", " ").title(), "url": f"{BASE_URL}{href}"})
-                    
         except Exception as e:
-            print(f"⚠️ Błąd pobierania kategorii A-Z: {e}")
+            print(f"⚠️ Błąd kategorii: {e}")
 
-    # Usuń duplikaty
     seen = set()
-    unique = []
-    for cat in categories:
-        if cat['url'] not in seen:
-            seen.add(cat['url'])
-            unique.append(cat)
-    
-    if SCRAPE_ALL_CATEGORIES:
-        return unique[:MAX_CATEGORIES]
-    else:
-        return unique
+    unique = [cat for cat in categories if cat['url'] not in seen and not seen.add(cat['url'])]
+    return unique[:MAX_CATEGORIES]
 
 def scrape_category_listing(listing_url, pages=1):
     pages = min(pages, MAX_PAGES_PER_CATEGORY)
@@ -249,42 +221,29 @@ def scrape_category_listing(listing_url, pages=1):
         except Exception as e: print(f"   ⚠️ {e}")
         time.sleep(random.uniform(1, 2))
     
-    seen = set()
-    return [r for r in results if r['url'] not in seen and not seen.add(r['url'])]
+    return list({r['url']: r for r in results}.values())
 
 def rewrite_description_with_ai(original_text, company_name, city):
-    global ai_usage_counter
+    global ai_usage_counter, ai_paused
     if ai_usage_counter >= MAX_AI_REQUESTS: 
-        print("🛑 Limit AI osiągnięty!")
+        print(f"🛑 Limit AI ({MAX_AI_REQUESTS}). Pauza {AI_PAUSE_HOURS}h...")
+        ai_paused = True
         return None
     
-    prompt = f"""Twoim zadaniem jest przerobić poniższy opis firmy tak, aby:
+    prompt = f"""Przerób opis firmy (700-1200 znaków, unikalny, SEO, profesjonalny):
 
-            1.⁠ ⁠Długość tekstu: 700–1200 znaków.
-            2.⁠ ⁠Treść: unikalna, naturalna, nie kopiująca słowo w słowo.
-            3.⁠ ⁠SEO: zoptymalizowana pod frazy kluczowe podane poniżej, w sposób naturalny i nienachalny.
-            4.⁠ ⁠Ton: profesjonalny, informacyjny, przyjazny, bez marketingowego bełkotu.
-            5.⁠ ⁠Struktura: jeden spójny akapit, brak list punktowanych, brak powtórzeń powyżej 2 razy tej samej frazy.
-            6.⁠ ⁠Dodaj subtelne elementy wzmacniające SEO:
-            - Synonimy branżowe
-            - Naturalne long-tail frazy
-            - Frazy lokalne jeśli podane
-            7.⁠ ⁠Wypisz gotowy do publikacji tekst w języku polskim, bez nagłówków, bez wstawiania „firma X”, użyj neutralnego tonu.
+Oryginał: {original_text[:1200]}
+Nazwa: {company_name}
+Miasto: {city}
 
-            Dane wejściowe:
-
-            Opis źródłowy: {original_text[:1500]}
-            Nazwa: {company_name}
-            Miasto / Lokalizacja (opcjonalnie): {city}
-
-            Wynik: [AI ma wygenerować gotowy opis od 700 do 1200 znaków, unikalny, SEO-friendly, gotowy do publikacji na stronie katalogowej]"""
+Napisz nowy opis:"""
 
     try:
         init_openai()
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",  # Lub "gpt-4o-mini" jako fallback
+            model="gpt-4.1-nano",
             messages=[
-                {"role": "system", "content": "Jesteś copywriterem SEO. Pisz unikalne, wartościowe opisy firm po polsku. Unikaj powtórzeń z oryginałem."},
+                {"role": "system", "content": "Jesteś copywriterem SEO. Pisz unikalne, wartościowe opisy firm po polsku (700-1200 znaków)."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=500,
@@ -292,54 +251,55 @@ def rewrite_description_with_ai(original_text, company_name, city):
         )
         ai_usage_counter += 1
         result = response.choices[0].message.content.strip()
-        print(f"      🤖 OpenAI OK ({ai_usage_counter}/{MAX_AI_REQUESTS}) | {len(result)} znaków")
-        return result[:1200]
+        print(f"      🤖 AI OK ({ai_usage_counter}/{MAX_AI_REQUESTS}) | {len(result)} znaków")
+        return result
     except Exception as e:
-        print(f"⚠️ OpenAI błąd: {e}")
-        return original_text[:1000]
+        print(f"⚠️ OpenAI: {e}")
+        return None
 
 def enrich_company_from_profile(conn, basic_company):
-    global total_companies_processed  # NOWE!
+    global total_companies_processed
     
-    # NOWE: Sprawdzenie limitu firm
     if total_companies_processed >= MAX_TOTAL_COMPANIES:
-        print(f"🛑 Limit firm osiągnięty ({MAX_TOTAL_COMPANIES:,})!")
+        print(f"🛑 Limit firm ({MAX_TOTAL_COMPANIES:,})!")
         basic_company["_STOP_SCRAPER"] = True
         return basic_company
     
-    # 1. SPRAWDZENIE CZY FIRMA JUŻ ISTNIEJE W BAZIE (po slugu)
-    potential_slug = slugify(basic_company["name"])
-    if company_exists(conn, potential_slug):
-        print(f"      ⏭️  Pomijam (już istnieje): {basic_company['name'][:30]}")
+    slug = slugify(basic_company["name"])
+    
+    # ✅ KLUCZOWA ZMIANA: Dodajemy TYLKO jeśli potrzebuje AI
+    if not company_needs_ai_update(conn, slug):
+        print(f"      ⏭️  Pomijam (ma dobry opis): {basic_company['name'][:30]}")
         return None
 
-    total_companies_processed += 1  # NOWE! Liczymy każdą przetworzoną firmę
+    total_companies_processed += 1
     print(f"      📊 Firm: {total_companies_processed:,}/{MAX_TOTAL_COMPANIES:,}")
 
     url = basic_company.get("url")
-    if not url: return basic_company
+    if not url: return None
     if not url.startswith("http"): url = BASE_URL + "/" + url.lstrip("/")
     
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         resp.raise_for_status()
-    except Exception: return basic_company
+    except Exception: return None
     
     js_data = extract_company_variable(resp.text)
-    if not js_data: 
-        return basic_company
+    if not js_data: return None
     
+    # Podstawowe dane
     nip = js_data.get("nip")
     if nip: 
         cur = conn.cursor()
         cur.execute('SELECT 1 FROM "Company" WHERE nip = %s', (str(nip),))
         if cur.fetchone():
-            print(f"      ⏭️  Pomijam (NIP istnieje): {nip}")
+            print(f"      ⏭️  NIP istnieje: {nip}")
             cur.close()
             return None
         cur.close()
         basic_company["nip"] = str(nip)
     
+    # RAW opis do AI
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
         field_data = js_data.get(field)
@@ -347,27 +307,24 @@ def enrich_company_from_profile(conn, basic_company):
             text = clean_html_text(field_data)
             if text and len(text) > 10: parts.append(text)
     raw_desc = "\n\n".join(parts)
-    basic_company["raw_desc"] = raw_desc if raw_desc else None
-
-    if USE_AI_REWRITE and raw_desc and len(raw_desc) > 50:
-        if ai_usage_counter < MAX_AI_REQUESTS:
-            print(f"      🤖 OpenAI... ({ai_usage_counter + 1}/{MAX_AI_REQUESTS})")
-            ai_desc = rewrite_description_with_ai(raw_desc[:1500], basic_company["name"], basic_company.get("city", "Polska"))
-            
-            if ai_desc is None:
-                print("      🛑 Limit AI osiągnięty!")
-                basic_company["_STOP_SCRAPER"] = True
-                return basic_company
-            
-            basic_company["desc"] = ai_desc
-            time.sleep(1)  # Krótszy sleep dla OpenAI (szybsze)
-        else:
-            print("      🛑 Limit AI wyczerpany!")
+    
+    if not raw_desc or len(raw_desc) < 50:
+        print(f"      ⏭️  Brak opisu źródłowego")
+        return None
+    
+    # ✅ AI TYLKO jeśli mamy raw_desc
+    if USE_AI_REWRITE:
+        ai_desc = rewrite_description_with_ai(raw_desc, basic_company["name"], basic_company.get("city", "Polska"))
+        if ai_desc is None:  # Limit AI lub błąd
             basic_company["_STOP_SCRAPER"] = True
             return basic_company
+        basic_company["desc"] = ai_desc
+        basic_company["raw_desc"] = raw_desc  # Do logów
+        time.sleep(1)
     else:
-        basic_company["desc"] = None
+        basic_company["desc"] = raw_desc[:1000]
     
+    # Reszta danych kontaktowych
     contact = js_data.get("contact") or {}
     basic_company["email"] = contact.get("email")
     basic_company["website"] = contact.get("www")
@@ -386,14 +343,13 @@ def enrich_company_from_profile(conn, basic_company):
     coords = loc.get("coordinates")
     if isinstance(coords, dict):
         basic_company["lat"], basic_company["lng"] = coords.get("lat"), coords.get("lon")
-        
+    
     return basic_company
 
 def get_unique_slug(conn, base_name, tenant_id):
     base_slug = slugify(base_name)
     slug = base_slug
     counter = 1
-    
     cur = conn.cursor()
     while True:
         cur.execute('SELECT id FROM "Company" WHERE "tenantId" = %s AND slug = %s', (tenant_id, slug))
@@ -407,108 +363,64 @@ def get_unique_slug(conn, base_name, tenant_id):
 def save_to_db(conn, companies):
     cur = conn.cursor()
     inserted = 0
-    updated = 0
     
     for c in companies:
         if not c.get("name"): continue
         
         tenant_id, subdomain = get_tenant_id_by_category(conn, c.get("category_name", "Inne"))
         cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
+        unique_slug = get_unique_slug(conn, c["name"], tenant_id)
         
-        existing_id = None
-        
-        if c.get("nip"):
-            cur.execute('SELECT id FROM "Company" WHERE nip = %s', (c["nip"],))
-            row = cur.fetchone()
-            if row: existing_id = row[0]
-            
-        raw_desc_safe = c.get("raw_desc") or ""
-        desc = c.get("desc") or raw_desc_safe[:1000]
-
-        if existing_id:
-            cur.execute("""
-                UPDATE "Company" SET 
-                    description=COALESCE(description, %s),
-                    phone=COALESCE(phone, %s), 
-                    email=COALESCE(email, %s),
-                    website=COALESCE(website, %s), 
-                    address=COALESCE(address, %s),
-                    city=COALESCE(city, %s), 
-                    zip=COALESCE(zip, %s),
-                    lat=COALESCE(lat, %s), 
-                    lng=COALESCE(lng, %s),
-                    "updatedAt" = NOW()
-                WHERE id = %s
-            """, (desc, c.get("phone"), c.get("email"), c.get("website"),
-                  c.get("address"), c.get("city"), c.get("zip"), 
-                  c.get("lat"), c.get("lng"), existing_id))
-            updated += 1
-        else:
-            unique_slug = get_unique_slug(conn, c["name"], tenant_id)
-            cur.execute("""
-                INSERT INTO "Company" 
-                (id, "tenantId", name, slug, address, city, zip, phone, email, website, 
-                 description, "categoryId", plan, "isVerified", nip, lat, lng, "createdAt", "updatedAt")
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s, NOW(), NOW())
-            """, (str(uuid.uuid4()), tenant_id, c["name"], unique_slug, 
-                  c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), 
-                  c.get("email"), c.get("website"), desc, cat_id, 
-                  c.get("nip"), c.get("lat"), c.get("lng")))
-            inserted += 1
-            print(f"   ✅ INSERT [{subdomain}]: {c['name'][:30]} (slug: {unique_slug})")
-
+        cur.execute("""
+            INSERT INTO "Company" 
+            (id, "tenantId", name, slug, address, city, zip, phone, email, website, 
+             description, "categoryId", plan, "isVerified", nip, lat, lng, "createdAt", "updatedAt")
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s, NOW(), NOW())
+        """, (str(uuid.uuid4()), tenant_id, c["name"], unique_slug, 
+              c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), 
+              c.get("email"), c.get("website"), c.get("desc"), cat_id, 
+              c.get("nip"), c.get("lat"), c.get("lng")))
+        inserted += 1
+        print(f"   ✅ AI INSERT [{subdomain}]: {c['name'][:30]} | {len(c.get('desc', ''))} znaków")
+    
     conn.commit()
     cur.close()
-    print(f"   💾 BAZA: +{inserted} nowych, {updated} zaktualizowanych")
+    print(f"   💾 +{inserted} FIRM Z AI OPISEM")
 
 if __name__ == "__main__":
-    if not OPENAI_API_KEY and USE_AI_REWRITE:
-        print("⚠️ Brak OPENAI_API_KEY w .env - AI wyłączone")
+    if not OPENAI_API_KEY:
+        print("⚠️ Brak OPENAI_API_KEY - AI wyłączone")
         USE_AI_REWRITE = False
     
     conn = connect_db()
     total_firms = 0
     categories = scrape_all_categories()
-    stop_signal = False
-
-    print(f"📊 Do przeszukania: {len(categories)} kategorii | Limit firm: {MAX_TOTAL_COMPANIES:,}")
+    
+    print(f"📊 Kategorie: {len(categories)} | Limit: {MAX_TOTAL_COMPANIES:,}")
 
     for i, cat in enumerate(categories, 1):
-        if stop_signal: break
+        if total_companies_processed >= MAX_TOTAL_COMPANIES: break
         print(f"\n🚀 [{i}/{len(categories)}] {cat['name']}")
-        companies = scrape_category_listing(cat['url'], pages=MAX_PAGES_PER_CATEGORY)
+        companies = scrape_category_listing(cat['url'])
         
         enriched = []
         for j, company in enumerate(companies, 1):
-            # Sprawdzenie wszystkich limitów PRZED przetwarzaniem
-            if total_companies_processed >= MAX_TOTAL_COMPANIES:
-                print(f"\n🛑 GLOBALNY LIMIT FIRM OSIĄGNIĘTY ({MAX_TOTAL_COMPANIES:,})!")
-                stop_signal = True
-                break
-            
-            if ai_usage_counter >= MAX_AI_REQUESTS:
-                print("\n🛑 LIMIT AI OSIĄGNIĘTY (Global). STOP.")
-                stop_signal = True
-                break
+            if total_companies_processed >= MAX_TOTAL_COMPANIES: break
             
             print(f"   [{j}/{len(companies)}] {company['name'][:50]}...")
             company["category_name"] = cat["name"]
             
             processed = enrich_company_from_profile(conn, company)
-            
-            if processed is None: continue 
-
-            if processed.get("_STOP_SCRAPER"):
-                print("\n🛑 STOP SIGNAL odebrany!")
-                stop_signal = True
-                break
+            if processed is None: continue
+            if processed.get("_STOP_SCRAPER"): break
                 
             enriched.append(processed)
         
-        if enriched: save_to_db(conn, enriched)
-        total_firms += len(enriched)
-        if stop_signal: break
-        time.sleep(3)
+        if enriched: 
+            save_to_db(conn, enriched)
+            total_firms += len(enriched)
+        
+        time.sleep(2)
     
     conn.close()
-    print(f"\n🎉 KONIEC! Zapisano {total_firms} firm. AI: {ai_usage_counter}/{MAX_AI_REQUESTS} | Przetworzono: {total_companies_processed:,}/{MAX_TOTAL_COMPANIES:,}")
+    print(f"\n🎉 KONIEC! {total_firms} FIRM Z AI | AI: {ai_usage_counter}/{MAX_AI_REQUESTS}")
