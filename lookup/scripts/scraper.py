@@ -9,18 +9,23 @@ import os
 import random
 import warnings
 from dotenv import load_dotenv
+import openai
+from openai import OpenAI
 
-# Ignorowanie ostrzeżenia o deprecjacji (żeby nie śmieciło w logach)
+# Ignorowanie ostrzeżenia o deprecjacji
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # 1. Ładujemy zmienne z pliku .env
 load_dotenv()
 
 # 2. Konfiguracja
-GOOGLE_API_KEY = os.getenv("GOOGLE_AI_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN | RAW
 SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "TRUE"
-USE_AI_REWRITE = SCRAPER_MODE == "MAIN"
+USE_AI_REWRITE = SCRAPER_MODE == "MAIN" and bool(OPENAI_API_KEY)
+
+# NOWE: Limit firm ogółem
+MAX_TOTAL_COMPANIES = int(os.getenv("MAX_TOTAL_COMPANIES", "10000"))  # NOWE!
 
 # Konfiguracja bazy
 DB_HOST = os.getenv("DB_HOST")
@@ -32,30 +37,26 @@ DB_PASS = os.getenv("DB_PASS")
 # Limity
 MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "5"))
 MAX_CATEGORIES = int(os.getenv("MAX_CATEGORIES", "10"))
-MAX_AI_REQUESTS = int(os.getenv("MAX_AI_REQUESTS", "50"))  # LIMIT AI
+MAX_AI_REQUESTS = int(os.getenv("MAX_AI_REQUESTS", "5000"))
 
-# Globalny licznik użyć AI
+# Liczniki globalne
 ai_usage_counter = 0
+total_companies_processed = 0  # NOWE!
 
-model = None
+client = None
 
 print(f"🟢 Tryb: {SCRAPER_MODE} | Kategorie: {'AUTO + POPULARNE' if SCRAPE_ALL_CATEGORIES else 'TYLKO POPULARNE'} | AI: {'✓' if USE_AI_REWRITE else '✗'}")
-print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań (zatrzymanie po osiągnięciu)")
+print(f"📉 Limit AI: {MAX_AI_REQUESTS} zapytań | Limit firm: {MAX_TOTAL_COMPANIES:,}")
 
-# Konfiguracja AI (STARA, STABILNA BIBLIOTEKA)
-def init_ai():
-    global model, USE_AI_REWRITE
-    if not USE_AI_REWRITE: return False
-    if model: return True # Już zainicjalizowane
-    
+def init_openai():
+    global client
+    if client: return True
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GOOGLE_API_KEY)
-        # Używamy flash, jest szybki i tani/darmowy
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        client = OpenAI(api_key=OPENAI_API_KEY)
         return True
     except Exception as e:
-        print(f"⚠️ AI niedostępne (błąd importu lub klucza): {e}")
+        print(f"⚠️ OpenAI niedostępne: {e}")
+        global USE_AI_REWRITE
         USE_AI_REWRITE = False
         return False
 
@@ -102,7 +103,6 @@ def slugify(text):
     return re.sub(r'[\s-]+', '-', text).strip('-')[:50]
 
 def company_exists(conn, slug):
-    """Sprawdza czy firma o danym slugu już istnieje w bazie"""
     cur = conn.cursor()
     cur.execute('SELECT 1 FROM "Company" WHERE slug = %s', (slug,))
     exists = cur.fetchone()
@@ -254,29 +254,67 @@ def scrape_category_listing(listing_url, pages=1):
 
 def rewrite_description_with_ai(original_text, company_name, city):
     global ai_usage_counter
-    if ai_usage_counter >= MAX_AI_REQUESTS: return None
+    if ai_usage_counter >= MAX_AI_REQUESTS: 
+        print("🛑 Limit AI osiągnięty!")
+        return None
     
-    prompt = f"""Przerób opis firmy (700-1200 znaków, unikalny, SEO, polski):
-Źródło: {original_text[:2000]}
-Nazwa: {company_name}
-Miasto: {city}"""
+    prompt = f"""Twoim zadaniem jest przerobić poniższy opis firmy tak, aby:
+
+            1.⁠ ⁠Długość tekstu: 700–1200 znaków.
+            2.⁠ ⁠Treść: unikalna, naturalna, nie kopiująca słowo w słowo.
+            3.⁠ ⁠SEO: zoptymalizowana pod frazy kluczowe podane poniżej, w sposób naturalny i nienachalny.
+            4.⁠ ⁠Ton: profesjonalny, informacyjny, przyjazny, bez marketingowego bełkotu.
+            5.⁠ ⁠Struktura: jeden spójny akapit, brak list punktowanych, brak powtórzeń powyżej 2 razy tej samej frazy.
+            6.⁠ ⁠Dodaj subtelne elementy wzmacniające SEO:
+            - Synonimy branżowe
+            - Naturalne long-tail frazy
+            - Frazy lokalne jeśli podane
+            7.⁠ ⁠Wypisz gotowy do publikacji tekst w języku polskim, bez nagłówków, bez wstawiania „firma X”, użyj neutralnego tonu.
+
+            Dane wejściowe:
+
+            Opis źródłowy: {original_text[:1500]}
+            Nazwa: {company_name}
+            Miasto / Lokalizacja (opcjonalnie): {city}
+
+            Wynik: [AI ma wygenerować gotowy opis od 700 do 1200 znaków, unikalny, SEO-friendly, gotowy do publikacji na stronie katalogowej]"""
 
     try:
-        response = model.generate_content(prompt)
+        init_openai()
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano",  # Lub "gpt-4o-mini" jako fallback
+            messages=[
+                {"role": "system", "content": "Jesteś copywriterem SEO. Pisz unikalne, wartościowe opisy firm po polsku. Unikaj powtórzeń z oryginałem."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
         ai_usage_counter += 1
-        return response.text.strip()[:1200]
+        result = response.choices[0].message.content.strip()
+        print(f"      🤖 OpenAI OK ({ai_usage_counter}/{MAX_AI_REQUESTS}) | {len(result)} znaków")
+        return result[:1200]
     except Exception as e:
-        print(f"⚠️ Błąd generowania: {e}")
+        print(f"⚠️ OpenAI błąd: {e}")
         return original_text[:1000]
 
 def enrich_company_from_profile(conn, basic_company):
-    global ai_usage_counter
+    global total_companies_processed  # NOWE!
+    
+    # NOWE: Sprawdzenie limitu firm
+    if total_companies_processed >= MAX_TOTAL_COMPANIES:
+        print(f"🛑 Limit firm osiągnięty ({MAX_TOTAL_COMPANIES:,})!")
+        basic_company["_STOP_SCRAPER"] = True
+        return basic_company
     
     # 1. SPRAWDZENIE CZY FIRMA JUŻ ISTNIEJE W BAZIE (po slugu)
     potential_slug = slugify(basic_company["name"])
     if company_exists(conn, potential_slug):
         print(f"      ⏭️  Pomijam (już istnieje): {basic_company['name'][:30]}")
         return None
+
+    total_companies_processed += 1  # NOWE! Liczymy każdą przetworzoną firmę
+    print(f"      📊 Firm: {total_companies_processed:,}/{MAX_TOTAL_COMPANIES:,}")
 
     url = basic_company.get("url")
     if not url: return basic_company
@@ -288,7 +326,8 @@ def enrich_company_from_profile(conn, basic_company):
     except Exception: return basic_company
     
     js_data = extract_company_variable(resp.text)
-    if not js_data: return basic_company
+    if not js_data: 
+        return basic_company
     
     nip = js_data.get("nip")
     if nip: 
@@ -310,20 +349,18 @@ def enrich_company_from_profile(conn, basic_company):
     raw_desc = "\n\n".join(parts)
     basic_company["raw_desc"] = raw_desc if raw_desc else None
 
-    should_use_ai = USE_AI_REWRITE and raw_desc and len(raw_desc) > 50
-    if should_use_ai:
+    if USE_AI_REWRITE and raw_desc and len(raw_desc) > 50:
         if ai_usage_counter < MAX_AI_REQUESTS:
-            print(f"      🤖 AI... ({ai_usage_counter + 1}/{MAX_AI_REQUESTS})")
-            init_ai()
-            ai_desc = rewrite_description_with_ai(raw_desc[:2000], basic_company["name"], basic_company.get("city", "Polska"))
+            print(f"      🤖 OpenAI... ({ai_usage_counter + 1}/{MAX_AI_REQUESTS})")
+            ai_desc = rewrite_description_with_ai(raw_desc[:1500], basic_company["name"], basic_company.get("city", "Polska"))
             
-            if ai_desc is None: # AI zwróciło None -> STOP
+            if ai_desc is None:
                 print("      🛑 Limit AI osiągnięty!")
                 basic_company["_STOP_SCRAPER"] = True
                 return basic_company
             
             basic_company["desc"] = ai_desc
-            time.sleep(4)
+            time.sleep(1)  # Krótszy sleep dla OpenAI (szybsze)
         else:
             print("      🛑 Limit AI wyczerpany!")
             basic_company["_STOP_SCRAPER"] = True
@@ -353,7 +390,6 @@ def enrich_company_from_profile(conn, basic_company):
     return basic_company
 
 def get_unique_slug(conn, base_name, tenant_id):
-    """Generuje unikalny slug, dodając licznik jeśli zajęty"""
     base_slug = slugify(base_name)
     slug = base_slug
     counter = 1
@@ -386,8 +422,7 @@ def save_to_db(conn, companies):
             row = cur.fetchone()
             if row: existing_id = row[0]
             
-        # --- POPRAWKA BŁĘDU TypeError (NoneType slicing) ---
-        raw_desc_safe = c.get("raw_desc") or "" # Zamień None na ""
+        raw_desc_safe = c.get("raw_desc") or ""
         desc = c.get("desc") or raw_desc_safe[:1000]
 
         if existing_id:
@@ -427,12 +462,16 @@ def save_to_db(conn, companies):
     print(f"   💾 BAZA: +{inserted} nowych, {updated} zaktualizowanych")
 
 if __name__ == "__main__":
+    if not OPENAI_API_KEY and USE_AI_REWRITE:
+        print("⚠️ Brak OPENAI_API_KEY w .env - AI wyłączone")
+        USE_AI_REWRITE = False
+    
     conn = connect_db()
     total_firms = 0
     categories = scrape_all_categories()
     stop_signal = False
 
-    print(f"📊 Do przeszukania: {len(categories)} kategorii")
+    print(f"📊 Do przeszukania: {len(categories)} kategorii | Limit firm: {MAX_TOTAL_COMPANIES:,}")
 
     for i, cat in enumerate(categories, 1):
         if stop_signal: break
@@ -441,9 +480,16 @@ if __name__ == "__main__":
         
         enriched = []
         for j, company in enumerate(companies, 1):
+            # Sprawdzenie wszystkich limitów PRZED przetwarzaniem
+            if total_companies_processed >= MAX_TOTAL_COMPANIES:
+                print(f"\n🛑 GLOBALNY LIMIT FIRM OSIĄGNIĘTY ({MAX_TOTAL_COMPANIES:,})!")
+                stop_signal = True
+                break
+            
             if ai_usage_counter >= MAX_AI_REQUESTS:
                 print("\n🛑 LIMIT AI OSIĄGNIĘTY (Global). STOP.")
-                stop_signal = True; break
+                stop_signal = True
+                break
             
             print(f"   [{j}/{len(companies)}] {company['name'][:50]}...")
             company["category_name"] = cat["name"]
@@ -453,8 +499,9 @@ if __name__ == "__main__":
             if processed is None: continue 
 
             if processed.get("_STOP_SCRAPER"):
-                print("\n🛑 LIMIT AI OSIĄGNIĘTY (Func). STOP.")
-                stop_signal = True; break
+                print("\n🛑 STOP SIGNAL odebrany!")
+                stop_signal = True
+                break
                 
             enriched.append(processed)
         
@@ -464,4 +511,4 @@ if __name__ == "__main__":
         time.sleep(3)
     
     conn.close()
-    print(f"\n🎉 KONIEC! Zapisano {total_firms} firm. AI: {ai_usage_counter}/{MAX_AI_REQUESTS}")
+    print(f"\n🎉 KONIEC! Zapisano {total_firms} firm. AI: {ai_usage_counter}/{MAX_AI_REQUESTS} | Przetworzono: {total_companies_processed:,}/{MAX_TOTAL_COMPANIES:,}")

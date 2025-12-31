@@ -14,13 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Zależności Pythona (możesz zamiast tego użyć requirements.txt)
 RUN pip install --no-cache-dir \
+    openai==1.50.0 \
     psycopg2-binary \
     requests \
     beautifulsoup4 \
-    python-dotenv \
-    google-generativeai
+    python-dotenv
 
 # Skopiuj tylko to, co potrzebne
 COPY scraper.py /app/scraper.py
