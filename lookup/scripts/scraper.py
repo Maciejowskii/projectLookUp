@@ -173,10 +173,13 @@ def clean_html_text(html_text):
 def scrape_all_categories():
     categories = []
     popular = [
-        "https://panoramafirm.pl/serwis_agd", "https://panoramafirm.pl/biura_rachunkowe", 
-        "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie", "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
-        "https://panoramafirm.pl/warsztaty_samochodowe", "https://panoramafirm.pl/mechanicy",
-        "https://panoramafirm.pl/hydraulicy", "https://panoramafirm.pl/elektrycy", "https://panoramafirm.pl/adwokaci"
+        # "https://panoramafirm.pl/serwis_agd", "https://panoramafirm.pl/biura_rachunkowe", 
+        # "https://panoramafirm.pl/fryzjerzy_i_salony_fryzjerskie", "https://panoramafirm.pl/salony_i_gabinety_kosmetyczne",
+        # "https://panoramafirm.pl/warsztaty_samochodowe", "https://panoramafirm.pl/mechanicy",
+        # "https://panoramafirm.pl/hydraulicy", "https://panoramafirm.pl/elektrycy", "https://panoramafirm.pl/adwokaci"
+        "https://panoramafirm.pl/agencje_artystyczne", "https://panoramafirm.pl/agencje_modelek",
+        "https://panoramafirm.pl/architekci", "https://panoramafirm.pl/biura_projektowe",
+        "https://panoramafirm.pl/biura_tlumaczen", "https://panoramafirm.pl/drukarnie","https://panoramafirm.pl/automaty_do_gier","https://panoramafirm.pl/artyku%C5%82y_zoologiczne"
     ]
     for url in popular:
         categories.append({"name": os.path.basename(url.rstrip("/")).replace("_", " ").title(), "url": url})
