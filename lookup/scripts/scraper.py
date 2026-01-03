@@ -404,6 +404,8 @@ def fallback_description_no_ai(company_name: str, category_name: str, city: str 
 def scrape_all_categories():
     categories = []
     popular = [
+        "https://panoramafirm.pl/folie_i_foliowanie",
+        "https://panoramafirm.pl/kursy_jazdy",
         "https://panoramafirm.pl/agencje_artystyczne",
         "https://panoramafirm.pl/agencje_modelek",
         "https://panoramafirm.pl/architekci",
