@@ -1,5 +1,3 @@
-# scraper_panoramafirm_insert_only.py
-
 import os
 import re
 import json
@@ -70,6 +68,7 @@ TENANT_MAP = {
     "serwis_agd": ["agd", "pralka", "lodówka", "zmywarka", "naprawa", "serwis"],
 }
 DEFAULT_TENANT_SUBDOMAIN = "katalog"
+
 
 # =========================
 # RUNTIME
@@ -253,43 +252,14 @@ def get_or_create_category(conn, tenant_id: str, name: str):
 
 
 # =========================
-# DEDUPE (INSERT-ONLY)
+# DEDUPE (sourceUrl)
 # =========================
-def company_exists(conn, tenant_id: str, nip: str | None, website: str | None, base_slug: str) -> bool:
-    """
-    INSERT-ONLY: jeśli istnieje po NIP lub website lub (tenantId, slug), skipujemy.
-    """
+def company_exists_by_source_url(conn, source_url: str) -> bool:
     cur = conn.cursor()
-
-    if nip:
-        cur.execute(
-            'SELECT 1 FROM "Company" WHERE "tenantId" = %s AND nip = %s LIMIT 1',
-            (tenant_id, str(nip)),
-        )
-        if cur.fetchone():
-            cur.close()
-            return True
-
-    if website:
-        cur.execute(
-            'SELECT 1 FROM "Company" WHERE "tenantId" = %s AND website = %s LIMIT 1',
-            (tenant_id, website),
-        )
-        if cur.fetchone():
-            cur.close()
-            return True
-
-    if base_slug:
-        cur.execute(
-            'SELECT 1 FROM "Company" WHERE "tenantId" = %s AND slug = %s LIMIT 1',
-            (tenant_id, base_slug),
-        )
-        if cur.fetchone():
-            cur.close()
-            return True
-
+    cur.execute('SELECT 1 FROM "Company" WHERE "sourceUrl" = %s LIMIT 1', (source_url,))
+    ok = cur.fetchone() is not None
     cur.close()
-    return False
+    return ok
 
 
 def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
@@ -312,16 +282,21 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 # OPENAI
 # =========================
 def init_openai():
-    global client
+    """
+    Jeśli init OpenAI się wysypie (np. problem z deps), wyłącza AI na resztę procesu.
+    """
+    global client, USE_AI_REWRITE
     if client is not None:
         return True
     if not OPENAI_API_KEY:
+        USE_AI_REWRITE = False
         return False
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
         return True
     except Exception as e:
-        log(f"OpenAI init error: {e}")
+        log(f"OpenAI init error (disabling AI): {e}")
+        USE_AI_REWRITE = False
         return False
 
 
@@ -341,40 +316,30 @@ def rewrite_description_with_ai(source_text: str, company_name: str, category_na
 
     city_txt = (city or "").strip() or "Polska"
 
+    # Prompt: akapity, "eye-catching", SEO bez spamu, bez CTA
     prompt = f"""
 Napisz unikalny opis firmy do katalogu lokalnych usług.
 
 JĘZYK I FORMA:
 - Język: polski.
 - Zwróć WYŁĄCZNIE gotowy opis jako PLAIN TEXT.
-- Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (czyli podwójny enter).
-- Brak list punktowanych i numerowanych.
-- Brak nagłówków typu „O firmie”, brak emoji.
-- Nie kończ tekstu zwrotami: „Zapraszamy do kontaktu”, „Skontaktuj się”, „Zadzwoń”, itp.
+- Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (podwójny enter).
+- Bez list punktowanych i numerowanych.
+- Bez nagłówków typu „O firmie” i bez emoji.
+- Nie kończ CTA typu „zapraszamy do kontaktu”.
 
 DŁUGOŚĆ:
 - 900–1400 znaków (ze spacjami).
 
-SEO (NATURALNIE, BEZ SPAMU):
-- W pierwszym akapicie użyj: nazwy firmy {company_name}, kategorii/usługi {category_name}, lokalizacji {city} oraz 1–2 fraz pokrewnych.
-- W całym tekście użyj łącznie 6–10 fraz powiązanych (synonimy/odmiany), ale bez sztucznego powtarzania.
-- Nie wymyślaj konkretnych faktów, których nie ma w źródle (np. „od 1992”, liczby instruktorów, certyfikaty), chyba że występują w materiale.
+SEO (naturalnie):
+- W pierwszym akapicie użyj: {company_name}, {category_name}, {city_txt} + 1–2 fraz pokrewnych.
+- Użyj synonimów i odmian; bez sztucznego powtarzania.
 
-STYL:
-- Rzeczowy, „eye‑catching” przez rytm: krótkie zdania, konkret, przyjazny ton.
-- Zero marketingowego bełkotu: bez „najlepsi”, „lider”, „bezkonkurencyjni”.
-- Użyj 1–2 zdań wyróżniających podejście/standard pracy (ale ogólnie, bez zmyślania).
+UWAGA:
+- Jeśli źródło jest ubogie, uzupełnij opis na podstawie nazwy i kategorii, ale nie wymyślaj konkretnych faktów.
 
-STRUKTURA AKAPITÓW:
-1) 2–3 zdania: kim jest {company_name} + {city} + główna usługa + dla kogo.
-2) Zakres usług: konkretne czynności/usługi typowe dla {category_name}.
-3) Problemy/cele klienta: co to rozwiązuje i w jakich sytuacjach pomaga.
-4) Jak wygląda współpraca/proces: krok po kroku w narracji (bez list).
-5) Jakość/bezpieczeństwo/standardy: co jest ważne w realizacji.
-6) Lokalnie: obsługiwany obszar ({city} i okolice) i kiedy to jest wygodne dla klienta.
-
-MATERIAŁ ŹRÓDŁOWY (nie kopiuj, streszczaj i przerabiaj):
-{source_text}
+MATERIAŁ ŹRÓDŁOWY (nie kopiuj dosłownie):
+{source_text[:1400]}
 
 Wygeneruj wyłącznie opis.
 """.strip()
@@ -386,14 +351,17 @@ Wygeneruj wyłącznie opis.
                 {"role": "system", "content": "Jesteś doświadczonym copywriterem SEO. Pisz po polsku."},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=650,
+            max_tokens=700,
             temperature=0.7,
         )
         ai_usage_counter += 1
         text = (resp.choices[0].message.content or "").strip()
         return text if len(text) >= MIN_AI_DESC_LEN else None
     except Exception as e:
-        log(f"OpenAI error: {e}")
+        log(f"OpenAI error (disabling AI): {e}")
+        # jeżeli runtime zacznie sypać, też wyłącz AI
+        global USE_AI_REWRITE
+        USE_AI_REWRITE = False
         return None
 
 
@@ -401,15 +369,13 @@ def fallback_description_no_ai(company_name: str, category_name: str, city: str 
     city_txt = (city or "").strip()
     loc = f"w {city_txt} i okolicach" if city_txt else "w Polsce"
     text = (
-        f"{company_name} to firma działająca {loc}, związana z branżą {category_name}. "
-        f"W ramach codziennej działalności realizowane są usługi typowe dla tej kategorii, z naciskiem na dopasowanie do potrzeb klienta "
-        f"oraz sprawną organizację zlecenia.\n\n"
-        f"Zakres prac może obejmować zarówno standardowe realizacje, jak i zadania wymagające indywidualnego podejścia. "
-        f"Kluczowe jest jasne ustalenie oczekiwań, dobór odpowiedniego rozwiązania oraz wykonanie usługi w sposób uporządkowany i przewidywalny.\n\n"
-        f"Oferta jest kierowana do osób prywatnych i firm, które szukają wykonawcy w kategorii {category_name} oraz cenią rzetelność "
-        f"i prostą komunikację. Lokalny charakter działalności ułatwia obsługę klientów z regionu."
+        f"{company_name} to firma działająca {loc}, związana z branżą {category_name}.\n\n"
+        f"W codziennej pracy liczy się konkret: dopasowanie zakresu usługi do potrzeb klienta, sprawna realizacja i przewidywalny proces.\n\n"
+        f"Usługi w kategorii {category_name} mogą obejmować zarówno standardowe zlecenia, jak i działania wymagające indywidualnego podejścia, zależnie od sytuacji.\n\n"
+        f"Ważna jest jasna komunikacja, odpowiednie przygotowanie i dbałość o jakość wykonania bez zbędnego chaosu.\n\n"
+        f"Lokalny charakter działalności ułatwia obsługę klientów z regionu i sprawną realizację zleceń."
     )
-    return text[:1200]
+    return text[:1400]
 
 
 # =========================
@@ -417,18 +383,14 @@ def fallback_description_no_ai(company_name: str, category_name: str, city: str 
 # =========================
 def scrape_all_categories():
     categories = []
+
+    # Możesz tu wrzucić własną listę startową:
     popular = [
-        "https://panoramafirm.pl/papier",
         "https://panoramafirm.pl/folie_i_foliowanie",
-        "https://panoramafirm.pl/kursy_jazdy",
         "https://panoramafirm.pl/agencje_artystyczne",
-        "https://panoramafirm.pl/agencje_modelek",
         "https://panoramafirm.pl/architekci",
-        "https://panoramafirm.pl/biura_projektowe",
-        "https://panoramafirm.pl/biura_tlumaczen",
         "https://panoramafirm.pl/drukarnie",
-        "https://panoramafirm.pl/automaty_do_gier",
-        "https://panoramafirm.pl/artyku%C5%82y_zoologiczne",
+        "https://panoramafirm.pl/biura_tlumaczen",
     ]
 
     for url in popular:
@@ -448,6 +410,7 @@ def scrape_all_categories():
         except Exception as e:
             log(f"Błąd pobierania kategorii: {e}")
 
+    # dedupe + limit
     seen = set()
     unique = []
     for cat in categories:
@@ -549,21 +512,21 @@ def parse_company_from_js(js_data: dict) -> dict:
 
 
 # =========================
-# INSERT (DO NOTHING)
+# INSERT (DO NOTHING) + sourceUrl
 # =========================
 def insert_company_do_nothing(conn, payload: dict) -> bool:
     """
-    Zwraca True jeśli wstawiono, False jeśli konflikt i nic nie zrobiono.
+    Zwraca True jeśli wstawiono, False jeśli konflikt (np. sourceUrl już istnieje) i nic nie zrobiono.
     """
     cur = conn.cursor()
     sql = """
     INSERT INTO "Company"
     (id, "tenantId", name, slug, address, city, province, zip, phone, email, website,
-     description, "categoryId", plan, "isVerified", nip, lat, lng, "createdAt", "updatedAt")
+     description, "categoryId", plan, "isVerified", nip, lat, lng, "sourceUrl", "createdAt", "updatedAt")
     VALUES
     (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-     %s, %s, 'FREE', false, %s, %s, %s, NOW(), NOW())
-    ON CONFLICT ("tenantId", slug) DO NOTHING
+     %s, %s, 'FREE', false, %s, %s, %s, %s, NOW(), NOW())
+    ON CONFLICT ("sourceUrl") DO NOTHING
     RETURNING id;
     """
 
@@ -586,6 +549,7 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
             payload.get("nip"),
             payload.get("lat"),
             payload.get("lng"),
+            payload.get("sourceUrl"),
         ),
     )
     row = cur.fetchone()
@@ -595,7 +559,7 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
 
 
 # =========================
-# PIPELINE (INSERT-ONLY)
+# PIPELINE (INSERT-ONLY, EARLY SKIP)
 # =========================
 def process_company(conn, session: requests.Session, listing_item: dict, category_name: str) -> bool:
     global total_inserted
@@ -607,10 +571,18 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     if not name:
         return False
 
+    profile_url = safe_url(listing_item.get("url"))
+    if not profile_url:
+        return False
+
+    # EARLY SKIP: nie pobieraj profilu i nie pal AI, jeśli firma jest już w bazie
+    if company_exists_by_source_url(conn, profile_url):
+        return False
+
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     category_id = get_or_create_category(conn, tenant_id, category_name)
 
-    js_data = fetch_company_js(session, listing_item.get("url"))
+    js_data = fetch_company_js(session, profile_url)
     if not js_data:
         return False
 
@@ -622,17 +594,8 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     # jeśli kiedyś dodasz ekstrakcję NIP, ustaw tu
     nip = None
 
-    base_slug = slugify(name)
-
-    # INSERT-ONLY: jeśli istnieje (NIP/website/slug), skipujemy i nie generujemy AI
-    if company_exists(conn, tenant_id, nip=nip, website=website, base_slug=base_slug):
-        log(f"  Skip (exists) [{tenant_subdomain}] {name[:60]}")
-        return False
-
-    # unikamy konfliktów slug wewnątrz tenant
     slug = get_unique_slug(conn, tenant_id, name)
 
-    # materiał do opisu
     if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
         source_text = f"Firma: {name}. Kategoria: {category_name}. Lokalizacja: {city or 'Polska'}."
     else:
@@ -667,6 +630,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         "nip": nip,
         "lat": parsed.get("lat"),
         "lng": parsed.get("lng"),
+        "sourceUrl": profile_url,
     }
 
     inserted = insert_company_do_nothing(conn, payload)
@@ -675,8 +639,6 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         log(f"  INSERT OK [{tenant_subdomain}] {name[:60]} | slug={slug} | desc={len(description)}")
         return True
 
-    # teoretycznie może się zdarzyć race/duplikat slug -> DO NOTHING
-    log(f"  INSERT SKIPPED (conflict) [{tenant_subdomain}] {name[:60]} | slug={slug}")
     return False
 
 
@@ -708,7 +670,6 @@ def main():
             for j, item in enumerate(companies, 1):
                 if total_inserted >= MAX_TOTAL_COMPANIES:
                     break
-
                 log(f"  ({j}/{len(companies)}) {item.get('name','')[:60]}")
                 process_company(conn, session, item, category_name=cat_name)
                 time.sleep(random.uniform(0.6, 1.2))
