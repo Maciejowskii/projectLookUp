@@ -15,11 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
-    openai==1.50.0 \
+    "openai==1.55.3" \
+    "httpx==0.27.2" \
     psycopg2-binary \
     requests \
     beautifulsoup4 \
     python-dotenv
+
 
 # Skopiuj tylko to, co potrzebne
 COPY scraper.py /app/scraper.py
