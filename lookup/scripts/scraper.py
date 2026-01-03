@@ -94,17 +94,30 @@ def slugify(text):
     text = re.sub(r'[^a-z0-9\s-]', '', text)
     return re.sub(r'[\s-]+', '-', text).strip('-')[:50]
 
-def company_needs_ai_update(conn, slug):
-    """Sprawdza czy firma istnieje I NIE MA opisu AI"""
+def company_needs_ai_update(conn, slug, tenant_id):
     cur = conn.cursor()
-    cur.execute('SELECT description FROM "Company" WHERE slug = %s', (slug,))
+    cur.execute(
+        'SELECT description FROM "Company" WHERE slug = %s AND "tenantId" = %s',
+        (slug, tenant_id)
+    )
     row = cur.fetchone()
     cur.close()
+
     if not row:
-        return True  # Nie istnieje = potrzebuje AI
+        return True
+
     desc = row[0] or ""
-    # Jeśli opis krótszy niż 300 znaków lub wygląda na zescrapowany (krótki) = potrzebuje AI
     return len(desc) < 300
+
+def company_exists_by_nip(conn, nip):
+    if not nip:
+        return False
+    cur = conn.cursor()
+    cur.execute('SELECT 1 FROM "Company" WHERE nip = %s', (str(nip),))
+    exists = cur.fetchone() is not None
+    cur.close()
+    return exists
+
 
 def get_tenant_id_by_category(conn, category_name):
     cat_lower = category_name.lower()
@@ -228,125 +241,160 @@ def scrape_category_listing(listing_url, pages=1):
 
 def rewrite_description_with_ai(original_text, company_name, city):
     global ai_usage_counter, ai_paused
-    if ai_usage_counter >= MAX_AI_REQUESTS: 
-        print(f"🛑 Limit AI ({MAX_AI_REQUESTS}). Pauza {AI_PAUSE_HOURS}h...")
+
+    if ai_paused:
+        print("🛑 AI PAUSED – pomijam wszystkie firmy")
+        return None
+
+    if ai_usage_counter >= MAX_AI_REQUESTS:
+        print(f"🛑 Limit AI ({MAX_AI_REQUESTS}) – wstrzymuję AI")
         ai_paused = True
         return None
-    
-    prompt = f"""Przerób opis firmy (700-1200 znaków, unikalny, SEO, profesjonalny):
 
-Oryginał: {original_text[:1200]}
-Nazwa: {company_name}
-Miasto: {city}
+    prompt = f"""
+    Napisz unikalny, profesjonalny opis firmy do katalogu lokalnych usług.
 
-Napisz nowy opis:"""
+    WYMAGANIA:
+    - Język: polski
+    - Długość: 700–1200 znaków
+    - Styl: naturalny, ekspercki, bez marketingowego bełkotu
+    - Zero list punktowanych
+    - Zero emoji
+    - Zero nagłówków
+    - Zero zdań typu „zapraszamy do kontaktu” na końcu
+
+    SEO:
+    - Użyj naturalnie nazwy firmy: {company_name}
+    - Użyj miasta i okolic: {city}
+    - Stosuj synonimy i odmiany (bez sztucznego powtarzania fraz)
+    - Tekst ma brzmieć jak napisany przez człowieka, nie AI
+
+    STRUKTURA TEKSTU:
+    1. Pierwsze 2 zdania: kim jest firma + lokalizacja
+    2. Kolejny akapit: zakres usług (konkretne czynności)
+    3. Kolejny akapit: dla kogo są usługi i jakie problemy rozwiązują
+    4. Kolejny akapit: doświadczenie, podejście, jakość
+    5. Ostatni akapit: lokalny charakter działalności
+
+    MATERIAŁ ŹRÓDŁOWY (do przetworzenia, nie kopiuj):
+    {original_text[:1200]}
+
+    Wygeneruj wyłącznie gotowy opis.
+    """
 
     try:
         init_openai()
         response = client.chat.completions.create(
             model="gpt-4.1-nano",
             messages=[
-                {"role": "system", "content": "Jesteś copywriterem SEO. Pisz unikalne, wartościowe opisy firm po polsku (700-1200 znaków)."},
+                {"role": "system", "content": "Jesteś doświadczonym copywriterem SEO. Pisz po polsku."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,
+            max_tokens=600,
             temperature=0.7
         )
         ai_usage_counter += 1
-        result = response.choices[0].message.content.strip()
-        print(f"      🤖 AI OK ({ai_usage_counter}/{MAX_AI_REQUESTS}) | {len(result)} znaków")
-        return result
+        text = response.choices[0].message.content.strip()
+        print(f"🤖 AI OK ({ai_usage_counter}/{MAX_AI_REQUESTS}) | {len(text)} znaków")
+        return text
     except Exception as e:
-        print(f"⚠️ OpenAI: {e}")
+        print(f"⚠️ OpenAI error: {e}")
         return None
+
 
 def enrich_company_from_profile(conn, basic_company):
     global total_companies_processed
-    
+
     if total_companies_processed >= MAX_TOTAL_COMPANIES:
-        print(f"🛑 Limit firm ({MAX_TOTAL_COMPANIES:,})!")
-        basic_company["_STOP_SCRAPER"] = True
-        return basic_company
-    
-    slug = slugify(basic_company["name"])
-    
-    # ✅ KLUCZOWA ZMIANA: Dodajemy TYLKO jeśli potrzebuje AI
-    if not company_needs_ai_update(conn, slug):
-        print(f"      ⏭️  Pomijam (ma dobry opis): {basic_company['name'][:30]}")
         return None
 
     total_companies_processed += 1
-    print(f"      📊 Firm: {total_companies_processed:,}/{MAX_TOTAL_COMPANIES:,}")
+    print(f"📊 Firmy: {total_companies_processed}/{MAX_TOTAL_COMPANIES}")
 
     url = basic_company.get("url")
-    if not url: return None
-    if not url.startswith("http"): url = BASE_URL + "/" + url.lstrip("/")
-    
+    if not url:
+        return None
+    if not url.startswith("http"):
+        url = BASE_URL + "/" + url.lstrip("/")
+
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         resp.raise_for_status()
-    except Exception: return None
-    
+    except Exception:
+        return None
+
     js_data = extract_company_variable(resp.text)
-    if not js_data: return None
-    
-    # Podstawowe dane
+    if not js_data:
+        return None
+
+    # 🔑 NIP CHECK (JEDYNE ŹRÓDŁO PRAWDY)
     nip = js_data.get("nip")
-    if nip: 
-        cur = conn.cursor()
-        cur.execute('SELECT 1 FROM "Company" WHERE nip = %s', (str(nip),))
-        if cur.fetchone():
-            print(f"      ⏭️  NIP istnieje: {nip}")
-            cur.close()
+    if nip:
+        if company_exists_by_nip(conn, nip):
+            print("⏭️ Pomijam (NIP istnieje)")
             return None
-        cur.close()
         basic_company["nip"] = str(nip)
-    
-    # RAW opis do AI
+
+    # RAW DESC – ŁAGODNY PRÓG
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
-        field_data = js_data.get(field)
-        if field_data:
-            text = clean_html_text(field_data)
-            if text and len(text) > 10: parts.append(text)
+        text = clean_html_text(js_data.get(field))
+        if text and len(text) > 10:
+            parts.append(text)
+
     raw_desc = "\n\n".join(parts)
-    
-    if not raw_desc or len(raw_desc) < 50:
-        print(f"      ⏭️  Brak opisu źródłowego")
+    if len(raw_desc) < 20:
+        print("⏭️ Za krótki opis źródłowy:", len(raw_desc))
         return None
-    
-    # ✅ AI TYLKO jeśli mamy raw_desc
+
+    # 🤖 AI – ZAWSZE DLA NOWYCH
     if USE_AI_REWRITE:
-        ai_desc = rewrite_description_with_ai(raw_desc, basic_company["name"], basic_company.get("city", "Polska"))
-        if ai_desc is None:  # Limit AI lub błąd
-            basic_company["_STOP_SCRAPER"] = True
-            return basic_company
+        ai_desc = rewrite_description_with_ai(
+            raw_desc,
+            basic_company["name"],
+            basic_company.get("city", "Polska")
+        )
+
+        if not ai_desc:
+            print("⚠️ AI fail – pomijam firmę")
+            return None
+
         basic_company["desc"] = ai_desc
-        basic_company["raw_desc"] = raw_desc  # Do logów
+        print("🤖 AI USED ✔", basic_company["name"][:40])
         time.sleep(1)
     else:
         basic_company["desc"] = raw_desc[:1000]
-    
-    # Reszta danych kontaktowych
+
+    basic_company["raw_desc"] = raw_desc
+
+    # KONTAKT
     contact = js_data.get("contact") or {}
     basic_company["email"] = contact.get("email")
     basic_company["website"] = contact.get("www")
+
     phone = contact.get("phone")
-    basic_company["phone"] = phone.get("formatted") or phone.get("number") if isinstance(phone, dict) else phone
-    
+    if isinstance(phone, dict):
+        basic_company["phone"] = phone.get("formatted") or phone.get("number")
+    else:
+        basic_company["phone"] = phone
+
     loc = js_data.get("location") or {}
-    city_data = loc.get("city")
-    basic_company["city"] = city_data.get("name") if isinstance(city_data, dict) else city_data
+    city = loc.get("city")
+    basic_company["city"] = city.get("name") if isinstance(city, dict) else city
+
     street = loc.get("street")
     if isinstance(street, dict):
-        street_name = street.get("normalizedName") or street.get("name")
-        street_num = street.get("number")
-        basic_company["address"] = f"{street_name} {street_num}" if street_name and street_num else street_name
+        basic_company["address"] = f"{street.get('name')} {street.get('number')}"
+    else:
+        basic_company["address"] = street
+
     basic_company["zip"] = loc.get("zip")
+
     coords = loc.get("coordinates")
     if isinstance(coords, dict):
-        basic_company["lat"], basic_company["lng"] = coords.get("lat"), coords.get("lon")
-    
+        basic_company["lat"] = coords.get("lat")
+        basic_company["lng"] = coords.get("lon")
+
     return basic_company
 
 def get_unique_slug(conn, base_name, tenant_id):
@@ -368,27 +416,57 @@ def save_to_db(conn, companies):
     inserted = 0
     
     for c in companies:
-        if not c.get("name"): continue
+        if not c.get("name"):
+            continue
+
+        description = c.get("desc") or c.get("raw_desc")
+        if not description or len(description) < 200:
+            print(f"   ⏭️ Pomijam (brak opisu): {c['name'][:30]}")
+            continue
         
-        tenant_id, subdomain = get_tenant_id_by_category(conn, c.get("category_name", "Inne"))
-        cat_id = get_or_create_category(conn, tenant_id, c.get("category_name", "Inne"))
+        tenant_id, subdomain = get_tenant_id_by_category(
+            conn, c.get("category_name", "Inne")
+        )
+        cat_id = get_or_create_category(
+            conn, tenant_id, c.get("category_name", "Inne")
+        )
         unique_slug = get_unique_slug(conn, c["name"], tenant_id)
         
         cur.execute("""
             INSERT INTO "Company" 
             (id, "tenantId", name, slug, address, city, zip, phone, email, website, 
-             description, "categoryId", plan, "isVerified", nip, lat, lng, "createdAt", "updatedAt")
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'FREE', false, %s, %s, %s, NOW(), NOW())
-        """, (str(uuid.uuid4()), tenant_id, c["name"], unique_slug, 
-              c.get("address"), c.get("city"), c.get("zip"), c.get("phone"), 
-              c.get("email"), c.get("website"), c.get("desc"), cat_id, 
-              c.get("nip"), c.get("lat"), c.get("lng")))
+             description, "categoryId", plan, "isVerified", nip, lat, lng, 
+             "createdAt", "updatedAt")
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                    'FREE', false, %s, %s, %s, NOW(), NOW())
+        """, (
+            str(uuid.uuid4()),
+            tenant_id,
+            c["name"],
+            unique_slug,
+            c.get("address"),
+            c.get("city"),
+            c.get("zip"),
+            c.get("phone"),
+            c.get("email"),
+            c.get("website"),
+            description,
+            cat_id,
+            c.get("nip"),
+            c.get("lat"),
+            c.get("lng")
+        ))
+        
         inserted += 1
-        print(f"   ✅ AI INSERT [{subdomain}]: {c['name'][:30]} | {len(c.get('desc', ''))} znaków")
+        print(
+            f"   ✅ INSERT [{subdomain}]: "
+            f"{c['name'][:30]} | {len(description)} znaków"
+        )
     
     conn.commit()
     cur.close()
-    print(f"   💾 +{inserted} FIRM Z AI OPISEM")
+    print(f"   💾 +{inserted} FIRM Z OPISEM")
+
 
 if __name__ == "__main__":
     if not OPENAI_API_KEY:
@@ -415,7 +493,6 @@ if __name__ == "__main__":
             
             processed = enrich_company_from_profile(conn, company)
             if processed is None: continue
-            if processed.get("_STOP_SCRAPER"): break
                 
             enriched.append(processed)
         
