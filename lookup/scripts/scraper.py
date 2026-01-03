@@ -342,27 +342,41 @@ def rewrite_description_with_ai(source_text: str, company_name: str, category_na
     city_txt = (city or "").strip() or "Polska"
 
     prompt = f"""
-Napisz unikalny, profesjonalny opis firmy do katalogu lokalnych usług.
+Napisz unikalny opis firmy do katalogu lokalnych usług.
 
-WYMAGANIA:
-- Język: polski
-- Długość: 700–1200 znaków
-- Styl: naturalny, rzeczowy, bez marketingowego bełkotu
-- Bez list punktowanych, bez emoji, bez nagłówków
-- Nie kończ tekstu zdaniem typu „zapraszamy do kontaktu”
+JĘZYK I FORMA:
+- Język: polski.
+- Zwróć WYŁĄCZNIE gotowy opis jako PLAIN TEXT.
+- Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (czyli podwójny enter).
+- Brak list punktowanych i numerowanych.
+- Brak nagłówków typu „O firmie”, brak emoji.
+- Nie kończ tekstu zwrotami: „Zapraszamy do kontaktu”, „Skontaktuj się”, „Zadzwoń”, itp.
 
-KONTEKST:
-- Nazwa firmy: {company_name}
-- Kategoria: {category_name}
-- Miasto i okolice: {city_txt}
+DŁUGOŚĆ:
+- 900–1400 znaków (ze spacjami).
 
-UWAGA:
-Jeśli materiał źródłowy jest ubogi, uzupełnij opis na podstawie nazwy i kategorii, ale nie wymyślaj konkretnych faktów (np. lat doświadczenia, certyfikatów, cen).
+SEO (NATURALNIE, BEZ SPAMU):
+- W pierwszym akapicie użyj: nazwy firmy {company_name}, kategorii/usługi {category_name}, lokalizacji {city} oraz 1–2 fraz pokrewnych.
+- W całym tekście użyj łącznie 6–10 fraz powiązanych (synonimy/odmiany), ale bez sztucznego powtarzania.
+- Nie wymyślaj konkretnych faktów, których nie ma w źródle (np. „od 1992”, liczby instruktorów, certyfikaty), chyba że występują w materiale.
 
-MATERIAŁ ŹRÓDŁOWY (do przetworzenia, nie kopiuj dosłownie):
-{source_text[:1400]}
+STYL:
+- Rzeczowy, „eye‑catching” przez rytm: krótkie zdania, konkret, przyjazny ton.
+- Zero marketingowego bełkotu: bez „najlepsi”, „lider”, „bezkonkurencyjni”.
+- Użyj 1–2 zdań wyróżniających podejście/standard pracy (ale ogólnie, bez zmyślania).
 
-Wygeneruj wyłącznie gotowy opis (ciągły tekst w akapitach).
+STRUKTURA AKAPITÓW:
+1) 2–3 zdania: kim jest {company_name} + {city} + główna usługa + dla kogo.
+2) Zakres usług: konkretne czynności/usługi typowe dla {category_name}.
+3) Problemy/cele klienta: co to rozwiązuje i w jakich sytuacjach pomaga.
+4) Jak wygląda współpraca/proces: krok po kroku w narracji (bez list).
+5) Jakość/bezpieczeństwo/standardy: co jest ważne w realizacji.
+6) Lokalnie: obsługiwany obszar ({city} i okolice) i kiedy to jest wygodne dla klienta.
+
+MATERIAŁ ŹRÓDŁOWY (nie kopiuj, streszczaj i przerabiaj):
+{source_text}
+
+Wygeneruj wyłącznie opis.
 """.strip()
 
     try:
@@ -404,6 +418,7 @@ def fallback_description_no_ai(company_name: str, category_name: str, city: str 
 def scrape_all_categories():
     categories = []
     popular = [
+        "https://panoramafirm.pl/papier",
         "https://panoramafirm.pl/folie_i_foliowanie",
         "https://panoramafirm.pl/kursy_jazdy",
         "https://panoramafirm.pl/agencje_artystyczne",
