@@ -12,11 +12,11 @@ from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
-from urllib.parse import unquote
-import re
+
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 load_dotenv()
+
 
 # =========================
 # KONFIG / ENV
@@ -27,7 +27,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano").strip()
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN / TEST
 REQUIRE_AI = os.getenv("REQUIRE_AI", "true").lower() == "true"
 
-# Jeśli REQUIRE_AI=true, a brak klucza -> proces będzie pauzował i próbował co godzinę
+# AI rewrite tylko w MAIN
 USE_AI_REWRITE = (SCRAPER_MODE == "MAIN")
 
 SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "TRUE"
@@ -85,6 +85,7 @@ TENANT_MAP = {
 }
 DEFAULT_TENANT_SUBDOMAIN = "katalog"
 
+
 # =========================
 # RUNTIME
 # =========================
@@ -117,11 +118,44 @@ def normalize_text(s: str) -> str:
     if re.search(r"%[0-9A-Fa-f]{2}", s):
         s = unquote(s)
 
-    # opcjonalnie: ujednolić typ cudzysłowu, ale NIE usuwać
+    # ujednolicaj, ale nie usuwaj cudzysłowów
     s = s.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
 
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+
+# =========================
+# NORMALIZACJA WOJEWÓDZTW
+# =========================
+CANONICAL_VOIVODESHIPS = {
+    "dolnośląskie",
+    "kujawsko-pomorskie",
+    "lubelskie",
+    "lubuskie",
+    "łódzkie",
+    "małopolskie",
+    "mazowieckie",
+    "opolskie",
+    "podkarpackie",
+    "podlaskie",
+    "pomorskie",
+    "śląskie",
+    "świętokrzyskie",
+    "warmińsko-mazurskie",
+    "wielkopolskie",
+    "zachodniopomorskie",
+}
+
+
+def normalize_province(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    s = raw.strip().lower()
+    s = s.replace("–", "-").replace("—", "-")
+    s = re.sub(r"\s+", "-", s)  # np. "kujawsko pomorskie"
+    return s if s in CANONICAL_VOIVODESHIPS else None
+
 
 # =========================
 # REQUESTS (retry + backoff)
@@ -134,7 +168,6 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
         try:
             resp = session.get(url, timeout=timeout)
 
-            # Jeśli dostajesz rate-limit / blokady / serwerowe błędy, retry
             if resp.status_code in (429, 500, 502, 503, 504):
                 raise RuntimeError(f"HTTP {resp.status_code}")
 
@@ -146,7 +179,6 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
             time.sleep(min(delay, HTTP_BACKOFF_MAX) + random.uniform(0, 1.0))
             delay *= 2
 
-    # Dłuższy problem - śpij godzinę i spróbuj jeszcze raz (nie kończ procesu)
     log(f"PanoramaFirm seems down. Sleeping {AI_RETRY_CHECK_SECONDS}s, then retrying...")
     time.sleep(AI_RETRY_CHECK_SECONDS)
     raise RuntimeError(f"HTTP failed after retries: {last_exc}")
@@ -254,6 +286,31 @@ def extract_company_variable(html_content: str) -> dict | None:
 
 
 # =========================
+# FALLBACK: NIP z HTML (#contact)
+# =========================
+def extract_nip_from_profile_html(html: str) -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    contact = soup.select_one("#contact")
+    if not contact:
+        return None
+
+    for row in contact.select(".contact-item"):
+        cols = row.find_all("div", recursive=False)
+        if len(cols) < 2:
+            continue
+
+        label = cols[0].get_text(strip=True)
+        if "NIP" not in label:
+            continue
+
+        value = cols[1].get_text(" ", strip=True)
+        nip = re.sub(r"\D", "", value)
+        return nip if re.fullmatch(r"\d{10}", nip) else None
+
+    return None
+
+
+# =========================
 # TENANT / CATEGORY
 # =========================
 def get_tenant_id_by_category(conn, category_name: str):
@@ -334,7 +391,7 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 
 
 # =========================
-# OPENAI (strict)
+# OPENAI (strict-ish)
 # =========================
 def ensure_openai_available_forever():
     """
@@ -370,8 +427,6 @@ def rewrite_description_with_ai_strict(source_text: str, company_name: str, cate
         raise RuntimeError("AI disabled (SCRAPER_MODE!=MAIN)")
 
     ensure_openai_available_forever()
-
-    city_txt = (city or "").strip() or "Polska"
 
     prompt = f"""
 Napisz unikalny opis firmy do katalogu lokalnych usług.
@@ -431,7 +486,6 @@ Wygeneruj wyłącznie opis.
             time.sleep(min(delay, AI_BACKOFF_MAX) + random.uniform(0, 1.0))
             delay *= 2
 
-    # dłuższa awaria
     log(f"AI seems down. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
     time.sleep(AI_RETRY_CHECK_SECONDS)
     raise RuntimeError("AI unavailable after retries + cooldown")
@@ -444,8 +498,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/artykuły_i_sprzęt_bhp",
-        "https://panoramafirm.pl/artykuły_papiernicze",
         "https://panoramafirm.pl/artykuły_szkolne",
         "https://panoramafirm.pl/audyty_oprogramowania_i_sprzętu_komputerowego",
         "https://panoramafirm.pl/części_komputerowe",
@@ -1704,12 +1756,13 @@ def scrape_all_categories():
         "https://panoramafirm.pl/żywność_ekologiczna",
         "https://panoramafirm.pl/akcesoria_do_komputerów",
         "https://panoramafirm.pl/artykuły_biurowe",
+        "https://panoramafirm.pl/artykuły_i_sprzęt_bhp",
+        "https://panoramafirm.pl/artykuły_papiernicze",
     ]
 
     for url in popular:
         categories.append({"name": normalize_category_name_from_url(url), "url": url})
 
-    # opcjonalne dołożenie kategorii z serwisu
     if SCRAPE_ALL_CATEGORIES:
         log("Pobieram dodatkowe kategorie...")
         try:
@@ -1751,7 +1804,6 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         try:
             resp = http_get_with_backoff(session, url, timeout=20)
         except Exception as e:
-            # po hourly sleep i tak rzuca wyjątek - tutaj pętla retry w while:
             log(f"  Listing hard error: {e}. Retrying same page...")
             continue
 
@@ -1781,27 +1833,45 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
     return results
 
 
-def fetch_company_js(session: requests.Session, company_url: str) -> dict | None:
+def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
+    """
+    Zwraca: (js_data, html_text) - html_text jest tylko do fallbacków.
+    """
     url = safe_url(company_url)
     if not url:
-        return None
+        return (None, None)
 
     while True:
         try:
             resp = http_get_with_backoff(session, url, timeout=20)
             if resp.status_code != 200:
-                return None
-            data = extract_company_variable(resp.text)
-            return data
+                return (None, None)
+
+            html = resp.text
+            data = extract_company_variable(html)
+            return (data, html)
         except Exception as e:
             log(f"  Company fetch error: {e}. Retrying after cooldown...")
-            # http_get_with_backoff już robi hourly sleep, więc tu tylko ponawiamy
             continue
 
 
-def parse_company_from_js(js_data: dict) -> dict:
+def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> dict:
     data = {}
 
+    # --- NIP (preferuj JS, fallback HTML) ---
+    nip = js_data.get("nip")
+    nip_digits = None
+    if isinstance(nip, str):
+        nip_digits = re.sub(r"\D", "", nip)
+        if not re.fullmatch(r"\d{10}", nip_digits):
+            nip_digits = None
+
+    if not nip_digits and html_fallback:
+        nip_digits = extract_nip_from_profile_html(html_fallback)
+
+    data["nip"] = nip_digits
+
+    # --- Contact (może być null) ---
     contact = js_data.get("contact") or {}
     data["email"] = contact.get("email")
     data["website"] = normalize_website(contact.get("www"))
@@ -1812,34 +1882,39 @@ def parse_company_from_js(js_data: dict) -> dict:
     else:
         data["phone"] = phone
 
+    # --- Location ---
     loc = js_data.get("location") or {}
+
     city = loc.get("city")
     data["city"] = city.get("name") if isinstance(city, dict) else city
 
     street = loc.get("street")
     if isinstance(street, dict):
-        name = (street.get("name") or "").strip()
-        number = (street.get("number") or "").strip()
-        data["address"] = f"{name} {number}".strip() if name or number else None
+        s_name = (street.get("name") or "").strip()
+        s_number = (street.get("number") or "").strip()
+        data["address"] = f"{s_name} {s_number}".strip() if s_name or s_number else None
     else:
         data["address"] = street
 
     data["zip"] = loc.get("zip")
-    prov = loc.get("province")
-    data["province"] = prov if isinstance(prov, str) else None
+
+    voiv = loc.get("voivodeship")
+    prov = voiv.get("name") if isinstance(voiv, dict) else None
+    data["province"] = normalize_province(prov)
 
     coords = loc.get("coordinates")
     if isinstance(coords, dict):
         data["lat"] = coords.get("lat")
         data["lng"] = coords.get("lon")
 
+    # --- opis surowy (jak było) ---
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
         txt = clean_html_text(js_data.get(field)).strip()
         if len(txt) >= 10:
             parts.append(txt)
-
     data["raw_desc"] = "\n\n".join(parts).strip()
+
     return data
 
 
@@ -1896,8 +1971,8 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
 def process_company(conn, session: requests.Session, listing_item: dict, category_name: str) -> bool:
     global total_inserted
 
-    name = normalize_text(listing_item.get("name"))
-    if not name:
+    listing_name = normalize_text(listing_item.get("name"))
+    if not listing_name:
         return False
 
     profile_url = safe_url(listing_item.get("url"))
@@ -1911,53 +1986,64 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     category_id = get_or_create_category(conn, tenant_id, category_name)
 
-    js_data = fetch_company_js(session, profile_url)
+    js_data, html = fetch_company_js(session, profile_url)
     if not js_data:
         return False
 
-    parsed = parse_company_from_js(js_data)
+    parsed = parse_company_from_js(js_data, html_fallback=html)
+
+    # preferuj nazwę z JS (zachowuje cudzysłowy/pełną nazwę)
+    company_name = normalize_text(js_data.get("name") or listing_name)
+    if not company_name:
+        company_name = listing_name
+
     raw_desc = parsed.get("raw_desc") or ""
     city = parsed.get("city")
     website = parsed.get("website")
+    nip = parsed.get("nip")
+    province = parsed.get("province")
 
-    nip = None
-    slug = get_unique_slug(conn, tenant_id, name)
+    slug = get_unique_slug(conn, tenant_id, company_name)
 
-    if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
-        source_text = f"Firma: {name}. Kategoria: {category_name}. Lokalizacja: {city or 'Polska'}."
-    else:
-        source_text = raw_desc
+    # opis
+    description = None
+    if USE_AI_REWRITE:
+        if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
+            source_text = f"Firma: {company_name}. Kategoria: {category_name}. Lokalizacja: {city or 'Polska'}."
+        else:
+            source_text = raw_desc
 
-    # STRICT AI: brak fallbacków
-    while True:
-        try:
-            if REQUIRE_AI and not OPENAI_API_KEY:
-                log(f"REQUIRE_AI=true, ale brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
-                time.sleep(AI_RETRY_CHECK_SECONDS)
+        while True:
+            try:
+                if REQUIRE_AI and not OPENAI_API_KEY:
+                    log(f"REQUIRE_AI=true, ale brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                    time.sleep(AI_RETRY_CHECK_SECONDS)
+                    continue
+
+                description = rewrite_description_with_ai_strict(
+                    source_text=source_text,
+                    company_name=company_name,
+                    category_name=category_name,
+                    city=city,
+                )
+                break
+            except Exception as e:
+                log(f"AI strict mode: waiting and retrying. Reason: {e}")
                 continue
-
-            description = rewrite_description_with_ai_strict(
-                source_text=source_text,
-                company_name=name,
-                category_name=category_name,
-                city=city,
-            )
-            break
-        except Exception as e:
-            log(f"AI strict mode: waiting and retrying. Reason: {e}")
-            # rewrite_description_with_ai_strict już robi backoff i hourly sleep, więc po prostu kontynuujemy
-            continue
+    else:
+        # bez AI: wrzuć surowy opis jeśli jest, inaczej NULL
+        description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
 
     payload = {
         "id": str(uuid.uuid4()),
         "tenantId": tenant_id,
         "categoryId": category_id,
-        "name": name,
+        "name": company_name,
         "slug": slug,
         "description": description,
         "address": parsed.get("address"),
         "city": city,
-        "province": parsed.get("province"),
+        "province": province,  # tylko raz
         "zip": parsed.get("zip"),
         "phone": parsed.get("phone"),
         "email": parsed.get("email"),
@@ -1971,7 +2057,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     inserted = insert_company_do_nothing(conn, payload)
     if inserted:
         total_inserted += 1
-        log(f"  INSERT OK [{tenant_subdomain}] {name[:60]} | slug={slug} | desc={len(description)}")
+        log(f"  INSERT OK [{tenant_subdomain}] {company_name[:60]} | slug={slug} | desc={len(description or '')}")
         return True
 
     return False
