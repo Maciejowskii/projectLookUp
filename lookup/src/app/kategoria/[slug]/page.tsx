@@ -6,6 +6,13 @@ import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { MapPin, ArrowRight } from 'lucide-react'
 import { Metadata } from 'next/dist/lib/metadata/types/metadata-interface'
+import { safeDecode } from '@/lib/text'
+
+const getInitial = (name?: string) => {
+	const s = safeDecode((name ?? '').trim())
+	const m = s.match(/[\p{L}\p{N}]/u) // pierwsza litera/cyfra Unicode
+	return (m?.[0] ?? '?').toUpperCase()
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
 	const { slug } = await params
@@ -17,9 +24,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 	if (!category) return { title: 'Kategoria nie znaleziona | Katalogo' }
 
+	const categoryName = safeDecode(category.name)
+
 	return {
-		title: `${category.name} – Firmy i usługi`,
-		description: `Sprawdź firmy w kategorii ${category.name}. Opinie, kontakt i lokalni wykonawcy.`,
+		title: `${categoryName} – Firmy i usługi`,
+		description: `Sprawdź firmy w kategorii ${categoryName}. Opinie, kontakt i lokalni wykonawcy.`,
 		alternates: { canonical: `/kategoria/${category.slug}` },
 		robots: { index: true, follow: true },
 	}
@@ -58,7 +67,7 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 				{/* HEADER KATEGORII */}
 				<div className='mb-12 text-center md:text-left'>
 					<span className='text-blue-600 font-bold uppercase tracking-wider text-sm mb-2 block'>Kategoria</span>
-					<h1 className='text-4xl md:text-5xl font-extrabold text-gray-900 mb-4'>{category.name}</h1>
+					<h1 className='text-4xl md:text-5xl font-extrabold text-gray-900 mb-4'>{safeDecode(category.name)}</h1>
 					<p className='text-gray-500 text-lg max-w-2xl'>
 						Znaleziono {companies.length} firm w tej kategorii. Przeglądaj najlepszych specjalistów w Twojej okolicy.
 					</p>
@@ -76,7 +85,7 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 								<div className='flex flex-col md:flex-row gap-6 items-start'>
 									{/* LOGO / AVATAR */}
 									<div className='w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 rounded-xl flex items-center justify-center font-bold text-2xl flex-shrink-0 group-hover:scale-110 transition-transform'>
-										{company.name.charAt(0)}
+										{getInitial(company.name)}
 									</div>
 
 									{/* TREŚĆ */}
