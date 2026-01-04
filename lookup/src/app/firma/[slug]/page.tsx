@@ -92,7 +92,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			postalCode: company.zip,
 			addressCountry: 'PL',
 		},
-		url: company.website || `https://www.katalogo.pl/firma/${company.slug}`,
+		url: `https://www.katalogo.pl/firma/${company.slug}`,
 		telephone: company.phone,
 		description: company.description || `Profil firmy ${company.name} w miejscowości ${company.city}.`,
 		priceRange: 'PLN',
