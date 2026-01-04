@@ -444,8 +444,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-"https://panoramafirm.pl/akcesoria_do_komputerów",
-        "https://panoramafirm.pl/artykuły_biurowe",
         "https://panoramafirm.pl/artykuły_i_sprzęt_bhp",
         "https://panoramafirm.pl/artykuły_papiernicze",
         "https://panoramafirm.pl/artykuły_szkolne",
@@ -1704,6 +1702,8 @@ def scrape_all_categories():
         "https://panoramafirm.pl/zaopatrzenie_i_wyposażenie_gastronomiczne",
         "https://panoramafirm.pl/zioła_i_przyprawy",
         "https://panoramafirm.pl/żywność_ekologiczna",
+        "https://panoramafirm.pl/akcesoria_do_komputerów",
+        "https://panoramafirm.pl/artykuły_biurowe",
     ]
 
     for url in popular:
