@@ -113,13 +113,14 @@ def connect_db():
 
 
 def normalize_text(s: str) -> str:
-    s = (s or "").strip()
-    # jeśli wygląda na percent-encoding, odkoduj
+    s = (s or "").strip()  # tylko białe znaki
     if re.search(r"%[0-9A-Fa-f]{2}", s):
-        s = unquote(s)  # %C5%82 -> ł [web:575]
-    # wyczyść dziwne cudzysłowy/spacje
-    s = s.strip(' \t\r\n"“”„\'')
-    s = re.sub(r"\s+", " ", s)
+        s = unquote(s)
+
+    # opcjonalnie: ujednolić typ cudzysłowu, ale NIE usuwać
+    s = s.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
+
+    s = re.sub(r"\s+", " ", s).strip()
     return s
 
 # =========================
