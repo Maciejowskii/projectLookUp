@@ -12,9 +12,6 @@ export async function GET() {
 ${VOIVODESHIPS.map(
   (region) => `  <url>
     <loc>${BASE_URL}/wojewodztwo/${region.slug}</loc>
-    <lastmod>${now}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
   </url>`
 ).join("\n")}
 </urlset>`;
