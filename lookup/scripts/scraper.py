@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
+from urllib.parse import unquote
+import re
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 load_dotenv()
@@ -109,6 +111,16 @@ def connect_db():
         password=DB_PASS,
     )
 
+
+def normalize_text(s: str) -> str:
+    s = (s or "").strip()
+    # jeśli wygląda na percent-encoding, odkoduj
+    if re.search(r"%[0-9A-Fa-f]{2}", s):
+        s = unquote(s)  # %C5%82 -> ł [web:575]
+    # wyczyść dziwne cudzysłowy/spacje
+    s = s.strip(' \t\r\n"“”„\'')
+    s = re.sub(r"\s+", " ", s)
+    return s
 
 # =========================
 # REQUESTS (retry + backoff)
@@ -431,7 +443,7 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/akcesoria_do_komputerów",
+"https://panoramafirm.pl/akcesoria_do_komputerów",
         "https://panoramafirm.pl/artykuły_biurowe",
         "https://panoramafirm.pl/artykuły_i_sprzęt_bhp",
         "https://panoramafirm.pl/artykuły_papiernicze",
@@ -1753,7 +1765,7 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         new_count = 0
         for link in links:
             href = link.get("href")
-            name = link.get_text(strip=True)
+            name = normalize_text(link.get_text(strip=True))
             if href and name and href not in seen_urls:
                 seen_urls.add(href)
                 results.append({"name": name, "url": href})
@@ -1883,7 +1895,7 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
 def process_company(conn, session: requests.Session, listing_item: dict, category_name: str) -> bool:
     global total_inserted
 
-    name = (listing_item.get("name") or "").strip()
+    name = normalize_text(listing_item.get("name"))
     if not name:
         return False
 
@@ -1979,7 +1991,7 @@ def main():
 
     try:
         for i, cat in enumerate(categories, 1):
-            cat_name = cat["name"]
+            cat_name = normalize_text(cat["name"])
             cat_url = cat["url"]
             log(f"\n[{i}/{len(categories)}] Category: {cat_name} -> {cat_url}")
 
