@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://www.katalogo.pl'
 
 export async function GET() {

@@ -1,5 +1,7 @@
-// app/sitemap.xml/route.ts
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://www.katalogo.pl'
 
