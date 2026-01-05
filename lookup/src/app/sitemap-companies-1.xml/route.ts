@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://www.katalogo.pl'
 const TAKE = 40000
 const SKIP = 0
 
 export async function GET() {
-	const companies = await prisma.company.findMany({
-		select: { slug: true, updatedAt: true },
-		orderBy: { id: 'asc' },
-		skip: SKIP,
-		take: TAKE,
-	})
+	try {
+		const [count, companies] = await Promise.all([
+			prisma.company.count(),
+			prisma.company.findMany({
+				select: { slug: true, updatedAt: true },
+				orderBy: { id: 'asc' },
+				skip: SKIP,
+				take: TAKE,
+			}),
+		])
 
-	const xml = `<?xml version="1.0" encoding="UTF-8"?>
+		const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${companies
+	.filter(c => c.slug)
 	.map(
 		c => `  <url>
     <loc>${BASE_URL}/firma/${c.slug}</loc>
@@ -25,5 +33,20 @@ ${companies
 	.join('\n')}
 </urlset>`
 
-	return new NextResponse(xml, { status: 200, headers: { 'Content-Type': 'application/xml' } })
+		return new NextResponse(xml, {
+			status: 200,
+			headers: {
+				'Content-Type': 'application/xml; charset=utf-8',
+				// pomocne do debug:
+				'X-Companies-Count': String(count),
+				'X-Companies-Returned': String(companies.length),
+			},
+		})
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : 'unknown'
+		return new NextResponse(`SITEMAP_ERROR: ${msg}`, {
+			status: 500,
+			headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+		})
+	}
 }
