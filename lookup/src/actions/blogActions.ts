@@ -4,26 +4,27 @@ import { prisma } from '@/lib/prisma'
 import { checkAdminAuth } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { toast } from 'react-hot-toast'
 
 interface FormState {
 	message?: string
 }
-// Inicjalizacja klienta Gemini
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || '')
+
+// --- HELPERY ---
 
 async function fetchPexelsImage(query: string): Promise<string | null> {
 	if (!process.env.PEXELS_API_KEY) return null
-
 	try {
-		const res = await fetch(`https://api.pexels.com/v1/search?query=${query}&per_page=1&locale=pl-PL`, {
-			headers: {
-				Authorization: process.env.PEXELS_API_KEY,
-			},
-		})
+		const res = await fetch(
+			`https://api.pexels.com/v1/search?query=${query}&per_page=1&locale=pl-PL&orientation=landscape`,
+			{
+				headers: { Authorization: process.env.PEXELS_API_KEY },
+			}
+		)
 		const data = await res.json()
 		if (data.photos && data.photos.length > 0) {
-			return data.photos[0].src.landscape
+			return data.photos[0].src.large // Wyższa jakość
 		}
 	} catch (e) {
 		console.error('Pexels error:', e)
@@ -31,43 +32,46 @@ async function fetchPexelsImage(query: string): Promise<string | null> {
 	return null
 }
 
+// --- AKCJE BLOGA (CRUD) ---
+
 export async function createPost(formData: FormData) {
 	await checkAdminAuth()
-
 	const title = formData.get('title') as string
 	const content = formData.get('content') as string
 	const excerpt = formData.get('excerpt') as string
 	const image = formData.get('image') as string
 
-	// Slugify
 	const slug = title
 		.toLowerCase()
-		.replace(/ł/g, 'l')
-		.replace(/ś/g, 's')
-		.replace(/ć/g, 'c')
-		.replace(/ą/g, 'a')
-		.replace(/ę/g, 'e')
-		.replace(/ń/g, 'n')
-		.replace(/ź/g, 'z')
-		.replace(/ż/g, 'z')
-		.replace(/ó/g, 'o')
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
 		.replace(/[^a-z0-9]/g, '-')
 		.replace(/-+/g, '-')
 
-	const post = await prisma.post.create({
-		data: {
-			title,
-			slug,
-			content,
-			excerpt,
-			image,
-			published: true,
-		},
+	await prisma.post.create({
+		data: { title, slug, content, excerpt, image, published: true },
 	})
 
 	revalidatePath('/admin/blog')
 	revalidatePath('/blog')
-	// ✅ NIE ZWRACA NIC - dla formularza
+}
+
+export async function updatePost(_prevState: FormState, formData: FormData): Promise<FormState> {
+	const id = formData.get('id')?.toString()
+	const title = formData.get('title')?.toString() ?? ''
+	const excerpt = formData.get('excerpt')?.toString() ?? ''
+	const content = formData.get('content')?.toString() ?? ''
+
+	if (!id) return { message: '❌ Brak ID posta!' }
+
+	await prisma.post.update({
+		where: { id },
+		data: { title, excerpt, content },
+	})
+
+	revalidatePath('/admin/blog')
+	revalidatePath('/blog')
+	return { message: '✅ Zmiany zapisane pomyślnie!' }
 }
 
 export async function deletePost(id: string) {
@@ -77,7 +81,8 @@ export async function deletePost(id: string) {
 	revalidatePath('/blog')
 }
 
-// --- GENERATOR AI DLA CRON (ZWRACA ID) ---
+// --- GENERATOR AI (GŁÓWNY SILNIK) ---
+
 export async function generatePostAI(formData: FormData): Promise<string> {
 	await checkAdminAuth()
 	const topic = formData.get('topic') as string
@@ -85,7 +90,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 	if (!process.env.GOOGLE_AI_KEY) throw new Error('Brak klucza GOOGLE_AI_KEY')
 
 	const model = genAI.getGenerativeModel({
-		model: 'gemini-2.5-flash', // Upewnij się, że model jest poprawny (zwykle gemini-1.5-flash)
+		model: 'gemini-1.5-flash', // Najbardziej stabilny model dla tekstu
 		generationConfig: { responseMimeType: 'application/json' },
 	})
 
@@ -126,24 +131,19 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 				{ headers: { Authorization: process.env.PEXELS_API_KEY } }
 			)
 			const pexels = await res.json()
-			// Używamy 'large' zamiast 'medium' dla lepszej jakości
 			if (pexels.photos) images = pexels.photos.map((p: any) => p.src.large)
 		}
 
 		const mainImage = images[0] || 'https://placehold.co/1200x630?text=Katalogo+News'
 		let finalContent = data.content
 
-		// Podmiana placeholderów na wysokiej jakości zdjęcia z klasami Tailwind
 		images.slice(1).forEach((imgUrl, i) => {
 			finalContent = finalContent.replace(
 				'src="IMAGE_PLACEHOLDER"',
-				`src="${imgUrl}" alt="${data.title} - foto ${
-					i + 1
-				}" class="w-full aspect-video rounded-3xl my-10 object-cover shadow-lg border border-gray-100"`
+				`src="${imgUrl}" class="w-full aspect-video rounded-3xl my-10 object-cover shadow-lg border border-gray-100"`
 			)
 		})
 
-		// Fallback dla brakujących placeholderów
 		finalContent = finalContent.replaceAll(
 			'src="IMAGE_PLACEHOLDER"',
 			`src="${mainImage}" class="w-full rounded-3xl my-10"`
@@ -153,9 +153,8 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 			data.title
 				.toLowerCase()
 				.normalize('NFD')
-				.replace(/[\u0300-\u036f]/g, '') // usuwanie polskich znaków
-				.replace(/[^a-z0-9]+/g, '-')
-				.replace(/(^-|-$)/g, '') +
+				.replace(/[\u0300-\u036f]/g, '')
+				.replace(/[^a-z0-9]+/g, '-') +
 			'-' +
 			Math.random().toString(36).substring(2, 7)
 
@@ -173,16 +172,17 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		revalidatePath('/blog')
 		return post.id
 	} catch (error: any) {
-		console.error('Błąd generowania postu:', error)
+		console.error('Błąd generowania:', error)
 		throw error
 	}
 }
 
-// --- DLA FORMULARZA (NIE ZWRACA NIC) ---
 export async function generatePostAIForm(formData: FormData) {
-	await generatePostAI(formData) // wywołuje główną funkcję
+	await generatePostAI(formData)
 	revalidatePath('/admin/blog')
 }
+
+// --- SYSTEM PLANOWANIA (SCHEDULING) ---
 
 export async function schedulePost(formData: FormData) {
 	const topic = formData.get('topic')?.toString()
@@ -191,72 +191,49 @@ export async function schedulePost(formData: FormData) {
 
 	if (!topic || !date) return
 
-	const scheduledAt = new Date(`${date}T${time}`) // ✅ DATA + GODZINA!
+	const scheduledAt = new Date(`${date}T${time}`)
 
 	await prisma.scheduledPost.create({
-		data: {
-			topic,
-			scheduledAt,
-			status: 'scheduled', // ✅ Domyślny status
-		},
+		data: { topic, scheduledAt, status: 'scheduled' },
 	})
 
 	revalidatePath('/admin/blog')
 }
 
-export async function updatePost(_prevState: FormState, formData: FormData): Promise<FormState> {
-	const id = formData.get('id')?.toString()
-	const title = formData.get('title')?.toString() ?? ''
-	const excerpt = formData.get('excerpt')?.toString() ?? ''
-	const content = formData.get('content')?.toString() ?? ''
-
-	if (!id) {
-		return { message: '❌ Brak ID posta!' }
-	}
-
-	await prisma.post.update({
-		where: { id },
-		data: { title, excerpt, content },
-	})
-
-	revalidatePath('/admin/blog')
-	revalidatePath('/blog')
-
-	return { message: '✅ Zmiany zapisane pomyślnie!' }
-}
-
-// DODAJ te 2 funkcje:
-export async function publishScheduledPost(formData: FormData) {
-	const id = formData.get('id')?.toString()
-	if (!id) return
-
-	const job = await prisma.scheduledPost.findUnique({ where: { id } })
-	if (!job) return
+export async function processPostExecution(jobId: string) {
+	const job = await prisma.scheduledPost.findUnique({ where: { id: jobId } })
+	if (!job || job.status !== 'scheduled') return
 
 	await prisma.scheduledPost.update({
-		where: { id },
+		where: { id: jobId },
 		data: { status: 'processing' },
 	})
 
-	const formDataAI = new FormData()
-	formDataAI.set('topic', job.topic)
-	const postId = await generatePostAI(formDataAI)
+	try {
+		const formDataAI = new FormData()
+		formDataAI.set('topic', job.topic)
+		const postId = await generatePostAI(formDataAI)
 
-	await prisma.scheduledPost.update({
-		where: { id },
-		data: { status: 'done', executedAt: new Date(), postId },
-	})
+		await prisma.scheduledPost.update({
+			where: { id: jobId },
+			data: { status: 'done', executedAt: new Date(), postId },
+		})
+	} catch (error) {
+		console.error(`Błąd automatu (${jobId}):`, error)
+		await prisma.scheduledPost.update({ where: { id: jobId }, data: { status: 'failed' } })
+	}
+}
 
+export async function publishScheduledPost(formData: FormData) {
+	const id = formData.get('id')?.toString()
+	if (!id) return
+	await processPostExecution(id)
 	revalidatePath('/admin/blog')
 }
 
 export async function cancelScheduledPost(formData: FormData) {
 	const id = formData.get('id')?.toString()
 	if (!id) return
-
-	await prisma.scheduledPost.update({
-		where: { id },
-		data: { status: 'cancelled' },
-	})
+	await prisma.scheduledPost.update({ where: { id }, data: { status: 'cancelled' } })
 	revalidatePath('/admin/blog')
 }
