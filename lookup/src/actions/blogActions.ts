@@ -45,7 +45,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
       "title": "string",
       "excerpt": "string",
       "content": "string",
-      "photoQuery": "string"
+      "photoQuery": "Konkretny angielski opis zdjęcia przedstawiającego ludzi przy pracy lub realne przedmioty (np. 'cleaning service professional at work', 'plumber repairing kitchen sink'). Unikaj pojęć abstrakcyjnych i symbolicznych."
     }
   `
 
@@ -66,13 +66,15 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 			throw new Error('AI zwróciło nieprawidłowy format danych.')
 		}
 
+		const searchQuery = `${data.photoQuery} service professional`
+
 		let images: string[] = []
 		if (process.env.PEXELS_API_KEY) {
 			try {
 				const res = await fetch(
 					`https://api.pexels.com/v1/search?query=${encodeURIComponent(
-						data.photoQuery
-					)}&per_page=3&orientation=landscape`,
+						searchQuery
+					)}&per_page=3&orientation=landscape&size=large`,
 					{ headers: { Authorization: process.env.PEXELS_API_KEY } }
 				)
 				const pexels = await res.json()
