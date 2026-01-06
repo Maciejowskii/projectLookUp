@@ -34,6 +34,8 @@ export async function generatePostAI(formData: FormData): Promise<string> {
     3. Formatowanie: Każdy akapit tekstu musi być otoczony tagiem <p>. Nie używaj podwójnych enterów, tylko czysty HTML.
     4. Długość: Minimum 2000 znaków.
     5. Zdjęcia: Wstaw tag <img src="IMAGE_PLACE_HOLDER" alt="opis" /> dokładnie w połowie tekstu oraz na końcu.
+    6. Zakaz Markdown: Absolutnie nie używaj gwiazdek (np. **tekst**) do pogrubiania. Zamiast tego używaj tagu <strong>tekst</strong>. 
+    7. Formatowanie list: Elementy listy <li> nie mogą zawierać gwiazdek na początku. Jeśli chcesz coś wyróżnić wewnątrz <li>, użyj <strong>.
 
     Struktura HTML:
       - Każdy akapit tekstu MUSI być w tagu <p class="mb-6 leading-relaxed">.
@@ -86,6 +88,11 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 
 		const mainImage = images[0] || 'https://placehold.co/1200x630?text=Katalogo+News'
 		let finalContent = data.content
+
+		// Zamień ewentualne pozostałości Markdown na HTML
+		finalContent = finalContent
+			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // zamienia **tekst** na <strong>tekst</strong>
+			.replace(/\*(.*?)\*/g, '<em>$1</em>') // zamienia *tekst* na <em>tekst</em>
 
 		images.slice(1).forEach((imgUrl, i) => {
 			finalContent = finalContent.replace(
