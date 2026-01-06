@@ -11,86 +11,15 @@ interface FormState {
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || '')
 
-// --- HELPERY ---
-
-async function fetchPexelsImage(query: string): Promise<string | null> {
-	if (!process.env.PEXELS_API_KEY) return null
-	try {
-		const res = await fetch(
-			`https://api.pexels.com/v1/search?query=${query}&per_page=1&locale=pl-PL&orientation=landscape`,
-			{
-				headers: { Authorization: process.env.PEXELS_API_KEY },
-			}
-		)
-		const data = await res.json()
-		if (data.photos && data.photos.length > 0) {
-			return data.photos[0].src.large // Wyższa jakość
-		}
-	} catch (e) {
-		console.error('Pexels error:', e)
-	}
-	return null
-}
-
-// --- AKCJE BLOGA (CRUD) ---
-
-export async function createPost(formData: FormData) {
-	await checkAdminAuth()
-	const title = formData.get('title') as string
-	const content = formData.get('content') as string
-	const excerpt = formData.get('excerpt') as string
-	const image = formData.get('image') as string
-
-	const slug = title
-		.toLowerCase()
-		.normalize('NFD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.replace(/[^a-z0-9]/g, '-')
-		.replace(/-+/g, '-')
-
-	await prisma.post.create({
-		data: { title, slug, content, excerpt, image, published: true },
-	})
-
-	revalidatePath('/admin/blog')
-	revalidatePath('/blog')
-}
-
-export async function updatePost(_prevState: FormState, formData: FormData): Promise<FormState> {
-	const id = formData.get('id')?.toString()
-	const title = formData.get('title')?.toString() ?? ''
-	const excerpt = formData.get('excerpt')?.toString() ?? ''
-	const content = formData.get('content')?.toString() ?? ''
-
-	if (!id) return { message: '❌ Brak ID posta!' }
-
-	await prisma.post.update({
-		where: { id },
-		data: { title, excerpt, content },
-	})
-
-	revalidatePath('/admin/blog')
-	revalidatePath('/blog')
-	return { message: '✅ Zmiany zapisane pomyślnie!' }
-}
-
-export async function deletePost(id: string) {
-	await checkAdminAuth()
-	await prisma.post.delete({ where: { id } })
-	revalidatePath('/admin/blog')
-	revalidatePath('/blog')
-}
-
-// --- GENERATOR AI (GŁÓWNY SILNIK) ---
-
+// --- GŁÓWNY GENERATOR AI (SILNIK) ---
+// Funkcja wyabstrahowana, aby mogła być wywoływana przez Cron (bez auth)
+// oraz przez formularze (z auth).
 export async function generatePostAI(formData: FormData): Promise<string> {
-	await checkAdminAuth()
 	const topic = formData.get('topic') as string
-
 	if (!process.env.GOOGLE_AI_KEY) throw new Error('Brak klucza GOOGLE_AI_KEY')
 
 	const model = genAI.getGenerativeModel({
-		model: 'gemini-1.5-flash', // Najbardziej stabilny model dla tekstu
+		model: 'gemini-1.5-flash', // Najszybszy i najbardziej stabilny dla długich tekstów
 		generationConfig: { responseMimeType: 'application/json' },
 	})
 
@@ -137,24 +66,30 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		const mainImage = images[0] || 'https://placehold.co/1200x630?text=Katalogo+News'
 		let finalContent = data.content
 
+		// Wstawianie zdjęć w miejsca placeholderów
 		images.slice(1).forEach((imgUrl, i) => {
 			finalContent = finalContent.replace(
 				'src="IMAGE_PLACEHOLDER"',
-				`src="${imgUrl}" class="w-full aspect-video rounded-3xl my-10 object-cover shadow-lg border border-gray-100"`
+				`src="${imgUrl}" alt="${data.title} - foto ${
+					i + 1
+				}" class="w-full aspect-video rounded-3xl my-10 object-cover shadow-lg border border-gray-100"`
 			)
 		})
 
+		// Fallback dla pozostałych tagów img
 		finalContent = finalContent.replaceAll(
 			'src="IMAGE_PLACEHOLDER"',
 			`src="${mainImage}" class="w-full rounded-3xl my-10"`
 		)
 
+		// Bezpieczny slug bez polskich znaków
 		const slug =
 			data.title
 				.toLowerCase()
 				.normalize('NFD')
 				.replace(/[\u0300-\u036f]/g, '')
-				.replace(/[^a-z0-9]+/g, '-') +
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/(^-|-$)/g, '') +
 			'-' +
 			Math.random().toString(36).substring(2, 7)
 
@@ -172,12 +107,62 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		revalidatePath('/blog')
 		return post.id
 	} catch (error: any) {
-		console.error('Błąd generowania:', error)
+		console.error('Błąd generatora AI:', error)
 		throw error
 	}
 }
 
+// --- AKCJE DLA ADMINA (Z AUTORYZACJĄ) ---
+
+export async function createPost(formData: FormData) {
+	await checkAdminAuth()
+	const title = formData.get('title') as string
+	const content = formData.get('content') as string
+	const excerpt = formData.get('excerpt') as string
+	const image = formData.get('image') as string
+
+	const slug = title
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/-+/g, '-')
+
+	await prisma.post.create({
+		data: { title, slug, content, excerpt, image, published: true },
+	})
+
+	revalidatePath('/admin/blog')
+	revalidatePath('/blog')
+}
+
+export async function updatePost(_prevState: FormState, formData: FormData): Promise<FormState> {
+	const id = formData.get('id')?.toString()
+	if (!id) return { message: '❌ Brak ID posta!' }
+
+	await prisma.post.update({
+		where: { id },
+		data: {
+			title: formData.get('title')?.toString() ?? '',
+			excerpt: formData.get('excerpt')?.toString() ?? '',
+			content: formData.get('content')?.toString() ?? '',
+		},
+	})
+
+	revalidatePath('/admin/blog')
+	revalidatePath('/blog')
+	return { message: '✅ Zmiany zapisane!' }
+}
+
+export async function deletePost(id: string) {
+	await checkAdminAuth()
+	await prisma.post.delete({ where: { id } })
+	revalidatePath('/admin/blog')
+	revalidatePath('/blog')
+}
+
 export async function generatePostAIForm(formData: FormData) {
+	await checkAdminAuth() // Sprawdzamy uprawnienia przed uruchomieniem Gemini
 	await generatePostAI(formData)
 	revalidatePath('/admin/blog')
 }
@@ -185,22 +170,26 @@ export async function generatePostAIForm(formData: FormData) {
 // --- SYSTEM PLANOWANIA (SCHEDULING) ---
 
 export async function schedulePost(formData: FormData) {
+	await checkAdminAuth()
 	const topic = formData.get('topic')?.toString()
 	const date = formData.get('date')?.toString()
 	const time = formData.get('time')?.toString() || '08:00'
 
 	if (!topic || !date) return
 
-	const scheduledAt = new Date(`${date}T${time}`)
-
 	await prisma.scheduledPost.create({
-		data: { topic, scheduledAt, status: 'scheduled' },
+		data: {
+			topic,
+			scheduledAt: new Date(`${date}T${time}`),
+			status: 'scheduled',
+		},
 	})
 
 	revalidatePath('/admin/blog')
 }
 
 export async function processPostExecution(jobId: string) {
+	// Funkcja bez checkAdminAuth, wywoływana przez Cron lub akcję admina
 	const job = await prisma.scheduledPost.findUnique({ where: { id: jobId } })
 	if (!job || job.status !== 'scheduled') return
 
@@ -210,9 +199,9 @@ export async function processPostExecution(jobId: string) {
 	})
 
 	try {
-		const formDataAI = new FormData()
-		formDataAI.set('topic', job.topic)
-		const postId = await generatePostAI(formDataAI)
+		const fd = new FormData()
+		fd.set('topic', job.topic)
+		const postId = await generatePostAI(fd)
 
 		await prisma.scheduledPost.update({
 			where: { id: jobId },
@@ -225,6 +214,7 @@ export async function processPostExecution(jobId: string) {
 }
 
 export async function publishScheduledPost(formData: FormData) {
+	await checkAdminAuth()
 	const id = formData.get('id')?.toString()
 	if (!id) return
 	await processPostExecution(id)
@@ -232,6 +222,7 @@ export async function publishScheduledPost(formData: FormData) {
 }
 
 export async function cancelScheduledPost(formData: FormData) {
+	await checkAdminAuth()
 	const id = formData.get('id')?.toString()
 	if (!id) return
 	await prisma.scheduledPost.update({ where: { id }, data: { status: 'cancelled' } })
