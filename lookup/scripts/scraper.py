@@ -498,15 +498,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/etykiety_i_naklejki",
-        "https://panoramafirm.pl/folie_i_foliowanie",
-        "https://panoramafirm.pl/hurtownie_artykułów_biurowych",
-        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
-        "https://panoramafirm.pl/hurtownie_dywanów_i_wykładzin",
-        "https://panoramafirm.pl/ksero",
-        "https://panoramafirm.pl/meble_biurowe",
-        "https://panoramafirm.pl/meble_metalowe",
-        "https://panoramafirm.pl/oprogramowanie_komputerowe",
         "https://panoramafirm.pl/papier",
         "https://panoramafirm.pl/pieczątki_i_stemple",
         "https://panoramafirm.pl/pomiary,_konsultacje_i_badania_bhp",
@@ -1758,6 +1749,15 @@ def scrape_all_categories():
         "https://panoramafirm.pl/audyty_oprogramowania_i_sprzętu_komputerowego",
         "https://panoramafirm.pl/części_komputerowe",
         "https://panoramafirm.pl/drukarki_i_urządzenia_peryferyjne",
+        "https://panoramafirm.pl/etykiety_i_naklejki",
+        "https://panoramafirm.pl/folie_i_foliowanie",
+        "https://panoramafirm.pl/hurtownie_artykułów_biurowych",
+        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
+        "https://panoramafirm.pl/hurtownie_dywanów_i_wykładzin",
+        "https://panoramafirm.pl/ksero",
+        "https://panoramafirm.pl/meble_biurowe",
+        "https://panoramafirm.pl/meble_metalowe",
+        "https://panoramafirm.pl/oprogramowanie_komputerowe",
     ]
 
     for url in popular:
