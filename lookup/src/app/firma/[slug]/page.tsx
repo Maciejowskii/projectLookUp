@@ -142,12 +142,25 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						<Link href={`/kategoria/${company.category.slug}`} className='hover:text-blue-600 hover:underline'>
 							{company.category.name}
 						</Link>
-						<ChevronRight size={14} className='text-gray-400' />
 
-						{/* Opcjonalnie: Link do miasta, jeśli będziesz miał taką stronę */}
-						<span className='text-gray-700'>{company.city}</span>
-						<ChevronRight size={14} className='text-gray-400' />
+						{company.city && (
+							<>
+								<ChevronRight size={14} className='text-gray-400' />
+								<Link
+									href={`/kategoria/${company.category.slug}/${company.city
+										.toLowerCase()
+										.normalize('NFD')
+										.replace(/[\u0300-\u036f]/g, '')
+										.replace(/ł/g, 'l')
+										.replace(/[^a-z0-9]+/g, '-')}`}
+									className='hover:text-blue-600 hover:underline'
+								>
+									{company.category.name} {company.city}
+								</Link>
+							</>
+						)}
 
+						<ChevronRight size={14} className='text-gray-400' />
 						<span className='font-semibold text-gray-900 truncate max-w-[200px]'>{company.name}</span>
 					</nav>
 
