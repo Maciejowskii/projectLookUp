@@ -98,6 +98,11 @@ export async function generatePostAI(formData: FormData): Promise<string> {
     3. Formatowanie: Każdy akapit tekstu musi być otoczony tagiem <p>. Nie używaj podwójnych enterów, tylko czysty HTML.
     4. Długość: Minimum 2000 znaków.
     5. Zdjęcia: Wstaw tag <img src="IMAGE_PLACEHOLDER" alt="opis" /> dokładnie w połowie tekstu oraz na końcu.
+
+    Struktura HTML: 
+      - Każdy akapit tekstu MUSI być w tagu <p class="mb-6 leading-relaxed">.
+      - Nagłówki sekcji MUSI być w tagu <h2 class="text-2xl font-bold mt-10 mb-4">.
+      - Listy w tagach <ul class="list-disc ml-6 mb-6"> i <li class="mb-2">.
     
     STRUKTURA JSON (zwróć tylko to):
     {
