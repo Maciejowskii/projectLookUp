@@ -498,12 +498,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/papier",
-        "https://panoramafirm.pl/pieczątki_i_stemple",
-        "https://panoramafirm.pl/pomiary,_konsultacje_i_badania_bhp",
-        "https://panoramafirm.pl/producenci_artykułów_biurowych",
-        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
-        "https://panoramafirm.pl/serwis_komputerów",
         "https://panoramafirm.pl/serwis_kserokopiarek",
         "https://panoramafirm.pl/sieci_komputerowe_i_integracja_systemów",
         "https://panoramafirm.pl/sprzedaż_komputerów",
@@ -1758,6 +1752,12 @@ def scrape_all_categories():
         "https://panoramafirm.pl/meble_biurowe",
         "https://panoramafirm.pl/meble_metalowe",
         "https://panoramafirm.pl/oprogramowanie_komputerowe",
+        "https://panoramafirm.pl/papier",
+        "https://panoramafirm.pl/pieczątki_i_stemple",
+        "https://panoramafirm.pl/pomiary,_konsultacje_i_badania_bhp",
+        "https://panoramafirm.pl/producenci_artykułów_biurowych",
+        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
+        "https://panoramafirm.pl/serwis_komputerów",
     ]
 
     for url in popular:
