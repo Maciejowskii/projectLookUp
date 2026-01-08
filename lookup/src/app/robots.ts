@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin/", "/dashboard/", "/api/"], // Chronimy prywatne sekcje
+      disallow: ["/admin/", "/dashboard/", "/api/"],
     },
     sitemap: `${BASE_URL}/sitemap.xml`,
   };

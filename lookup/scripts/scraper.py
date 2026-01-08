@@ -2043,7 +2043,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         "description": description,
         "address": parsed.get("address"),
         "city": city,
-        "province": province,  # tylko raz
+        "province": province,
         "zip": parsed.get("zip"),
         "phone": parsed.get("phone"),
         "email": parsed.get("email"),
