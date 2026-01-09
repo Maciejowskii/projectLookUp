@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { checkAdminAuth } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { injectBacklinks } from '@/lib/backlinks'
 
 interface FormState {
 	message?: string
@@ -23,6 +24,8 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		model: 'gemini-2.5-flash',
 		generationConfig: { responseMimeType: 'application/json' },
 	})
+
+	// ⭐ ULEPSZONE - SEO + 5 sekcji + spis treści + wiele obrazków
 	const prompt = `
     Jesteś ekspertem SEO i Copywriterem. Napisz obszerny, merytoryczny artykuł blogowy na temat: "${topic}".
    
@@ -120,7 +123,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 			'-' +
 			Math.random().toString(36).substring(2, 7)
 
-		// Zapisz do bazy
+		// ⭐ NAJPIERW: Zapisz do bazy aby mieć ID
 		const post = await prisma.post.create({
 			data: {
 				title: data.title,
@@ -131,6 +134,23 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 				image: finalImages[0] || 'https://placehold.co/1200x630?text=Blog',
 			},
 		})
+
+		// ⭐ DRUGI KROK: Dodaj backlinki
+		console.log(`🔗 Dodawanie backlinków do artykułu: ${post.id}`)
+		let contentWithBacklinks = finalContent
+		try {
+			contentWithBacklinks = await injectBacklinks(finalContent, post.id, 3)
+		} catch (backlinkerror) {
+			console.warn('⚠️ Nie udało się dodać backlinków, ciąg dalej:', backlinkerror)
+		}
+
+		// ⭐ TRZECI KROK: Update post z backlinkami
+		await prisma.post.update({
+			where: { id: post.id },
+			data: { content: contentWithBacklinks },
+		})
+
+		console.log(`✅ Artykuł gotowy z backlinkami!`)
 
 		revalidatePath('/blog')
 		return post.id
