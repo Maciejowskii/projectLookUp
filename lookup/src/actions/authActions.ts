@@ -103,3 +103,41 @@ export async function setPasswordAction(formData: FormData) {
 
   redirect("/dashboard");
 }
+
+export async function changePasswordAction(formData: FormData) {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("session_user_id")?.value;
+
+  if (!userId) redirect("/strefa-partnera");
+
+  const oldPassword = formData.get("oldPassword") as string;
+  const newPassword = formData.get("newPassword") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) redirect("/strefa-partnera");
+
+  // Walidacja starego hasła
+  const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+  if (!isOldPasswordValid) {
+    redirect("/dashboard?error=wrong_old_password");
+  }
+
+  // Walidacja długości
+  if (newPassword.length < 8) {
+    redirect("/dashboard?error=password_too_short");
+  }
+
+  // Walidacja identyczności haseł (to naprawia Twój błąd ze screena)
+  if (newPassword !== confirmPassword) {
+    redirect("/dashboard?error=passwords_not_matching");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+  });
+
+  redirect("/dashboard?status=password_updated");
+}
