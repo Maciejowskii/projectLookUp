@@ -23,8 +23,6 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		model: 'gemini-2.5-flash',
 		generationConfig: { responseMimeType: 'application/json' },
 	})
-
-	// ⭐ ULEPSZONE - SEO + 5 sekcji + spis treści + wiele obrazków
 	const prompt = `
     Jesteś ekspertem SEO i Copywriterem. Napisz obszerny, merytoryczny artykuł blogowy na temat: "${topic}".
    
