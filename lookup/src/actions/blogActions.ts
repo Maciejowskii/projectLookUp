@@ -11,7 +11,7 @@ interface FormState {
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || '')
 
-// --- GŁÓWNY GENERATOR AI (SILNIK) ---
+// --- GŁÓWNY GENERATOR AI (ULEPSZONA WERSJA) ---
 export async function generatePostAI(formData: FormData): Promise<string> {
 	const topic = formData.get('topic') as string
 	if (!process.env.GOOGLE_AI_KEY) {
@@ -24,30 +24,35 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		generationConfig: { responseMimeType: 'application/json' },
 	})
 
-	// TWÓJ PROMPT (BEZ ZMIAN)
+	// ⭐ ULEPSZONE - SEO + 5 sekcji + spis treści + wiele obrazków
 	const prompt = `
     Jesteś ekspertem SEO i Copywriterem. Napisz obszerny, merytoryczny artykuł blogowy na temat: "${topic}".
    
     WYMAGANIA TREŚCIOWE:
     1. Styl: Profesjonalny, doradczy, angażujący.
-    2. Struktura HTML: Minimum 4 sekcje <h2>. Każda sekcja musi mieć 2-3 akapity <p>. Używaj <ul> i <li> dla list.
-    3. Formatowanie: Każdy akapit tekstu musi być otoczony tagiem <p>. Nie używaj podwójnych enterów, tylko czysty HTML.
-    4. Długość: Minimum 2000 znaków.
-    5. Zdjęcia: Wstaw tag <img src="IMAGE_PLACE_HOLDER" alt="opis" /> dokładnie w połowie tekstu oraz na końcu.
-    6. Zakaz Markdown: Absolutnie nie używaj gwiazdek (np. **tekst**) do pogrubiania. Zamiast tego używaj tagu <strong>tekst</strong>. 
-    7. Formatowanie list: Elementy listy <li> nie mogą zawierać gwiazdek na początku. Jeśli chcesz coś wyróżnić wewnątrz <li>, użyj <strong>.
+    2. Struktura: Dokładnie 5 sekcji (h2), każda z 2-3 akapitami (p). Minimum 3500 znaków.
+    3. Formatowanie: Każdy akapit w <p class="mb-6 leading-relaxed">. Nagłówki w <h2 class="text-2xl font-bold mt-10 mb-4">. Listy w <ul class="list-disc ml-6 mb-6"><li class="mb-2">
+    4. Zakaz Markdown: Absolutnie nie używaj gwiazdek (**tekst**). Używaj <strong>tekst</strong> do pogrubienia.
+    5. Obrazki: Wstaw dokładnie 5 tagów: <img src="IMAGE_PLACEHOLDER_1" alt="opis" class="w-full rounded-3xl my-10 object-cover shadow-lg" />
+    6. Spis Treści: Na POCZĄTKU artykułu, przed wszystkim, wstaw:
+       <nav class="bg-gray-50 p-6 rounded-lg mb-10 border border-gray-200">
+         <h3 class="font-bold mb-4">📋 Spis Treści</h3>
+         <ul class="space-y-2">
+           <li><a href="#section-0" class="text-blue-600 hover:underline">Sekcja 1</a></li>
+           <li><a href="#section-1" class="text-blue-600 hover:underline">Sekcja 2</a></li>
+           <li><a href="#section-2" class="text-blue-600 hover:underline">Sekcja 3</a></li>
+           <li><a href="#section-3" class="text-blue-600 hover:underline">Sekcja 4</a></li>
+           <li><a href="#section-4" class="text-blue-600 hover:underline">Sekcja 5</a></li>
+         </ul>
+       </nav>
+    7. Sekcje: Każdą sekcję opakuj w <section id="section-X"> gdzie X=0,1,2,3,4
 
-    Struktura HTML:
-      - Każdy akapit tekstu MUSI być w tagu <p class="mb-6 leading-relaxed">.
-      - Nagłówki sekcji MUSI być w tagu <h2 class="text-2xl font-bold mt-10 mb-4">.
-      - Listy w tagach <ul class="list-disc ml-6 mb-6"> i <li class="mb-2">.
-   
-    STRUKTURA JSON (zwróć tylko to):
+    Struktura JSON:
     {
-      "title": "string",
-      "excerpt": "string",
-      "content": "string",
-      "photoQuery": "Konkretny angielski opis zdjęcia przedstawiającego ludzi przy pracy lub realne przedmioty (np. 'cleaning service professional at work', 'plumber repairing kitchen sink'). Unikaj pojęć abstrakcyjnych i symbolicznych."
+      "title": "string (max 70 znaków dla SEO)",
+      "excerpt": "string (max 160 znaków)",
+      "content": "string (spis treści + 5 sekcji z obrazkami)",
+      "photoQuery": "Konkretny angielski opis dla zdjęcia (np. 'professional plumber at work', 'cleaning service expert')"
     }
   `
 
@@ -55,7 +60,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 		const result = await model.generateContent(prompt)
 		const responseText = result.response.text()
 
-		// Bardziej odporne wycinanie JSON (na wypadek gdyby AI dodało markdown)
+		// Wycinanie JSON (na wypadek markdown)
 		const firstBrace = responseText.indexOf('{')
 		const lastBrace = responseText.lastIndexOf('}')
 		const cleanText = responseText.substring(firstBrace, lastBrace + 1)
@@ -68,46 +73,45 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 			throw new Error('AI zwróciło nieprawidłowy format danych.')
 		}
 
+		// Pobierz obrazki z Pexels
 		const searchQuery = `${data.photoQuery} service professional`
-
 		let images: string[] = []
+
 		if (process.env.PEXELS_API_KEY) {
 			try {
 				const res = await fetch(
 					`https://api.pexels.com/v1/search?query=${encodeURIComponent(
 						searchQuery
-					)}&per_page=3&orientation=landscape&size=large`,
+					)}&per_page=5&orientation=landscape&size=large`,
 					{ headers: { Authorization: process.env.PEXELS_API_KEY } }
 				)
 				const pexels = await res.json()
 				if (pexels.photos) images = pexels.photos.map((p: any) => p.src.large)
 			} catch (imgError) {
-				console.error('Błąd Pexels:', imgError)
+				console.warn('⚠️ Błąd Pexels - będzie używany placeholder:', imgError)
 			}
 		}
 
-		const mainImage = images[0] || 'https://placehold.co/1200x630?text=Katalogo+News'
+		// Fallback na placeholder
+		const placeholderImages = Array(5)
+			.fill(0)
+			.map((_, i) => `https://placehold.co/1200x630?text=Katalogo+${i + 1}`)
+		const finalImages = [...images, ...placeholderImages].slice(0, 5)
+
 		let finalContent = data.content
 
-		// Zamień ewentualne pozostałości Markdown na HTML
-		finalContent = finalContent
-			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // zamienia **tekst** na <strong>tekst</strong>
-			.replace(/\*(.*?)\*/g, '<em>$1</em>') // zamienia *tekst* na <em>tekst</em>
-
-		images.slice(1).forEach((imgUrl, i) => {
-			finalContent = finalContent.replace(
-				'src="IMAGE_PLACE_HOLDER"',
-				`src="${imgUrl}" alt="${data.title} - foto ${
-					i + 1
-				}" class="w-full aspect-video rounded-3xl my-10 object-cover shadow-lg border border-gray-100"`
-			)
+		// Zamień IMAGE_PLACEHOLDER_X na rzeczywiste URLs
+		finalImages.forEach((imgUrl, idx) => {
+			finalContent = finalContent.replace(`IMAGE_PLACEHOLDER_${idx + 1}`, imgUrl)
 		})
 
-		finalContent = finalContent.replaceAll(
-			'src="IMAGE_PLACE_HOLDER"',
-			`src="${mainImage}" class="w-full rounded-3xl my-10"`
-		)
+		// Cleanup - zamień pozostałe placeholdery
+		finalContent = finalContent.replaceAll(/IMAGE_PLACEHOLDER_\d+/g, 'https://placehold.co/1200x630?text=Blog')
 
+		// Markdown cleanup (jeśli AI nie posłuchał)
+		finalContent = finalContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')
+
+		// Wygeneruj slug
 		const slug =
 			data.title
 				.toLowerCase()
@@ -118,6 +122,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 			'-' +
 			Math.random().toString(36).substring(2, 7)
 
+		// Zapisz do bazy
 		const post = await prisma.post.create({
 			data: {
 				title: data.title,
@@ -125,7 +130,7 @@ export async function generatePostAI(formData: FormData): Promise<string> {
 				excerpt: data.excerpt,
 				content: finalContent,
 				published: true,
-				image: mainImage,
+				image: finalImages[0] || 'https://placehold.co/1200x630?text=Blog',
 			},
 		})
 
