@@ -57,6 +57,8 @@ model Company {
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
 
   plan       Plan    @default(FREE)
   premiumUntil DateTime?

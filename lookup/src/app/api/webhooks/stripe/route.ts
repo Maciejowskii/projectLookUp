@@ -1,49 +1,84 @@
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
 export async function POST(req: Request) {
 	const body = await req.text()
-	const headersList = await headers()
-	const signature = headersList.get('stripe-signature')
+	const signature = req.headers.get('stripe-signature')
 
 	if (!signature) {
 		return NextResponse.json({ error: 'No signature' }, { status: 400 })
 	}
 
 	let event: Stripe.Event
-
 	try {
 		event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
 	} catch (err) {
-		console.error('Webhook signature verification failed:', err)
 		return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
 	}
 
-	// Obsługa udanej płatności
-	if (event.type === 'checkout.session.completed') {
-		const session = event.data.object as Stripe.Checkout.Session
+	try {
+		switch (event.type) {
+			case 'checkout.session.completed': {
+				const session = event.data.object as Stripe.Checkout.Session
+				if (session.mode !== 'subscription') break
 
-		const companyId = session.metadata?.companyId
+				const companyId = session.metadata?.companyId
+				const subscriptionId = session.subscription as string | null
+				const customerId = session.customer as string | null
 
-		if (companyId) {
-			try {
+				if (!companyId || !subscriptionId || !customerId) break
+
+				const sub = await stripe.subscriptions.retrieve(subscriptionId)
+
+				const item = sub.items.data[0]
+				const periodEnd = item?.current_period_end
+
+				if (typeof periodEnd !== 'number') {
+					throw new Error(`Missing items.data[0].current_period_end on subscription ${sub.id}`)
+				}
+
 				await prisma.company.update({
 					where: { id: companyId },
 					data: {
 						plan: 'PREMIUM',
-						premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dni
+						stripeCustomerId: customerId,
+						stripeSubscriptionId: subscriptionId,
+						premiumUntil: new Date(periodEnd * 1000),
 					},
 				})
 
-				console.log(`✅ Company ${companyId} upgraded to PREMIUM`)
-			} catch (error) {
-				console.error('Failed to update company plan:', error)
+				await prisma.company.update({
+					where: { id: companyId },
+					data: {
+						plan: 'PREMIUM',
+						stripeCustomerId: customerId,
+						stripeSubscriptionId: subscriptionId,
+						premiumUntil: new Date(periodEnd * 1000),
+					},
+				})
+
+				break
+			}
+
+			case 'customer.subscription.deleted': {
+				const sub = event.data.object as Stripe.Subscription
+				await prisma.company.updateMany({
+					where: { stripeSubscriptionId: sub.id },
+					data: {
+						plan: 'FREE',
+						premiumUntil: null,
+						stripeSubscriptionId: null,
+					},
+				})
+				break
 			}
 		}
-	}
 
-	return NextResponse.json({ received: true })
+		return NextResponse.json({ received: true })
+	} catch (err) {
+		console.error('Webhook handler error:', err)
+		return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+	}
 }

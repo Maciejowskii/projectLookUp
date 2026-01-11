@@ -21,19 +21,39 @@ export async function POST() {
 			return NextResponse.json({ error: 'User not found' }, { status: 404 })
 		}
 
+		// (opcjonalnie) blokada, jeśli już ma subskrypcję w bazie
+		if (user.company.stripeSubscriptionId) {
+			return NextResponse.json({ error: 'Subscription already exists. Use Customer Portal.' }, { status: 409 })
+		}
+
+		// Stripe Customer
+		let customerId = user.company.stripeCustomerId
+
+		if (!customerId) {
+			const customer = await stripe.customers.create({
+				email: user.email ?? undefined,
+				name: user.company.name,
+				metadata: {
+					userId: user.id,
+					companyId: user.company.id,
+				},
+			})
+
+			customerId = customer.id
+
+			await prisma.company.update({
+				where: { id: user.company.id },
+				data: { stripeCustomerId: customerId },
+			})
+		}
+
+		// Checkout Session (SUBSCRIPTION)
 		const session = await stripe.checkout.sessions.create({
-			payment_method_types: ['card'],
-			mode: 'payment',
+			customer: customerId,
+			mode: 'subscription',
 			line_items: [
 				{
-					price_data: {
-						currency: 'pln',
-						product_data: {
-							name: 'Katalogo Premium',
-							description: 'Miesięczny dostęp do funkcji Premium',
-						},
-						unit_amount: 9900,
-					},
+					price: 'price_1SoVJnHGnBnyRYyLMbDKGtmQ',
 					quantity: 1,
 				},
 			],
