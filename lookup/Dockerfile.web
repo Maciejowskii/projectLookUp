@@ -1,24 +1,21 @@
-# Zmieniamy na slim, żeby naprawić błędy OpenSSL i Prisma
 FROM node:20-slim
 
 WORKDIR /app
 
-# Instalujemy openssl (wymagane przez Prisma w obrazach slim/debian)
 RUN apt-get update -y && apt-get install -y openssl
 
 COPY package*.json ./
 COPY prisma ./prisma/
 
 RUN npm install
-RUN npx prisma db push --accept-data-loss
+
+# Generujemy Prisma Client (nie wymaga DB)
 RUN npx prisma generate
 
 COPY . .
 
-# Budujemy standardowym Webpackiem (domyślny w Next 15)
 RUN npx next build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run start"]
-
+CMD ["npm", "run", "start"]
