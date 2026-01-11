@@ -53,7 +53,7 @@ export async function POST() {
 			mode: 'subscription',
 			line_items: [
 				{
-					price: 'price_1SoVJnHGnBnyRYyLMbDKGtmQ',
+					price: 'price_1So95cHGnBnyRYyL8t8aQfn0',
 					quantity: 1,
 				},
 			],
