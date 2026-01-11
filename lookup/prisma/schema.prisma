@@ -59,6 +59,7 @@ model Company {
   category   Category @relation(fields: [categoryId], references: [id])
 
   plan       Plan    @default(FREE)
+  premiumUntil DateTime?
   isVerified Boolean @default(false)
 
   leads Lead[]
