@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { prisma } from '@/lib/prisma'
 import { Toaster } from 'react-hot-toast'
+import { GoogleTagManager } from '@next/third-parties/google'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				<script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
 				{/* Google Tag Manager */}
-				<script
+				{/* <script
 					dangerouslySetInnerHTML={{
 						__html: `
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -63,24 +64,25 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-KBMJTNBQ');
           `,
 					}}
-				/>
+				/> */}
 				{/* End Google Tag Manager */}
 			</head>
 			<body className={inter.className}>
 				{/* Google Tag Manager (noscript) */}
-				<noscript>
+				{/* <noscript>
 					<iframe
 						src='https://www.googletagmanager.com/ns.html?id=GTM-KBMJTNBQ'
 						height='0'
 						width='0'
 						style={{ display: 'none', visibility: 'hidden' }}
 					/>
-				</noscript>
+				</noscript> */}
 				{/* End Google Tag Manager (noscript) */}
 
 				{children}
 				<Toaster />
 			</body>
+			<GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID!} />
 		</html>
 	)
 }
