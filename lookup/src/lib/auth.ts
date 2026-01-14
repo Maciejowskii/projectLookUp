@@ -26,11 +26,9 @@ if (isNextAuthConfigured) {
 // Strategy must be a literal type, not a variable string
 const strategy: 'jwt' | 'database' = adapter ? 'database' : 'jwt'
 
-const authOptions = {
-	...(adapter && { adapter }),
-	secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-development-only',
-	trustHost: true,
-	providers: [
+// Helper function to get providers list without initializing full authOptions
+export function getProviders() {
+	return [
 		...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
 			? [
 					GoogleProvider({
@@ -47,7 +45,14 @@ const authOptions = {
 					}),
 			  ]
 			: []),
-	],
+	]
+}
+
+const authOptions = {
+	...(adapter && { adapter }),
+	secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-development-only',
+	trustHost: true,
+	providers: getProviders(),
 	callbacks: {
 		async signIn({ user, account, profile }: { user: any; account?: any; profile?: any }) {
 			// Allow sign in
@@ -85,14 +90,20 @@ const authOptions = {
 	events: {
 		async signIn({ user, account, isNewUser }: { user: any; account?: any; isNewUser?: boolean }) {
 			// Set session cookie after OAuth sign in
-			if (user.id) {
-				const cookieStore = await cookies()
-				cookieStore.set('session_user_id', user.id, {
-					httpOnly: true,
-					secure: process.env.NODE_ENV === 'production',
-					maxAge: 60 * 60 * 24 * 7,
-					path: '/',
-				})
+			// Note: cookies() can only be called during request handling
+			try {
+				if (user?.id) {
+					const cookieStore = await cookies()
+					cookieStore.set('session_user_id', user.id, {
+						httpOnly: true,
+						secure: process.env.NODE_ENV === 'production',
+						maxAge: 60 * 60 * 24 * 7,
+						path: '/',
+					})
+				}
+			} catch (error) {
+				// Silently fail if cookies() is not available (e.g., during initialization)
+				console.warn('Could not set session cookie:', error)
 			}
 		},
 	},
