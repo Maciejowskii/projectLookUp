@@ -45,7 +45,7 @@ const authOptions = {
 			: []),
 	],
 	callbacks: {
-		async signIn({ user, account, profile }: { user: any; account: any; profile?: any }) {
+		async signIn({ user, account, profile }: { user: any; account?: any; profile?: any }) {
 			// Allow sign in
 			return true
 		},
