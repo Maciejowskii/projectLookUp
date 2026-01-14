@@ -29,6 +29,11 @@ export async function loginAction(formData: FormData) {
     throw new Error("Konto nieaktywne. Sprawdź e-mail weryfikacyjny.");
   }
 
+  // Sprawdzamy czy użytkownik ma hasło (OAuth users nie mają hasła)
+  if (!user.password) {
+    throw new Error("To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.");
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password);
 
   if (!isPasswordValid) {
