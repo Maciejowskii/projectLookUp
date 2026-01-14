@@ -45,11 +45,11 @@ const authOptions = {
 			: []),
 	],
 	callbacks: {
-		async signIn({ user, account, profile }) {
+		async signIn({ user, account, profile }: { user: any; account: any; profile?: any }) {
 			// Allow sign in
 			return true
 		},
-		async session({ session, user, token }) {
+		async session({ session, user, token }: { session: any; user?: any; token?: any }) {
 			// Add user id to session
 			// For database strategy, user is available
 			// For JWT strategy, use token
@@ -62,7 +62,7 @@ const authOptions = {
 			}
 			return session
 		},
-		async jwt({ token, user, account }) {
+		async jwt({ token, user, account }: { token: any; user?: any; account?: any }) {
 			// Add user id to token (for JWT strategy)
 			if (user) {
 				token.id = user.id
@@ -80,7 +80,7 @@ const authOptions = {
 		maxAge: 60 * 60 * 24 * 7, // 7 days
 	},
 	events: {
-		async signIn({ user, account, isNewUser }) {
+		async signIn({ user, account, isNewUser }: { user: any; account?: any; isNewUser?: boolean }) {
 			// Set session cookie after OAuth sign in
 			if (user.id) {
 				const cookieStore = await cookies()
