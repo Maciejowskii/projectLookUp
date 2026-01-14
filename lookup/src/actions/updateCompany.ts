@@ -14,27 +14,54 @@ export async function updateCompanyAction(formData: FormData) {
     throw new Error("Nieautoryzowany dostęp");
   }
 
-  // 2. Pobieramy usera, żeby wiedzieć jaką firmę edytować
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { companyId: true },
-  });
-
-  if (!user || !user.companyId) {
-    throw new Error("Nie znaleziono firmy przypisanej do konta.");
+  // 2. Pobieramy companyId z formularza
+  const companyId = formData.get("companyId") as string;
+  
+  if (!companyId) {
+    throw new Error("Brak identyfikatora firmy.");
   }
 
-  // 3. Pobieramy dane z formularza
+  // 3. Sprawdzamy czy użytkownik ma dostęp do tej firmy
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      companies: {
+        where: { companyId },
+      },
+      // Legacy support
+      company: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("Nie znaleziono użytkownika.");
+  }
+
+  // Sprawdzamy dostęp: nowa struktura (CompanyUser) lub legacy (companyId)
+  const hasAccessViaNewStructure = user.companies.length > 0;
+  const hasAccessViaLegacy = user.companyId === companyId && user.company?.id === companyId;
+
+  if (!hasAccessViaNewStructure && !hasAccessViaLegacy) {
+    throw new Error("Brak uprawnień do edycji tej firmy.");
+  }
+
+  // 4. Pobieramy dane z formularza
   const description = formData.get("description") as string;
   const website = formData.get("website") as string;
   const phone = formData.get("phone") as string;
   const email = formData.get("email") as string;
   const address = formData.get("address") as string;
 
-  // 4. Aktualizacja w bazie
+  // 5. Pobieramy slug firmy dla revalidatePath
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { slug: true },
+  });
+
+  // 6. Aktualizacja w bazie
   await prisma.company.update({
-    where: { id: user.companyId },
-     data:{
+    where: { id: companyId },
+    data: {
       description,
       website,
       phone,
@@ -43,7 +70,9 @@ export async function updateCompanyAction(formData: FormData) {
     },
   });
 
-  // 5. Odświeżamy cache, żeby użytkownik od razu widział zmiany
+  // 7. Odświeżamy cache, żeby użytkownik od razu widział zmiany
   revalidatePath("/dashboard");
-  revalidatePath(`/firma/${user.companyId}`); // Opcjonalnie, jeśli znamy slug
+  if (company?.slug) {
+    revalidatePath(`/firma/${company.slug}`);
+  }
 }

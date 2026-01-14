@@ -5,6 +5,7 @@ import './globals.css'
 import { prisma } from '@/lib/prisma'
 import { Toaster } from 'react-hot-toast'
 import { GoogleTagManager } from '@next/third-parties/google'
+import { Providers } from '@/components/Providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -79,8 +80,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				</noscript> */}
 				{/* End Google Tag Manager (noscript) */}
 
-				{children}
-				<Toaster />
+				<Providers>
+					{children}
+					<Toaster />
+				</Providers>
 			</body>
 			<GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID!} />
 		</html>

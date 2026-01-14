@@ -45,19 +45,30 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 
 			const response = await fetch('/api/checkout', {
 				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					companyId: company.id,
+				}),
 			})
 
 			if (!response.ok) {
-				throw new Error('Failed to create checkout session')
+				const errorData = await response.json().catch(() => ({}))
+				throw new Error(errorData.error || 'Failed to create checkout session')
 			}
 
 			const { url } = await response.json()
 
+			if (!url) {
+				throw new Error('No checkout URL received')
+			}
+
 			// Proste przekierowanie przez window.location
 			window.location.href = url
-		} catch (error) {
+		} catch (error: any) {
 			console.error('Payment error:', error)
-			alert('Wystąpił błąd podczas inicjowania płatności.')
+			alert(error.message || 'Wystąpił błąd podczas inicjowania płatności.')
 			setIsProcessing(false)
 		}
 	}
@@ -203,6 +214,7 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 
 			{/* Formularz */}
 			<form action={handleSubmit} className='space-y-8'>
+				<input type='hidden' name='companyId' value={company.id} />
 				<div className='space-y-4'>
 					<label className='flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-wide'>
 						<AlignLeft size={16} className='text-blue-600' /> O firmie

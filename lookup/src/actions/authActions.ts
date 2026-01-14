@@ -1,143 +1,228 @@
-"use server";
+'use server'
 
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import bcrypt from 'bcryptjs'
+import { cookies } from 'next/headers'
+
+// --- 0. REJESTRACJA ---
+export async function registerAction(formData: FormData) {
+	const email = formData.get('email') as string
+	const password = formData.get('password') as string
+
+	if (!email || !password) {
+		throw new Error('Wypełnij wszystkie pola')
+	}
+
+	if (password.length < 8) {
+		throw new Error('Hasło musi mieć minimum 8 znaków')
+	}
+
+	// Sprawdź czy użytkownik już istnieje
+	const existingUser = await prisma.user.findUnique({
+		where: { email },
+	})
+
+	if (existingUser) {
+		throw new Error('Użytkownik z tym emailem już istnieje')
+	}
+
+	// Hashowanie hasła
+	const hashedPassword = await bcrypt.hash(password, 10)
+
+	// Tworzenie użytkownika (bez przypisanej firmy - może claimować później)
+	const user = await prisma.user.create({
+		data: {
+			email,
+			password: hashedPassword,
+			emailVerified: new Date(), // Auto-verify dla uproszczenia (można zmienić na email verification)
+		},
+	})
+
+	// Auto-login po rejestracji
+	const cookieStore = await cookies()
+	cookieStore.set('session_user_id', user.id, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		maxAge: 60 * 60 * 24 * 7,
+		path: '/',
+	})
+
+	redirect('/dashboard')
+}
 
 // --- 1. LOGOWANIE ---
 export async function loginAction(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+	const email = formData.get('email') as string
+	const password = formData.get('password') as string
 
-  if (!email || !password) {
-    throw new Error("Wypełnij wszystkie pola");
-  }
+	if (!email || !password) {
+		redirect('/strefa-partnera?error=' + encodeURIComponent('Wypełnij wszystkie pola'))
+		return
+	}
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { company: true },
-  });
+	const user = await prisma.user.findUnique({
+		where: { email },
+		include: {
+			// Legacy support
+			company: true,
+			// New many-to-many
+			companies: {
+				include: {
+					company: {
+						include: {
+							category: true,
+						},
+					},
+				},
+			},
+		},
+	})
 
-  if (!user) {
-    throw new Error("Nieprawidłowy email lub hasło");
-  }
+	if (!user) {
+		redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło'))
+		return
+	}
 
-  // Sprawdzamy czy konto jest zweryfikowane
-  if (!user.emailVerified) {
-    throw new Error("Konto nieaktywne. Sprawdź e-mail weryfikacyjny.");
-  }
+	// Sprawdzamy czy konto jest zweryfikowane
+	if (!user.emailVerified) {
+		redirect('/strefa-partnera?error=' + encodeURIComponent('Konto nieaktywne. Sprawdź e-mail weryfikacyjny.'))
+		return
+	}
 
-  const isPasswordValid = await bcrypt.compare(password, user.password);
+	// Sprawdzamy czy użytkownik ma hasło (OAuth users nie mają hasła)
+	if (!user.password) {
+		redirect('/strefa-partnera?error=' + encodeURIComponent('To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.'))
+		return
+	}
 
-  if (!isPasswordValid) {
-    throw new Error("Nieprawidłowy email lub hasło");
-  }
+	const isPasswordValid = await bcrypt.compare(password, user.password)
 
-  const cookieStore = await cookies();
-  cookieStore.set("session_user_id", user.id, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
-    path: "/",
-  });
+	if (!isPasswordValid) {
+		redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło'))
+		return
+	}
 
-  redirect("/dashboard");
+	// Auto-migracja: jeśli użytkownik ma companyId ale nie ma CompanyUser
+	if (user.companyId && user.companies.length === 0) {
+		try {
+			await prisma.companyUser.create({
+				data: {
+					userId: user.id,
+					companyId: user.companyId,
+					role: 'OWNER',
+				},
+			})
+		} catch (error) {
+			// Ignore if already exists or company doesn't exist
+			console.log('Auto-migration note:', error)
+		}
+	}
+
+	const cookieStore = await cookies()
+	cookieStore.set('session_user_id', user.id, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		maxAge: 60 * 60 * 24 * 7,
+		path: '/',
+	})
+
+	redirect('/dashboard')
 }
 
 // --- 2. WYLOGOWYWANIE ---
 export async function logoutAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete("session_user_id");
-  redirect("/strefa-partnera");
+	const cookieStore = await cookies()
+	cookieStore.delete('session_user_id')
+	redirect('/strefa-partnera')
 }
 
 // --- 3. USTAWIANIE HASŁA (WERYFIKACJA) ---
 export async function setPasswordAction(formData: FormData) {
-  const token = formData.get("token") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+	const token = formData.get('token') as string
+	const email = formData.get('email') as string
+	const password = formData.get('password') as string
 
-  if (!password || password.length < 8) {
-    throw new Error("Hasło musi mieć min. 8 znaków");
-  }
+	if (!password || password.length < 8) {
+		throw new Error('Hasło musi mieć min. 8 znaków')
+	}
 
-  // 1. Weryfikacja tokenu
-  const verificationData = await prisma.verificationToken.findUnique({
-    where: { token },
-  });
+	// 1. Weryfikacja tokenu
+	const verificationData = await prisma.verificationToken.findUnique({
+		where: { token },
+	})
 
-  if (!verificationData || verificationData.identifier !== email) {
-    throw new Error("Nieprawidłowy lub nieważny token.");
-  }
+	if (!verificationData || verificationData.identifier !== email) {
+		throw new Error('Nieprawidłowy lub nieważny token.')
+	}
 
-  // 2. Hashowanie hasła
-  const hashedPassword = await bcrypt.hash(password, 10);
+	// 2. Hashowanie hasła
+	const hashedPassword = await bcrypt.hash(password, 10)
 
-  // 3. Transakcja: Update usera + usunięcie tokenu
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { email },
-      data: {
-        password: hashedPassword,
-        emailVerified: new Date(), // Ustawiamy datę = konto aktywne
-      },
-    }),
-    prisma.verificationToken.delete({
-      where: { token },
-    }),
-  ]);
+	// 3. Transakcja: Update usera + usunięcie tokenu
+	await prisma.$transaction([
+		prisma.user.update({
+			where: { email },
+			data: {
+				password: hashedPassword,
+				emailVerified: new Date(), // Ustawiamy datę = konto aktywne
+			},
+		}),
+		prisma.verificationToken.delete({
+			where: { token },
+		}),
+	])
 
-  // 4. Auto-login po ustawieniu hasła
-  const user = await prisma.user.findUnique({ where: { email } });
+	// 4. Auto-login po ustawieniu hasła
+	const user = await prisma.user.findUnique({ where: { email } })
 
-  if (user) {
-    const cookieStore = await cookies();
-    cookieStore.set("session_user_id", user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
-  }
+	if (user) {
+		const cookieStore = await cookies()
+		cookieStore.set('session_user_id', user.id, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			maxAge: 60 * 60 * 24 * 7,
+			path: '/',
+		})
+	}
 
-  redirect("/dashboard");
+	redirect('/dashboard')
 }
 
 export async function changePasswordAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("session_user_id")?.value;
+	const cookieStore = await cookies()
+	const userId = cookieStore.get('session_user_id')?.value
 
-  if (!userId) redirect("/strefa-partnera");
+	if (!userId) redirect('/strefa-partnera')
 
-  const oldPassword = formData.get("oldPassword") as string;
-  const newPassword = formData.get("newPassword") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
+	const oldPassword = formData.get('oldPassword') as string
+	const newPassword = formData.get('newPassword') as string
+	const confirmPassword = formData.get('confirmPassword') as string
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) redirect("/strefa-partnera");
+	const user = await prisma.user.findUnique({ where: { id: userId } })
+	if (!user) redirect('/strefa-partnera')
 
-  // Walidacja starego hasła
-  const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
-  if (!isOldPasswordValid) {
-    redirect("/dashboard?error=wrong_old_password");
-  }
+	// Walidacja starego hasła
+	const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password)
+	if (!isOldPasswordValid) {
+		redirect('/dashboard?error=wrong_old_password')
+	}
 
-  // Walidacja długości
-  if (newPassword.length < 8) {
-    redirect("/dashboard?error=password_too_short");
-  }
+	// Walidacja długości
+	if (newPassword.length < 8) {
+		redirect('/dashboard?error=password_too_short')
+	}
 
-  // Walidacja identyczności haseł (to naprawia Twój błąd ze screena)
-  if (newPassword !== confirmPassword) {
-    redirect("/dashboard?error=passwords_not_matching");
-  }
+	// Walidacja identyczności haseł (to naprawia Twój błąd ze screena)
+	if (newPassword !== confirmPassword) {
+		redirect('/dashboard?error=passwords_not_matching')
+	}
 
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { password: hashedPassword },
-  });
+	const hashedPassword = await bcrypt.hash(newPassword, 10)
+	await prisma.user.update({
+		where: { id: userId },
+		data: { password: hashedPassword },
+	})
 
-  redirect("/dashboard?status=password_updated");
+	redirect('/dashboard?status=password_updated')
 }

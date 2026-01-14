@@ -77,6 +77,8 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 		orderBy: [{ isVerified: 'desc' }, { logo: 'desc' }, { name: 'asc' }],
 	})
 
+	type CompanyType = (typeof companies)[number]
+
 	return (
 		<div className='min-h-screen bg-gray-50 flex flex-col font-sans'>
 			<Navbar />
@@ -100,7 +102,7 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 
 				{companies.length > 0 ? (
 					<div className='grid grid-cols-1 gap-6'>
-						{companies.map(company => (
+						{companies.map((company: CompanyType) => (
 							<Link
 								key={company.id}
 								href={`/firma/${company.slug}`}

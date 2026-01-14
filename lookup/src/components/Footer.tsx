@@ -73,8 +73,9 @@ export const Footer = async () => {
               <li>
                 <Link
                   href="/cennik"
-                  className="hover:text-white transition-colors"
+                  className="text-white font-medium hover:text-blue-400 transition-colors flex items-center gap-2"
                 >
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                   Cennik i Pakiety
                 </Link>
               </li>
@@ -179,16 +180,46 @@ export const Footer = async () => {
           </div>
         </div>
 
-        <div className="text-center text-xs text-gray-600 mt-8">
-          &copy; {new Date().getFullYear()} katalogo. Realizacja:{" "}
-          <a
-            href="http://digitay.pl"
-            target="_blank"
-            rel="nofollow"
-            className="text-gray-500 hover:text-white transition-colors"
-          >
-            Digitay
-          </a>
+        {/* COMPANY INFO & PAYMENT METHODS */}
+        <div className="border-t border-gray-900 pt-8 mt-8">
+          <div className="text-center space-y-4">
+            {/* Company Details */}
+            <div className="text-xs text-gray-500">
+              <p className="font-semibold text-gray-400 mb-1">Jakub Wolert</p>
+              <p>ul. Targowa 6/5, 72-010 Police</p>
+              <p>NIP: 8513315629 | REGON: 52918637000000</p>
+            </div>
+
+            {/* Payment Method Flags */}
+            <div className="flex items-center justify-center gap-4 mt-6 flex-wrap">
+              <span className="text-xs text-gray-500">Płatności:</span>
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                <span className="text-xs font-semibold text-gray-400 bg-gray-800 px-2 py-1 rounded">
+                  Przelewy24
+                </span>
+                <span className="text-xs font-bold text-white bg-[#1A1F71] px-3 py-1 rounded flex items-center gap-1">
+                  <span className="text-[10px]">VISA</span>
+                </span>
+                <span className="text-xs font-bold text-white bg-[#EB001B] px-3 py-1 rounded flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-[#F79E1B] mr-1"></span>
+                  <span className="text-[10px]">MC</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Copyright */}
+            <div className="text-xs text-gray-600 mt-6">
+              &copy; {new Date().getFullYear()} katalogo. Realizacja:{" "}
+              <a
+                href="http://digitay.pl"
+                target="_blank"
+                rel="nofollow"
+                className="text-gray-500 hover:text-white transition-colors"
+              >
+                Digitay
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

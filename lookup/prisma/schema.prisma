@@ -70,7 +70,8 @@ model Company {
   updatedAt DateTime? @updatedAt
   sourceUrl String? @unique
 
-  users User[]
+  users       User[]        @relation("UserCompany") // Legacy relation
+  companyUsers CompanyUser[] // New many-to-many relation
 
   @@unique([tenantId, slug])
   @@index([tenantId, city])
@@ -137,14 +138,73 @@ model Setting {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  password      String // Zahaszowane hasło
+  password      String? // Zahaszowane hasło (nullable dla OAuth users)
   emailVerified DateTime?
+  name          String? // Imię i nazwisko (dla OAuth)
+  image         String? // Avatar URL (dla OAuth)
 
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id])
+  // OAuth accounts
+  accounts Account[]
+  // NextAuth sessions
+  sessions Session[]
+
+  // Legacy field - kept for backward compatibility
+  // Will be auto-migrated to CompanyUser on first dashboard access
+  companyId String?
+  company   Company? @relation("UserCompany", fields: [companyId], references: [id])
+
+  // New many-to-many relationship
+  companies CompanyUser[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// NextAuth Account model for OAuth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Junction table for many-to-many relationship
+model CompanyUser {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  role      String   @default("OWNER") // OWNER, EDITOR, VIEWER
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
 }
 
 model Post {

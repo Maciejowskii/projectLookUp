@@ -108,7 +108,100 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                §5. Reklamacje
+                §5. Metody płatności i realizacja usług
+              </h2>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  Płatności w serwisie katalogo.pl są obsługiwane przez system
+                  płatności <strong>Przelewy24</strong>.
+                </li>
+                <li>
+                  Dostępne metody płatności: przelewy bankowe online, płatności
+                  kartą kredytową/debetową (Visa, Mastercard), BLIK oraz inne
+                  metody oferowane przez Przelewy24.
+                </li>
+                <li>
+                  Płatność za usługi Premium jest wymagana przed aktywacją
+                  pakietu. Usługa jest aktywowana natychmiast po potwierdzeniu
+                  płatności przez system płatniczy.
+                </li>
+                <li>
+                  W przypadku płatności kartą kredytową/debetową, dostawcą usług
+                  płatniczych jest <strong>PayPro SA</strong>, Agent Rozliczeniowy, ul.
+                  Pastelowa 8, 60-198 Poznań, wpisany do rejestru przedsiębiorców
+                  Krajowego Rejestru Sądowego prowadzonego przez Sąd Rejonowy dla
+                  Poznania Nowe Miasto i Wilda w Poznaniu, VIII Wydział Gospodarczy
+                  Krajowego Rejestru Sądowego, pod numerem KRS 0000347935, NIP
+                  7792369887, REGON 301345068.
+                </li>
+                <li>
+                  Termin płatności: płatność jest wymagana przed aktywacją usługi.
+                  W przypadku niepowodzenia płatności, usługa nie zostanie
+                  aktywowana.
+                </li>
+                <li>
+                  Usługi Premium są świadczone w formie cyfrowej (dostęp online do
+                  panelu zarządzania i funkcji Premium). Usługa jest aktywowana
+                  automatycznie po potwierdzeniu płatności.
+                </li>
+              </ol>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                §6. Prawo odstąpienia od umowy
+              </h2>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  Zgodnie z art. 38 pkt 1 ustawy o prawach konsumenta, konsument
+                  nie może odstąpić od umowy o świadczenie usług, jeżeli
+                  usługodawca wykonał w pełni usługę za wyraźną zgodą konsumenta,
+                  który został poinformowany przed rozpoczęciem świadczenia, że po
+                  spełnieniu świadczenia przez usługodawcę utraci prawo odstąpienia
+                  od umowy.
+                </li>
+                <li>
+                  W przypadku usług Premium, które są aktywowane natychmiast po
+                  płatności, konsument traci prawo odstąpienia po wyrażeniu zgody
+                  na natychmiastową aktywację usługi.
+                </li>
+                <li>
+                  W przypadku, gdy konsument nie wyraził zgody na natychmiastową
+                  aktywację, przysługuje mu prawo odstąpienia od umowy w terminie
+                  <strong> 14 dni</strong> od dnia zawarcia umowy bez podania przyczyny.
+                </li>
+                <li>
+                  Aby skorzystać z prawa odstąpienia, konsument powinien poinformować
+                  nas o swojej decyzji za pomocą jednoznacznego oświadczenia (np.
+                  pismo wysłane pocztą, faksem lub e-mailem) na adres:{" "}
+                  <a
+                    href="mailto:kontakt@katalogo.pl"
+                    className="text-blue-600"
+                  >
+                    kontakt@katalogo.pl
+                  </a>
+                  .
+                </li>
+                <li>
+                  Wzór formularza odstąpienia od umowy dostępny jest{" "}
+                  <Link href="/formularz-odstapienia" className="text-blue-600 underline">
+                    tutaj
+                  </Link>
+                  .
+                </li>
+                <li>
+                  W przypadku odstąpienia od umowy, zwrotu dokonamy niezwłocznie, nie
+                  później niż w terminie 14 dni od dnia otrzymania informacji o
+                  odstąpieniu. Zwrotu dokonamy tym samym sposobem płatności, jakiego
+                  użył konsument, chyba że konsument wyraźnie zgodził się na inny
+                  sposób zwrotu.
+                </li>
+              </ol>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                §7. Reklamacje
               </h2>
               <ol className="list-decimal pl-5 space-y-2">
                 <li>
@@ -125,7 +218,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                §6. Postanowienia końcowe
+                §8. Postanowienia końcowe
               </h2>
               <ol className="list-decimal pl-5 space-y-2">
                 <li>

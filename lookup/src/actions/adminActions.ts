@@ -19,14 +19,48 @@ export async function approveClaim(claimId: string) {
 		data: { status: 'APPROVED' },
 	})
 
-	// 3. Zaktualizuj firmę (zweryfikuj ją i przypisz dane kontaktowe właściciela)
+	// 3. Znajdź użytkownika po emailu (jeśli istnieje konto)
+	const user = await prisma.user.findUnique({
+		where: { email: claim.email },
+		select: { id: true, companyId: true },
+	})
+
+	// 4. Jeśli użytkownik istnieje i nie ma jeszcze przypisanej firmy, przypisz firmę
+	if (user) {
+		if (!user.companyId) {
+			// Użytkownik istnieje i nie ma firmy - bezpiecznie przypisz
+			await prisma.user.update({
+				where: { id: user.id },
+				data: { companyId: claim.companyId },
+			})
+		} else if (user.companyId !== claim.companyId) {
+			// Użytkownik ma już inną firmę - nie nadpisujemy (bezpieczeństwo danych)
+			console.log(`⚠️ User ${user.id} already has company ${user.companyId}, cannot assign ${claim.companyId}`)
+		}
+		// Jeśli user.companyId === claim.companyId, wszystko jest już OK
+	}
+
+	// 5. Pobierz firmę, żeby sprawdzić czy ma już email
+	const company = await prisma.company.findUnique({
+		where: { id: claim.companyId },
+		select: { email: true },
+	})
+
+	// 6. Zaktualizuj firmę (zweryfikuj ją)
+	// NIE nadpisujemy istniejących danych - tylko ustawiamy isVerified
+	// Email aktualizujemy tylko jeśli firma nie ma jeszcze emailu
+	const updateData: { isVerified: boolean; email?: string } = {
+		isVerified: true,
+	}
+
+	// Aktualizuj email tylko jeśli firma nie ma jeszcze emailu
+	if (claim.email && (!company || !company.email)) {
+		updateData.email = claim.email
+	}
+
 	await prisma.company.update({
 		where: { id: claim.companyId },
-		data: {
-			isVerified: true,
-			email: claim.email, // Nadpisujemy email firmowy emailem właściciela (opcjonalne)
-			// phone: claim.phone // Możemy też nadpisać telefon, jeśli chcesz
-		},
+		data: updateData,
 	})
 
 	revalidatePath('/admin/zgloszenia')
