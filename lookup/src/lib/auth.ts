@@ -1,4 +1,5 @@
 import NextAuth from 'next-auth'
+import type { NextAuthConfig } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import FacebookProvider from 'next-auth/providers/facebook'
 import { PrismaAdapter } from '@auth/prisma-adapter'
@@ -21,6 +22,9 @@ if (isNextAuthConfigured) {
 		adapter = undefined
 	}
 }
+
+// Strategy must be a literal type, not a variable string
+const strategy: 'jwt' | 'database' = adapter ? 'database' : 'jwt'
 
 const authOptions = {
 	...(adapter && { adapter }),
@@ -75,8 +79,7 @@ const authOptions = {
 		error: '/strefa-partnera',
 	},
 	session: {
-		// Use JWT strategy if adapter is not available (tables don't exist yet)
-		strategy: adapter ? 'database' : 'jwt',
+		strategy,
 		maxAge: 60 * 60 * 24 * 7, // 7 days
 	},
 	events: {
@@ -93,7 +96,7 @@ const authOptions = {
 			}
 		},
 	},
-}
+} satisfies NextAuthConfig
 
 // Export NextAuth handlers and functions for NextAuth v5
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
