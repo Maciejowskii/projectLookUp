@@ -202,6 +202,12 @@ export async function changePasswordAction(formData: FormData) {
 	const user = await prisma.user.findUnique({ where: { id: userId } })
 	if (!user) redirect('/strefa-partnera')
 
+	// Sprawdź czy użytkownik ma hasło (OAuth users nie mają hasła)
+	if (!user.password) {
+		redirect('/dashboard?error=oauth_user_cannot_change_password')
+		return
+	}
+
 	// Walidacja starego hasła
 	const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password)
 	if (!isOldPasswordValid) {
