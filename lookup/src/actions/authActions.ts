@@ -6,49 +6,64 @@ import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 
 // --- 0. REJESTRACJA ---
-export async function registerAction(formData: FormData) {
+export async function registerAction(
+	prevState: { error?: string } | null,
+	formData: FormData
+): Promise<{ error?: string }> {
 	const email = formData.get('email') as string
 	const password = formData.get('password') as string
 
 	if (!email || !password) {
-		throw new Error('Wypełnij wszystkie pola')
+		return { error: 'Wypełnij wszystkie pola' }
 	}
 
 	if (password.length < 8) {
-		throw new Error('Hasło musi mieć minimum 8 znaków')
+		return { error: 'Hasło musi mieć minimum 8 znaków' }
 	}
 
-	// Sprawdź czy użytkownik już istnieje
-	const existingUser = await prisma.user.findUnique({
-		where: { email },
-	})
+	try {
+		// Sprawdź czy użytkownik już istnieje
+		const existingUser = await prisma.user.findUnique({
+			where: { email },
+		})
 
-	if (existingUser) {
-		throw new Error('Użytkownik z tym emailem już istnieje')
+		if (existingUser) {
+			return { error: 'Użytkownik z tym emailem już istnieje' }
+		}
+
+		// Hashowanie hasła
+		const hashedPassword = await bcrypt.hash(password, 10)
+
+		// Tworzenie użytkownika (bez przypisanej firmy - może claimować później)
+		const user = await prisma.user.create({
+			data: {
+				email,
+				password: hashedPassword,
+				emailVerified: new Date(), // Auto-verify dla uproszczenia (można zmienić na email verification)
+			},
+		})
+
+		// Auto-login po rejestracji
+		const cookieStore = await cookies()
+		cookieStore.set('session_user_id', user.id, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			maxAge: 60 * 60 * 24 * 7,
+			path: '/',
+		})
+
+		redirect('/dashboard')
+	} catch (error) {
+		console.error('Registration error:', error)
+		// Handle Prisma errors
+		if (error instanceof Error) {
+			// Check for unique constraint violation
+			if (error.message.includes('Unique constraint') || error.message.includes('email')) {
+				return { error: 'Użytkownik z tym emailem już istnieje' }
+			}
+		}
+		return { error: 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.' }
 	}
-
-	// Hashowanie hasła
-	const hashedPassword = await bcrypt.hash(password, 10)
-
-	// Tworzenie użytkownika (bez przypisanej firmy - może claimować później)
-	const user = await prisma.user.create({
-		data: {
-			email,
-			password: hashedPassword,
-			emailVerified: new Date(), // Auto-verify dla uproszczenia (można zmienić na email verification)
-		},
-	})
-
-	// Auto-login po rejestracji
-	const cookieStore = await cookies()
-	cookieStore.set('session_user_id', user.id, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		maxAge: 60 * 60 * 24 * 7,
-		path: '/',
-	})
-
-	redirect('/dashboard')
 }
 
 // --- 1. LOGOWANIE ---

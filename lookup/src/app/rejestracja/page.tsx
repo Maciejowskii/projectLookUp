@@ -1,11 +1,31 @@
+'use client'
+
 import { registerAction } from '@/actions/authActions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { OAuthButtons } from '@/components/OAuthButtons'
-import { Lock, Mail, ArrowRight, UserPlus } from 'lucide-react'
+import { Lock, Mail, ArrowRight, UserPlus, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { useState, useTransition } from 'react'
 
 export default function RegisterPage() {
+	const [error, setError] = useState<string | null>(null)
+	const [isPending, startTransition] = useTransition()
+
+	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault()
+		setError(null)
+		
+		const formData = new FormData(e.currentTarget)
+		
+		startTransition(async () => {
+			const result = await registerAction(null, formData)
+			if (result?.error) {
+				setError(result.error)
+			}
+		})
+	}
+
 	return (
 		<div className='min-h-screen bg-[#F8FAFC] flex flex-col font-sans relative'>
 			<Navbar />
@@ -27,7 +47,15 @@ export default function RegisterPage() {
 
 						<OAuthButtons />
 
-						<form action={registerAction} className='space-y-5'>
+						{/* Error message */}
+						{error && (
+							<div className='mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3'>
+								<AlertCircle className='text-red-600 flex-shrink-0 mt-0.5' size={20} />
+								<p className='text-sm text-red-800 font-medium'>{error}</p>
+							</div>
+						)}
+
+						<form onSubmit={handleSubmit} className='space-y-5'>
 							{/* Email */}
 							<div>
 								<label className='block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 ml-1'>Email</label>
@@ -66,8 +94,13 @@ export default function RegisterPage() {
 								<p className='text-xs text-gray-500 mt-1 ml-1'>Hasło musi mieć minimum 8 znaków</p>
 							</div>
 
-							<button className='w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-gray-900/10 flex justify-center items-center gap-2 group transform active:scale-[0.98] mt-2'>
-								Utwórz konto <ArrowRight size={20} className='text-gray-400 group-hover:text-white transition-colors' />
+							<button
+								type='submit'
+								disabled={isPending}
+								className='w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-gray-900/10 flex justify-center items-center gap-2 group transform active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed'
+							>
+								{isPending ? 'Tworzenie konta...' : 'Utwórz konto'}{' '}
+								{!isPending && <ArrowRight size={20} className='text-gray-400 group-hover:text-white transition-colors' />}
 							</button>
 						</form>
 
