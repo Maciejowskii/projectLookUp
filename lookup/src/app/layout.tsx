@@ -49,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	}
 
 	const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-KBMJTNBQ'
+	const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-ME8GSE9S3Z'
 
 	return (
 		<html lang='pl'>
@@ -73,17 +74,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				{/* End Google Tag Manager */}
 
 				{/* Google tag (gtag.js) - Google Analytics 4 */}
-				<script async src='https://www.googletagmanager.com/gtag/js?id=G-ME8GSE9S3Z'></script>
-				<script
-					dangerouslySetInnerHTML={{
-						__html: `
+				{gaId && (
+					<>
+						<script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+						<script
+							dangerouslySetInnerHTML={{
+								__html: `
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-ME8GSE9S3Z');
-						`.trim(),
-					}}
-				/>
+  gtag('config', '${gaId}');
+							`.trim(),
+							}}
+						/>
+					</>
+				)}
 				{/* End Google tag (gtag.js) */}
 			</head>
 			<body className={inter.className}>
