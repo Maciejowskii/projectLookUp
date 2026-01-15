@@ -71,6 +71,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 					/>
 				)}
 				{/* End Google Tag Manager */}
+
+				{/* Google tag (gtag.js) - Google Analytics 4 */}
+				<script async src='https://www.googletagmanager.com/gtag/js?id=G-ME8GSE9S3Z'></script>
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ME8GSE9S3Z');
+						`.trim(),
+					}}
+				/>
+				{/* End Google tag (gtag.js) */}
 			</head>
 			<body className={inter.className}>
 				{/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
