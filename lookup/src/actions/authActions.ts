@@ -6,19 +6,18 @@ import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 
 // --- 0. REJESTRACJA ---
-export async function registerAction(
-	prevState: { error?: string } | null,
-	formData: FormData
-): Promise<{ error?: string }> {
+export async function registerAction(formData: FormData) {
 	const email = formData.get('email') as string
 	const password = formData.get('password') as string
 
 	if (!email || !password) {
-		return { error: 'Wypełnij wszystkie pola' }
+		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola'))
+		return
 	}
 
 	if (password.length < 8) {
-		return { error: 'Hasło musi mieć minimum 8 znaków' }
+		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków'))
+		return
 	}
 
 	try {
@@ -28,7 +27,8 @@ export async function registerAction(
 		})
 
 		if (existingUser) {
-			return { error: 'Użytkownik z tym emailem już istnieje' }
+			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje'))
+			return
 		}
 
 		// Hashowanie hasła
@@ -56,13 +56,14 @@ export async function registerAction(
 	} catch (error) {
 		console.error('Registration error:', error)
 		// Handle Prisma errors
+		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
 		if (error instanceof Error) {
 			// Check for unique constraint violation
 			if (error.message.includes('Unique constraint') || error.message.includes('email')) {
-				return { error: 'Użytkownik z tym emailem już istnieje' }
+				errorMessage = 'Użytkownik z tym emailem już istnieje'
 			}
 		}
-		return { error: 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.' }
+		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage))
 	}
 }
 
