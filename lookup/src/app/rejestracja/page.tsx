@@ -2,7 +2,7 @@
 
 import { registerAction } from '@/actions/authActions'
 import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
+import { FooterWrapper } from '@/components/FooterWrapper'
 import { OAuthButtons } from '@/components/OAuthButtons'
 import { Lock, Mail, ArrowRight, UserPlus, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -110,7 +110,7 @@ function RegisterForm() {
 					</div>
 				</div>
 			</div>
-			<Footer />
+			<FooterWrapper />
 		</div>
 	)
 }
