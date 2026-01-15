@@ -57,6 +57,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				{/* JSON-LD Schema: To jest kluczowe dla Google Site Name */}
 				<script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
+				{/* Initialize dataLayer FIRST - before GTM and GA4 */}
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `window.dataLayer = window.dataLayer || [];`.trim(),
+					}}
+				/>
+
 				{/* Google Tag Manager - Direct implementation for better compatibility */}
 				{gtmId && (
 					<script
@@ -80,7 +87,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 						<script
 							dangerouslySetInnerHTML={{
 								__html: `
-  window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', '${gaId}');
