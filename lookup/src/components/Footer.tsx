@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { VOIVODESHIPS } from "@/lib/regions";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Mail, Phone } from "lucide-react";
 
 export const Footer = async () => {
   // 1. Pobieramy 6 najpopularniejszych kategorii do stopki
@@ -10,6 +10,12 @@ export const Footer = async () => {
     include: { _count: { select: { companies: true } } },
     orderBy: { companies: { _count: "desc" } },
   });
+
+  // 2. Pobieramy ustawienia kontaktowe
+  const settings = await prisma.setting.findMany();
+  const getSetting = (key: string) => settings.find((s) => s.key === key)?.value || null;
+  const contactEmail = getSetting("contact_email");
+  const contactPhone = getSetting("contact_phone");
 
   // 2. Generujemy "SEO Combo" - mieszamy kategorie z regionami
   // To tworzy linki typu: "Mechanika (Mazowieckie)", "Budownictwo (Śląskie)"
@@ -143,6 +149,14 @@ export const Footer = async () => {
                   Polityka Prywatności
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/formularz-odstapienia"
+                  className="hover:text-white transition-colors"
+                >
+                  Formularz odstąpienia
+                </Link>
+              </li>
               {/* Tutaj link do bloga (ukryty w gąszczu linków, dobry dla SEO) */}
               <li>
                 <Link
@@ -184,10 +198,32 @@ export const Footer = async () => {
         <div className="border-t border-gray-900 pt-8 mt-8">
           <div className="text-center space-y-4">
             {/* Company Details */}
-            <div className="text-xs text-gray-500">
-              <p className="font-semibold text-gray-400 mb-1">Jakub Wolert</p>
+            <div className="text-xs text-gray-500 space-y-2">
+              <p className="font-semibold text-gray-400 mb-2">Jakub Wolert</p>
               <p>ul. Targowa 6/5, 72-010 Police</p>
               <p>NIP: 8513315629 | REGON: 52918637000000</p>
+              
+              {/* Contact Information */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 pt-4 border-t border-gray-800">
+                {contactEmail && (
+                  <a
+                    href={`mailto:${contactEmail}`}
+                    className="flex items-center gap-2 text-gray-400 hover:text-blue-400 transition-colors"
+                  >
+                    <Mail size={14} className="text-gray-500" />
+                    <span>{contactEmail}</span>
+                  </a>
+                )}
+                {contactPhone && (
+                  <a
+                    href={`tel:${contactPhone.replace(/\s/g, '')}`}
+                    className="flex items-center gap-2 text-gray-400 hover:text-blue-400 transition-colors"
+                  >
+                    <Phone size={14} className="text-gray-500" />
+                    <span>{contactPhone}</span>
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* Payment Method Flags */}
