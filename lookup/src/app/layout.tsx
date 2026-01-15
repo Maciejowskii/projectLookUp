@@ -48,44 +48,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		url: BASE_URL,
 	}
 
+	const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-KBMJTNBQ'
+
 	return (
 		<html lang='pl'>
 			<head>
 				{/* JSON-LD Schema: To jest kluczowe dla Google Site Name */}
 				<script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
-				{/* Google Tag Manager */}
-				{/* <script
-					dangerouslySetInnerHTML={{
-						__html: `
-(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-KBMJTNBQ');
-          `,
-					}}
-				/> */}
-				{/* End Google Tag Manager */}
 			</head>
 			<body className={inter.className}>
-				{/* Google Tag Manager (noscript) */}
-				{/* <noscript>
+				{/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
+				<noscript>
 					<iframe
-						src='https://www.googletagmanager.com/ns.html?id=GTM-KBMJTNBQ'
+						src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
 						height='0'
 						width='0'
 						style={{ display: 'none', visibility: 'hidden' }}
 					/>
-				</noscript> */}
+				</noscript>
 				{/* End Google Tag Manager (noscript) */}
+
+				{/* GoogleTagManager component automatically adds script to <head> */}
+				{gtmId && <GoogleTagManager gtmId={gtmId} />}
 
 				<Providers>
 					{children}
 					<Toaster />
 				</Providers>
 			</body>
-			<GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID!} />
 		</html>
 	)
 }
