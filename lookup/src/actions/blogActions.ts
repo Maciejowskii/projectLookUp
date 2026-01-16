@@ -234,10 +234,40 @@ export async function schedulePost(formData: FormData) {
 
 	if (!topic || !date) return
 
+	// Tworzymy datę w lokalnej strefie czasowej (Poland = UTC+1/+2)
+	const scheduledAt = new Date(`${date}T${time}:00`)
+	
+	console.log(`📅 Planowanie posta: "${topic}" na ${scheduledAt.toISOString()}`)
+
 	await prisma.scheduledPost.create({
-		data: { topic, scheduledAt: new Date(`${date}T${time}`), status: 'scheduled' },
+		data: { topic, scheduledAt, status: 'scheduled' },
 	})
 	revalidatePath('/admin/blog')
+}
+
+// Ręczne uruchomienie CRON-a z panelu admina (bez wymagania CRON_SECRET)
+export async function runScheduledPostsManually() {
+	await checkAdminAuth()
+	
+	const jobsToRun = await prisma.scheduledPost.findMany({
+		where: {
+			status: 'scheduled',
+			scheduledAt: { lte: new Date() },
+		},
+	})
+
+	console.log(`🔄 Ręczne uruchomienie CRON: ${jobsToRun.length} postów do przetworzenia`)
+
+	for (const job of jobsToRun) {
+		try {
+			await processPostExecution(job.id)
+		} catch (e) {
+			console.error(`Błąd przetwarzania ${job.id}:`, e)
+		}
+	}
+
+	revalidatePath('/admin/blog')
+	revalidatePath('/blog')
 }
 
 export async function processPostExecution(jobId: string) {
