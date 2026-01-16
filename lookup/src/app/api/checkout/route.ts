@@ -65,10 +65,93 @@ export async function POST(req: Request) {
 		}
 
 		if (paymentMethod === 'payu') {
-			// Redirect to PayU API route which will handle the payment
-			return NextResponse.redirect(
-				new URL(`/api/checkout/payu?companyId=${company.id}`, req.url)
-			)
+			// PayU payment flow - handle directly here instead of redirect
+			const PAYU_BASE_URL = process.env.NODE_ENV === 'production' 
+				? 'https://secure.payu.com' 
+				: 'https://secure.snd.payu.com'
+			
+			const PAYU_POS_ID = process.env.PAYU_POS_ID || ''
+			const PAYU_CLIENT_ID = process.env.PAYU_CLIENT_ID || ''
+			const PAYU_CLIENT_SECRET = process.env.PAYU_CLIENT_SECRET || ''
+
+			if (!PAYU_POS_ID || !PAYU_CLIENT_SECRET) {
+				console.error('PayU not configured - missing env variables')
+				return NextResponse.json({ error: 'PayU nie jest skonfigurowane. Skontaktuj się z administratorem.' }, { status: 500 })
+			}
+
+			// Get OAuth token
+			const tokenResponse = await fetch(`${PAYU_BASE_URL}/pl/standard/user/oauth/authorize`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({
+					grant_type: 'client_credentials',
+					client_id: PAYU_CLIENT_ID,
+					client_secret: PAYU_CLIENT_SECRET,
+				}),
+			})
+
+			if (!tokenResponse.ok) {
+				const error = await tokenResponse.text()
+				console.error('PayU OAuth error:', error)
+				return NextResponse.json({ error: 'Błąd autoryzacji PayU' }, { status: 500 })
+			}
+
+			const tokenData = await tokenResponse.json()
+			const accessToken = tokenData.access_token
+
+			// Create order
+			const extOrderId = `premium-${company.id}-${Date.now()}`
+			const orderData = {
+				notifyUrl: `${process.env.NEXT_PUBLIC_URL}/api/webhooks/payu`,
+				continueUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard?companyId=${company.id}&payment=success`,
+				customerIp: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '127.0.0.1',
+				merchantPosId: PAYU_POS_ID,
+				description: `Pakiet Premium - ${company.name}`,
+				currencyCode: 'PLN',
+				totalAmount: '9900',
+				extOrderId,
+				buyer: {
+					email: user.email,
+					firstName: company.name.split(' ')[0] || 'Klient',
+					lastName: company.name.split(' ').slice(1).join(' ') || 'Katalogo',
+					language: 'pl',
+				},
+				products: [{
+					name: 'Pakiet Premium Katalogo - 1 miesiąc',
+					unitPrice: '9900',
+					quantity: '1',
+				}],
+			}
+
+			const orderResponse = await fetch(`${PAYU_BASE_URL}/api/v2_1/orders`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${accessToken}`,
+				},
+				body: JSON.stringify(orderData),
+				redirect: 'manual',
+			})
+
+			// PayU returns 302 with Location header
+			if (orderResponse.status === 302) {
+				const redirectUrl = orderResponse.headers.get('Location')
+				if (redirectUrl) {
+					console.log(`✅ PayU order created: ${extOrderId}`)
+					return NextResponse.json({ url: redirectUrl })
+				}
+			}
+
+			// Or JSON with redirectUri
+			const responseData = await orderResponse.json()
+			
+			if (responseData.redirectUri) {
+				console.log(`✅ PayU order created: ${extOrderId}`)
+				return NextResponse.json({ url: responseData.redirectUri })
+			}
+
+			console.error('PayU order creation failed:', responseData)
+			return NextResponse.json({ error: 'Błąd tworzenia zamówienia PayU', details: responseData }, { status: 500 })
 		}
 
 		// Stripe payment flow
