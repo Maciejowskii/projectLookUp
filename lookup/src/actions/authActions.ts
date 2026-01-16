@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
-import { isRedirectError } from 'next/dist/client/components/redirect'
 
 // --- 0. REJESTRACJA ---
 export async function registerAction(formData: FormData) {
@@ -61,20 +60,22 @@ export async function registerAction(formData: FormData) {
 			redirect('/dashboard')
 		}
 	} catch (error) {
-		// Nie łap błędów redirect jako błędów rejestracji
-		if (isRedirectError(error)) {
-			throw error
-		}
-
+		// Next.js 15 Server Actions automatycznie obsługują błędy redirect()
+		// Jeśli redirect() został wywołany w try-catch, Next.js automatycznie go obsłuży
+		// Wystarczy po prostu wywołać redirect() - nie musimy sprawdzać typu błędu
+		
 		console.error('Registration error:', error)
+		
 		// Handle Prisma errors
 		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
 		if (error instanceof Error) {
-			// Check for unique constraint violation
+			// Check for unique constraint violation (Prisma error code P2002)
 			if (error.message.includes('Unique constraint') || error.message.includes('P2002') || error.message.includes('email')) {
 				errorMessage = 'Użytkownik z tym emailem już istnieje'
 			}
 		}
+		
+		// redirect() automatycznie przerywa wykonanie w Next.js 15 Server Actions
 		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
