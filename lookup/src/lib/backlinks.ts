@@ -17,45 +17,70 @@ export async function injectBacklinks(content: string, currentPostId: string, li
 				slug: true,
 				title: true,
 			},
-			take: limit * 2, // Pobierz więcej, żeby miał z czego wybrać
+			orderBy: { createdAt: 'desc' },
+			take: limit * 3, // Pobierz więcej, żeby miał z czego wybrać
 		})
 
-		if (otherPosts.length === 0) return content
+		if (otherPosts.length === 0) {
+			console.log('⚠️ Brak innych artykułów do backlinkowania')
+			return content
+		}
 
-		// Losowo wybiór artykułów
-		const selectedPosts = otherPosts.sort(() => Math.random() - 0.5).slice(0, Math.min(limit, 3))
+		// Losowo wybór artykułów
+		const selectedPosts = otherPosts.sort(() => Math.random() - 0.5).slice(0, Math.min(limit, otherPosts.length))
 
 		let updatedContent = content
 		let linksAdded = 0
 
-		// Szukaj sekcji i wstaw linki
-		selectedPosts.forEach((post, idx) => {
-			// Ustaw pozycję linku na podstawie sekcji
-			let targetSection = `<section id="section-${idx + 1}">`
+		// Znajdź wszystkie paragrafy </p> w treści
+		const paragraphEndPositions: number[] = []
+		let searchStart = 0
+		while (true) {
+			const pos = updatedContent.indexOf('</p>', searchStart)
+			if (pos === -1) break
+			paragraphEndPositions.push(pos)
+			searchStart = pos + 4
+		}
 
-			if (updatedContent.includes(targetSection)) {
-				// Znajdź ostatni <p> w sekcji i dodaj link do niego
-				const sectionStart = updatedContent.indexOf(targetSection)
-				const nextSection = updatedContent.indexOf(`<section id="section-${idx + 2}">`, sectionStart)
-				const sectionEnd = nextSection !== -1 ? nextSection : updatedContent.length
+		if (paragraphEndPositions.length < 3) {
+			console.log('⚠️ Za mało paragrafów do backlinkowania')
+			return content
+		}
 
-				const sectionContent = updatedContent.substring(sectionStart, sectionEnd)
-				const lastPIndex = sectionContent.lastIndexOf('</p>')
+		// Wybierz pozycje do wstawienia linków (rozłożone równomiernie)
+		const insertPositions = [
+			Math.floor(paragraphEndPositions.length * 0.25),
+			Math.floor(paragraphEndPositions.length * 0.5),
+			Math.floor(paragraphEndPositions.length * 0.75),
+		].slice(0, selectedPosts.length)
 
-				if (lastPIndex !== -1) {
-					const insertPos = sectionStart + lastPIndex
+		// Wstaw linki od końca (żeby nie zepsuć pozycji)
+		for (let i = selectedPosts.length - 1; i >= 0; i--) {
+			const post = selectedPosts[i]
+			const posIndex = insertPositions[i]
+			if (posIndex === undefined || !paragraphEndPositions[posIndex]) continue
 
-					const backlink = `<a href="/blog/${post.slug}" class="text-blue-600 hover:underline font-semibold">${post.title}</a>`
-					const contextLink = ` Więcej informacji na ten temat znajdziesz w artykule "${backlink}".`
+			const insertPos = paragraphEndPositions[posIndex]
+			const backlink = `<a href="/blog/${post.slug}" class="text-blue-600 hover:underline font-semibold">${post.title}</a>`
+			const contextLink = ` Przeczytaj również: ${backlink}.`
 
-					updatedContent = updatedContent.substring(0, insertPos) + contextLink + updatedContent.substring(insertPos)
+			updatedContent = updatedContent.substring(0, insertPos) + contextLink + updatedContent.substring(insertPos)
+			linksAdded++
+		}
 
-					linksAdded++
-				}
-			}
-		})
+		// Dodaj też sekcję "Zobacz również" na końcu artykułu
+		if (selectedPosts.length > 0) {
+			const seeAlsoSection = `
+<div class="mt-12 p-6 bg-blue-50 rounded-2xl border border-blue-100">
+  <h3 class="font-bold text-lg text-gray-900 mb-4">📚 Zobacz również</h3>
+  <ul class="space-y-2">
+    ${selectedPosts.map(p => `<li><a href="/blog/${p.slug}" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">→ ${p.title}</a></li>`).join('\n    ')}
+  </ul>
+</div>`
+			updatedContent += seeAlsoSection
+		}
 
-		console.log(`✅ Dodano ${linksAdded} backlinków`)
+		console.log(`✅ Dodano ${linksAdded} backlinków + sekcję "Zobacz również"`)
 		return updatedContent
 	} catch (error) {
 		console.error('❌ Błąd podczas dodawania backlinków:', error)

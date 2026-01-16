@@ -1,4 +1,3 @@
-
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
@@ -6,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { RecommendedBlogsCarousel } from "@/components/RecommendedBlogsCarousel";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { Metadata } from "next";
 
@@ -86,6 +86,9 @@ export default async function BlogPostPage({
           </div>
         </article>
       </main>
+
+      {/* Polecane Blogi Carousel */}
+      <RecommendedBlogsCarousel currentPostId={post.id} />
 
       <Footer />
     </div>
