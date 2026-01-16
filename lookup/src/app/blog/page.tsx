@@ -9,6 +9,13 @@ import { ArrowRight, Calendar } from 'lucide-react'
 export const metadata = {
 	title: 'Blog i Porady | katalogo',
 	description: 'Najnowsze artykuły, porady i rankingi firm.',
+	robots: {
+		index: true,
+		follow: true,
+	},
+	alternates: {
+		canonical: '/blog',
+	},
 }
 
 export default async function BlogIndexPage() {

@@ -21,7 +21,17 @@ export async function generateMetadata({
   return {
     title: `${post.title} | Blog katalogo`,
     description: post.excerpt,
+    robots: {
+      index: true,
+      follow: true,
+    },
+    alternates: {
+      canonical: `/blog/${slug}`,
+    },
     openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      type: 'article',
       images: post.image ? [post.image] : [],
     },
   };
