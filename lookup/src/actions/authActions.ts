@@ -11,30 +11,38 @@ export async function registerAction(formData: FormData) {
 	const password = formData.get('password') as string
 	const returnTo = formData.get('returnTo') as string | null
 
+	console.log('[REGISTER] Starting registration for:', email)
+
 	if (!email || !password) {
+		console.log('[REGISTER] Validation failed: missing email or password')
 		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		return
 	}
 
 	if (password.length < 8) {
+		console.log('[REGISTER] Validation failed: password too short')
 		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		return
 	}
 
 	try {
+		console.log('[REGISTER] Checking if user exists...')
 		// Sprawdź czy użytkownik już istnieje
 		const existingUser = await prisma.user.findUnique({
 			where: { email },
 		})
 
 		if (existingUser) {
+			console.log('[REGISTER] User already exists:', email)
 			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 			return
 		}
 
+		console.log('[REGISTER] Hashing password...')
 		// Hashowanie hasła
 		const hashedPassword = await bcrypt.hash(password, 10)
 
+		console.log('[REGISTER] Creating user...')
 		// Tworzenie użytkownika (bez przypisanej firmy - może claimować później)
 		const user = await prisma.user.create({
 			data: {
@@ -44,15 +52,25 @@ export async function registerAction(formData: FormData) {
 			},
 		})
 
-		// Auto-login po rejestracji
-		const cookieStore = await cookies()
-		cookieStore.set('session_user_id', user.id, {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
-			maxAge: 60 * 60 * 24 * 7,
-			path: '/',
-		})
+		console.log('[REGISTER] User created successfully:', user.id)
 
+		console.log('[REGISTER] Setting session cookie...')
+		// Auto-login po rejestracji
+		try {
+			const cookieStore = await cookies()
+			cookieStore.set('session_user_id', user.id, {
+				httpOnly: true,
+				secure: process.env.NODE_ENV === 'production',
+				maxAge: 60 * 60 * 24 * 7,
+				path: '/',
+			})
+			console.log('[REGISTER] Session cookie set successfully')
+		} catch (cookieError) {
+			console.error('[REGISTER] Error setting cookie:', cookieError)
+			// Kontynuuj mimo błędu cookie - redirect i tak zadziała
+		}
+
+		console.log('[REGISTER] Redirecting...')
 		// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
 		if (returnTo) {
 			redirect(returnTo)
@@ -65,11 +83,21 @@ export async function registerAction(formData: FormData) {
 			const digest = String((error as any).digest)
 			// Next.js redirect errors mają digest zaczynający się od "NEXT_REDIRECT"
 			if (digest.includes('NEXT_REDIRECT')) {
+				console.log('[REGISTER] Redirect error caught, re-throwing...')
 				throw error // Rzuć błąd redirect dalej - Next.js go obsłuży
 			}
 		}
 		
-		console.error('Registration error:', error)
+		// Szczegółowe logowanie błędu
+		console.error('[REGISTER] Registration error occurred:')
+		console.error('[REGISTER] Error type:', error?.constructor?.name)
+		console.error('[REGISTER] Error message:', error instanceof Error ? error.message : String(error))
+		console.error('[REGISTER] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+		
+		// Jeśli to błąd Prisma, loguj szczegóły
+		if (error && typeof error === 'object' && 'code' in error) {
+			console.error('[REGISTER] Prisma error code:', (error as any).code)
+		}
 		
 		// Handle Prisma errors
 		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
@@ -77,9 +105,12 @@ export async function registerAction(formData: FormData) {
 			// Check for unique constraint violation (Prisma error code P2002)
 			if (error.message.includes('Unique constraint') || error.message.includes('P2002') || error.message.includes('email')) {
 				errorMessage = 'Użytkownik z tym emailem już istnieje'
+			} else if (error.message.includes('Prisma') || error.message.includes('database')) {
+				errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
 			}
 		}
 		
+		console.log('[REGISTER] Redirecting with error message:', errorMessage)
 		// redirect() automatycznie przerywa wykonanie w Next.js 15 Server Actions
 		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
