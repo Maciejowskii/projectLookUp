@@ -4,19 +4,21 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
+import { isRedirectError } from 'next/dist/client/components/redirect'
 
 // --- 0. REJESTRACJA ---
 export async function registerAction(formData: FormData) {
 	const email = formData.get('email') as string
 	const password = formData.get('password') as string
+	const returnTo = formData.get('returnTo') as string | null
 
 	if (!email || !password) {
-		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola'))
+		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		return
 	}
 
 	if (password.length < 8) {
-		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków'))
+		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		return
 	}
 
@@ -27,7 +29,7 @@ export async function registerAction(formData: FormData) {
 		})
 
 		if (existingUser) {
-			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje'))
+			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 			return
 		}
 
@@ -52,18 +54,28 @@ export async function registerAction(formData: FormData) {
 			path: '/',
 		})
 
-		redirect('/dashboard')
+		// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
+		if (returnTo) {
+			redirect(returnTo)
+		} else {
+			redirect('/dashboard')
+		}
 	} catch (error) {
+		// Nie łap błędów redirect jako błędów rejestracji
+		if (isRedirectError(error)) {
+			throw error
+		}
+
 		console.error('Registration error:', error)
 		// Handle Prisma errors
 		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
 		if (error instanceof Error) {
 			// Check for unique constraint violation
-			if (error.message.includes('Unique constraint') || error.message.includes('email')) {
+			if (error.message.includes('Unique constraint') || error.message.includes('P2002') || error.message.includes('email')) {
 				errorMessage = 'Użytkownik z tym emailem już istnieje'
 			}
 		}
-		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage))
+		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
 
@@ -71,9 +83,10 @@ export async function registerAction(formData: FormData) {
 export async function loginAction(formData: FormData) {
 	const email = formData.get('email') as string
 	const password = formData.get('password') as string
+	const returnTo = formData.get('returnTo') as string | null
 
 	if (!email || !password) {
-		redirect('/strefa-partnera?error=' + encodeURIComponent('Wypełnij wszystkie pola'))
+		redirect('/strefa-partnera?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		return
 	}
 
@@ -143,7 +156,12 @@ export async function loginAction(formData: FormData) {
 		path: '/',
 	})
 
-	redirect('/dashboard')
+	// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
+	if (returnTo) {
+		redirect(returnTo)
+	} else {
+		redirect('/dashboard')
+	}
 }
 
 // --- 2. WYLOGOWYWANIE ---

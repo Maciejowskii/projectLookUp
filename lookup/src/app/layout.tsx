@@ -51,20 +51,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-KBMJTNBQ'
 	const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-ME8GSE9S3Z'
 
+	// ⚠️ WAŻNE: NIE MODYFIKUJ tej sekcji bez powodu!
+	// Google Analytics i Tag Manager są skonfigurowane i działają poprawnie.
+	// Kolejność skryptów jest krytyczna: dataLayer → GTM → GA4
+	// Zmiana kolejności lub struktury może spowodować, że dane przestaną być zbierane.
+
 	return (
 		<html lang='pl'>
 			<head>
 				{/* JSON-LD Schema: To jest kluczowe dla Google Site Name */}
 				<script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-				{/* Initialize dataLayer FIRST - before GTM and GA4 */}
+				{/* 
+					⚠️ KRYTYCZNE: Initialize dataLayer FIRST - before GTM and GA4
+					Nie zmieniaj kolejności - dataLayer MUSI być zdefiniowany przed innymi skryptami Google
+				*/}
 				<script
 					dangerouslySetInnerHTML={{
 						__html: `window.dataLayer = window.dataLayer || [];`.trim(),
 					}}
 				/>
 
-				{/* Google Tag Manager - Direct implementation for better compatibility */}
+				{/* 
+					⚠️ KRYTYCZNE: Google Tag Manager - Direct implementation
+					Nie zmieniaj tej implementacji - działa poprawnie z Tag Assistant
+					Kolejność: dataLayer → GTM → GA4
+				*/}
 				{gtmId && (
 					<script
 						dangerouslySetInnerHTML={{
@@ -80,7 +92,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				)}
 				{/* End Google Tag Manager */}
 
-				{/* Google tag (gtag.js) - Google Analytics 4 */}
+				{/* 
+					⚠️ KRYTYCZNE: Google Analytics 4 (gtag.js)
+					Nie modyfikuj tej sekcji - jest skonfigurowana i działa poprawnie
+					ID: G-ME8GSE9S3Z
+					Kolejność MUSI być: dataLayer → GTM → GA4
+					Nie usuwaj `function gtag()` - jest wymagane przez Google
+				*/}
 				{gaId && (
 					<>
 						<script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>

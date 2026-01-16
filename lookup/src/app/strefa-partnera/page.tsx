@@ -7,7 +7,14 @@ import { Lock, Mail, ArrowRight, Quote } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 
-function LoginForm() {
+export default async function LoginPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ error?: string; returnTo?: string }>
+}) {
+	const params = await searchParams
+	const returnTo = params.returnTo
+
 	return (
 		<div className='min-h-screen bg-[#F8FAFC] flex flex-col font-sans relative'>
 			<Navbar />
@@ -34,6 +41,7 @@ function LoginForm() {
 							<OAuthButtons />
 
 							<form action={loginAction} className='space-y-5'>
+								{returnTo && <input type='hidden' name='returnTo' value={returnTo} />}
 								{/* Email */}
 								<div>
 									<label className='block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 ml-1'>
@@ -86,7 +94,10 @@ function LoginForm() {
 							<div className='mt-8 text-center border-t border-gray-100 pt-6'>
 								<p className='text-gray-500 text-sm'>
 									Nie masz konta?{' '}
-									<Link href='/rejestracja' className='text-blue-600 font-bold hover:text-blue-800 transition-colors'>
+									<Link 
+										href={returnTo ? `/rejestracja?returnTo=${encodeURIComponent(returnTo)}` : '/rejestracja'} 
+										className='text-blue-600 font-bold hover:text-blue-800 transition-colors'
+									>
 										Zarejestruj się
 									</Link>
 									{' lub '}
@@ -130,8 +141,4 @@ function LoginForm() {
 			<Footer />
 		</div>
 	)
-}
-
-export default function LoginPage() {
-	return <LoginForm />
 }

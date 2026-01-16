@@ -26,6 +26,7 @@ function SubmitButton() {
 function RegisterFormContent() {
 	const searchParams = useSearchParams()
 	const error = searchParams.get('error')
+	const returnTo = searchParams.get('returnTo')
 
 	return (
 		<>
@@ -57,6 +58,7 @@ function RegisterFormContent() {
 						)}
 
 						<form action={registerAction} className='space-y-5'>
+							{returnTo && <input type='hidden' name='returnTo' value={returnTo} />}
 							{/* Email */}
 							<div>
 								<label className='block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 ml-1'>Email</label>
