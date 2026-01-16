@@ -105,7 +105,7 @@ export function RecommendedBlogsCarousel({ currentPostId }: RecommendedBlogsCaro
 			<div className="container mx-auto px-4">
 				<div className="flex items-center justify-between mb-8">
 					<div>
-						<h2 className="text-3xl font-extrabold text-gray-900 mb-2">📖 Polecane artykuły</h2>
+						<h2 className="text-3xl font-extrabold text-gray-900 mb-2">Polecane artykuły</h2>
 						<p className="text-gray-600">Odkryj więcej interesujących treści</p>
 					</div>
 					<div className="flex gap-2">

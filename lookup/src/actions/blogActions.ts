@@ -37,7 +37,7 @@ WYMAGANIA TREŚCIOWE:
 KRYTYCZNE - SPIS TREŚCI:
 Na samym początku artykułu (przed pierwszą sekcją) wstaw spis treści z PRAWDZIWYMI tytułami sekcji:
 <nav class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl mb-10 border border-blue-100">
-  <h3 class="font-bold text-lg mb-4 text-gray-900">📋 Spis treści</h3>
+  <h3 class="font-bold text-lg mb-4 text-gray-900">Spis treści</h3>
   <ul class="space-y-2">
     <li><a href="#section-0" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">1. [Prawdziwy tytuł sekcji 1]</a></li>
     <li><a href="#section-1" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">2. [Prawdziwy tytuł sekcji 2]</a></li>

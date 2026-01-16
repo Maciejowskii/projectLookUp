@@ -72,7 +72,7 @@ export async function injectBacklinks(content: string, currentPostId: string, li
 		if (selectedPosts.length > 0) {
 			const seeAlsoSection = `
 <div class="mt-12 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-  <h3 class="font-bold text-lg text-gray-900 mb-4">📚 Zobacz również</h3>
+  <h3 class="font-bold text-lg text-gray-900 mb-4">Zobacz również</h3>
   <ul class="space-y-2">
     ${selectedPosts.map(p => `<li><a href="/blog/${p.slug}" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">→ ${p.title}</a></li>`).join('\n    ')}
   </ul>
