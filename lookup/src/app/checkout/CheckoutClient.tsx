@@ -10,7 +10,7 @@ export default function CheckoutClient() {
 	const [termsAccepted, setTermsAccepted] = useState(false)
 	const [privacyAccepted, setPrivacyAccepted] = useState(false)
 	const [canProceed, setCanProceed] = useState(false)
-	const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'przelewy24'>('stripe')
+	const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'przelewy24' | 'payu'>('payu')
 	const [isProcessing, setIsProcessing] = useState(false)
 	const companyId = searchParams.get('companyId')
 	const error = searchParams.get('error')
@@ -155,8 +155,9 @@ export default function CheckoutClient() {
 						<div>
 							<h3 className='font-semibold mb-2'>Dostępne metody płatności:</h3>
 							<ul className='text-xs text-gray-600 space-y-1 ml-4 list-disc'>
-								<li>Karta płatnicza (Stripe) - Visa, Mastercard</li>
+								<li>PayU - przelewy bankowe, BLIK, karty płatnicze (rekomendowane)</li>
 								<li>Przelewy24 - przelewy bankowe, karty płatnicze, BLIK</li>
+								<li>Karta płatnicza (Stripe) - Visa, Mastercard</li>
 							</ul>
 						</div>
 						<div>
@@ -256,7 +257,74 @@ export default function CheckoutClient() {
 				{/* Payment Method Selection */}
 				<div className='space-y-4 mb-8'>
 					<h2 className='text-xl font-bold text-gray-900'>Wybierz metodę płatności</h2>
-					<div className='grid md:grid-cols-2 gap-4'>
+					<div className='grid md:grid-cols-3 gap-4'>
+						{/* PayU Option - Rekomendowane */}
+						<label
+							className={`flex items-start gap-4 p-6 border-2 rounded-2xl cursor-pointer transition-all relative ${
+								selectedPaymentMethod === 'payu'
+									? 'border-red-500 bg-red-50 ring-2 ring-red-100'
+									: 'border-gray-200 hover:border-gray-300 bg-white'
+							}`}
+						>
+							<span className='absolute -top-2 left-4 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full'>
+								REKOMENDOWANE
+							</span>
+							<input
+								type='radio'
+								name='paymentMethod'
+								value='payu'
+								checked={selectedPaymentMethod === 'payu'}
+								onChange={() => setSelectedPaymentMethod('payu')}
+								className='mt-1 w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500'
+							/>
+							<div className='flex-1'>
+								<div className='flex items-center gap-3 mb-2'>
+									<div className='w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center text-white font-bold text-xs'>
+										PayU
+									</div>
+									<div>
+										<h3 className='font-black text-gray-900'>PayU</h3>
+										<p className='text-xs text-gray-500'>BLIK, przelewy, karty</p>
+									</div>
+								</div>
+								<p className='text-sm text-gray-600'>
+									Najpopularniejszy system płatności w Polsce. BLIK, przelewy bankowe, karty.
+								</p>
+							</div>
+						</label>
+
+						{/* Przelewy24 Option */}
+						<label
+							className={`flex items-start gap-4 p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+								selectedPaymentMethod === 'przelewy24'
+									? 'border-green-500 bg-green-50 ring-2 ring-green-100'
+									: 'border-gray-200 hover:border-gray-300 bg-white'
+							}`}
+						>
+							<input
+								type='radio'
+								name='paymentMethod'
+								value='przelewy24'
+								checked={selectedPaymentMethod === 'przelewy24'}
+								onChange={() => setSelectedPaymentMethod('przelewy24')}
+								className='mt-1 w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500'
+							/>
+							<div className='flex-1'>
+								<div className='flex items-center gap-3 mb-2'>
+									<div className='w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center text-white font-bold text-xs'>
+										P24
+									</div>
+									<div>
+										<h3 className='font-black text-gray-900'>Przelewy24</h3>
+										<p className='text-xs text-gray-500'>Przelewy, karty, BLIK</p>
+									</div>
+								</div>
+								<p className='text-sm text-gray-600'>
+									Polski system płatności. Przelewy bankowe, karty płatnicze, BLIK.
+								</p>
+							</div>
+						</label>
+
 						{/* Stripe Option */}
 						<label
 							className={`flex items-start gap-4 p-6 border-2 rounded-2xl cursor-pointer transition-all ${
@@ -275,48 +343,16 @@ export default function CheckoutClient() {
 							/>
 							<div className='flex-1'>
 								<div className='flex items-center gap-3 mb-2'>
-									<div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold'>
+									<div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-[10px]'>
 										Stripe
 									</div>
 									<div>
-										<h3 className='font-black text-gray-900'>Karta płatnicza (Stripe)</h3>
+										<h3 className='font-black text-gray-900'>Karta (Stripe)</h3>
 										<p className='text-xs text-gray-500'>Visa, Mastercard</p>
 									</div>
 								</div>
 								<p className='text-sm text-gray-600'>
-									Szybka i bezpieczna płatność kartą kredytową lub debetową. Obsługiwane przez Stripe.
-								</p>
-							</div>
-						</label>
-
-						{/* Przelewy24 Option */}
-						<label
-							className={`flex items-start gap-4 p-6 border-2 rounded-2xl cursor-pointer transition-all ${
-								selectedPaymentMethod === 'przelewy24'
-									? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
-									: 'border-gray-200 hover:border-gray-300 bg-white'
-							}`}
-						>
-							<input
-								type='radio'
-								name='paymentMethod'
-								value='przelewy24'
-								checked={selectedPaymentMethod === 'przelewy24'}
-								onChange={() => setSelectedPaymentMethod('przelewy24')}
-								className='mt-1 w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500'
-							/>
-							<div className='flex-1'>
-								<div className='flex items-center gap-3 mb-2'>
-									<div className='w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center text-white font-bold text-xs'>
-										P24
-									</div>
-									<div>
-										<h3 className='font-black text-gray-900'>Przelewy24</h3>
-										<p className='text-xs text-gray-500'>Przelewy, karty, BLIK</p>
-									</div>
-								</div>
-								<p className='text-sm text-gray-600'>
-									Polski system płatności. Przelewy bankowe, karty płatnicze, BLIK i inne metody.
+									Bezpieczna płatność kartą kredytową lub debetową.
 								</p>
 							</div>
 						</label>
@@ -336,7 +372,7 @@ export default function CheckoutClient() {
 								Przetwarzanie...
 							</>
 						) : (
-							`Przejdź do płatności ${selectedPaymentMethod === 'stripe' ? '(Stripe)' : '(Przelewy24)'}`
+							`Przejdź do płatności (${selectedPaymentMethod === 'payu' ? 'PayU' : selectedPaymentMethod === 'stripe' ? 'Stripe' : 'Przelewy24'})`
 						)}
 					</button>
 					<Link

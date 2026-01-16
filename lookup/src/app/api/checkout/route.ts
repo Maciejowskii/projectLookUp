@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
 		}
 
-		if (paymentMethod !== 'stripe' && paymentMethod !== 'przelewy24') {
+		if (paymentMethod !== 'stripe' && paymentMethod !== 'przelewy24' && paymentMethod !== 'payu') {
 			return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
 		}
 
@@ -61,6 +61,13 @@ export async function POST(req: Request) {
 			// Redirect to Przelewy24 API route which will handle the payment
 			return NextResponse.redirect(
 				new URL(`/api/checkout/przelewy24?companyId=${company.id}`, req.url)
+			)
+		}
+
+		if (paymentMethod === 'payu') {
+			// Redirect to PayU API route which will handle the payment
+			return NextResponse.redirect(
+				new URL(`/api/checkout/payu?companyId=${company.id}`, req.url)
 			)
 		}
 
