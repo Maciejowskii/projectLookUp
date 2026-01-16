@@ -11,188 +11,94 @@ export async function registerAction(formData: FormData) {
 	const password = formData.get('password') as string
 	const returnTo = formData.get('returnTo') as string | null
 
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:registerAction:start',message:'Registration started',data:{email,hasPassword:!!password,returnTo},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A-E'})}).catch(()=>{});
-	// #endregion
-
-	console.log('[REGISTER] Starting registration for:', email)
+	console.log('[REGISTER] ===== REGISTRATION START =====')
+	console.log('[REGISTER] Email:', email)
+	console.log('[REGISTER] Has password:', !!password)
+	console.log('[REGISTER] ReturnTo:', returnTo)
 
 	if (!email || !password) {
 		console.log('[REGISTER] Validation failed: missing email or password')
 		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-		return
 	}
 
 	if (password.length < 8) {
 		console.log('[REGISTER] Validation failed: password too short')
 		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-		return
 	}
 
-	// W Next.js 15, cookies() MUSI być wywołane na początku Server Action, przed operacjami async
-	// Inaczej może powodować błędy "cookies() was called after async operation"
-	let cookieStore: any;
-	try {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:cookies:before',message:'Calling cookies()',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-		// #endregion
-		cookieStore = await cookies()
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:cookies:after',message:'cookies() succeeded',data:{hasCookieStore:!!cookieStore},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-		// #endregion
-	} catch (cookiesError: any) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:cookies:error',message:'cookies() FAILED',data:{errorType:cookiesError?.constructor?.name,errorMessage:cookiesError?.message,hasDigest:'digest' in (cookiesError||{})},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-		// #endregion
-		console.error('[REGISTER] cookies() error:', cookiesError)
-		redirect('/rejestracja?error=' + encodeURIComponent('Błąd sesji. Spróbuj ponownie.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-		return
-	}
+	// Pobierz cookies na początku
+	console.log('[REGISTER] Getting cookies...')
+	const cookieStore = await cookies()
+	console.log('[REGISTER] Cookies obtained')
 	
 	try {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:prisma:findUnique:before',message:'Checking if user exists',data:{email},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
-		// #endregion
 		console.log('[REGISTER] Checking if user exists...')
-		// Sprawdź czy użytkownik już istnieje
 		const existingUser = await prisma.user.findUnique({
 			where: { email },
 		})
-
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:prisma:findUnique:after',message:'findUnique completed',data:{userExists:!!existingUser},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-		// #endregion
+		console.log('[REGISTER] User exists check complete:', !!existingUser)
 
 		if (existingUser) {
-			console.log('[REGISTER] User already exists:', email)
+			console.log('[REGISTER] User already exists, redirecting...')
 			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-			return
 		}
 
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:bcrypt:before',message:'Hashing password',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-		// #endregion
 		console.log('[REGISTER] Hashing password...')
-		// Hashowanie hasła
 		const hashedPassword = await bcrypt.hash(password, 10)
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:bcrypt:after',message:'Password hashed',data:{hashLength:hashedPassword?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-		// #endregion
+		console.log('[REGISTER] Password hashed, length:', hashedPassword.length)
 
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:prisma:create:before',message:'Creating user',data:{email},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-		// #endregion
-		console.log('[REGISTER] Creating user...')
-		// Tworzenie użytkownika (bez przypisanej firmy - może claimować później)
+		console.log('[REGISTER] Creating user in database...')
 		const user = await prisma.user.create({
 			data: {
 				email,
 				password: hashedPassword,
-				emailVerified: new Date(), // Auto-verify dla uproszczenia (można zmienić na email verification)
+				emailVerified: new Date(),
 			},
 		})
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:prisma:create:after',message:'User created',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-		// #endregion
-
-		console.log('[REGISTER] User created successfully:', user.id)
+		console.log('[REGISTER] User created successfully, ID:', user.id)
 
 		console.log('[REGISTER] Setting session cookie...')
-		// Auto-login po rejestracji - używamy cookieStore już pobranego na początku
-		try {
-			cookieStore.set('session_user_id', user.id, {
-				httpOnly: true,
-				secure: process.env.NODE_ENV === 'production',
-				maxAge: 60 * 60 * 24 * 7,
-				path: '/',
-			})
-			console.log('[REGISTER] Session cookie set successfully')
-		} catch (cookieError) {
-			console.error('[REGISTER] Error setting cookie:', cookieError)
-			// Kontynuuj mimo błędu cookie - redirect i tak zadziała
-		}
+		cookieStore.set('session_user_id', user.id, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			maxAge: 60 * 60 * 24 * 7,
+			path: '/',
+		})
+		console.log('[REGISTER] Session cookie set')
 
-		console.log('[REGISTER] Redirecting...')
-		// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
+		console.log('[REGISTER] Redirecting to dashboard...')
 		if (returnTo) {
 			redirect(returnTo)
 		} else {
 			redirect('/dashboard')
 		}
-	} catch (error) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:catch:entry',message:'ERROR CAUGHT',data:{errorType:error?.constructor?.name,errorMessage:error instanceof Error ? error.message : String(error),hasDigest:'digest' in (error as any || {}),digestValue:(error as any)?.digest,hasCode:'code' in (error as any || {}),codeValue:(error as any)?.code},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
-		// #endregion
+	} catch (error: any) {
+		console.log('[REGISTER] ===== ERROR CAUGHT =====')
+		console.log('[REGISTER] Error type:', error?.constructor?.name)
+		console.log('[REGISTER] Error message:', error?.message)
+		console.log('[REGISTER] Has digest:', 'digest' in (error || {}))
+		console.log('[REGISTER] Digest value:', error?.digest)
+		console.log('[REGISTER] Has code:', 'code' in (error || {}))
+		console.log('[REGISTER] Code value:', error?.code)
 		
-		// Sprawdź czy to błąd redirect z Next.js - jeśli tak, rzuć go dalej (nie łap go)
-		if (error && typeof error === 'object' && 'digest' in error) {
-			const digest = String((error as any).digest)
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:catch:digestCheck',message:'Has digest, checking NEXT_REDIRECT',data:{digest,includesNEXT_REDIRECT:digest.includes('NEXT_REDIRECT')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-			// #endregion
-			// Next.js redirect errors mają digest zaczynający się od "NEXT_REDIRECT"
-			if (digest.includes('NEXT_REDIRECT')) {
-				console.log('[REGISTER] Redirect error caught, re-throwing...')
-				throw error // Rzuć błąd redirect dalej - Next.js go obsłuży
-			}
+		// WAŻNE: Sprawdź czy to błąd redirect - jeśli tak, MUSI być rzucony dalej
+		if (error?.digest?.includes?.('NEXT_REDIRECT')) {
+			console.log('[REGISTER] This is a redirect error, re-throwing...')
+			throw error
 		}
 		
-		// Szczegółowe logowanie błędu
-		console.error('[REGISTER] Registration error occurred:')
-		console.error('[REGISTER] Error type:', error?.constructor?.name)
-		console.error('[REGISTER] Error message:', error instanceof Error ? error.message : String(error))
-		console.error('[REGISTER] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-		
-		// Jeśli to błąd Prisma, loguj szczegóły
-		if (error && typeof error === 'object' && 'code' in error) {
-			console.error('[REGISTER] Prisma error code:', (error as any).code)
-		}
-		
-		// Handle Prisma errors
+		// Określ komunikat błędu
 		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
-		if (error instanceof Error) {
-			// Check for unique constraint violation (Prisma error code P2002)
-			if (error.message.includes('Unique constraint') || error.message.includes('P2002') || error.message.includes('email')) {
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:catch:uniqueConstraint',message:'Unique constraint error',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-				// #endregion
-				errorMessage = 'Użytkownik z tym emailem już istnieje'
-			} else if (
-				error.message.includes('Prisma') || 
-				error.message.includes('database') || 
-				error.message.includes('DATABASE_URL') ||
-				error.message.includes('connection') ||
-				error.message.includes('connect') ||
-				(error && typeof error === 'object' && 'code' in error && String((error as any).code).startsWith('P'))
-			) {
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authActions.ts:catch:databaseError',message:'Database error branch taken',data:{errorMessage:error.message,code:(error as any).code},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-				// #endregion
-				// Błędy Prisma związane z połączeniem
-				console.error('[REGISTER] Prisma connection error detected')
-				errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
-				
-				// Sprawdź czy DATABASE_URL jest ustawione
-				if (!process.env.DATABASE_URL) {
-					console.error('[REGISTER] DATABASE_URL nie jest ustawione!')
-					errorMessage = 'Błąd konfiguracji: brak połączenia z bazą danych. Skontaktuj się z administratorem.'
-				}
-			}
+		
+		if (error?.code === 'P2002' || error?.message?.includes('Unique constraint')) {
+			errorMessage = 'Użytkownik z tym emailem już istnieje'
+		} else if (error?.code?.startsWith?.('P') || error?.message?.includes?.('Prisma') || error?.message?.includes?.('database')) {
+			errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
 		}
 		
-		// Dodatkowa weryfikacja - czy to błąd Prisma
-		if (error && typeof error === 'object' && 'code' in error) {
-			const prismaCode = (error as any).code
-			console.error('[REGISTER] Prisma error code:', prismaCode)
-			
-			// Błędy połączenia Prisma (P1001, P1000, etc.)
-			if (String(prismaCode).startsWith('P1')) {
-				errorMessage = 'Błąd połączenia z bazą danych. Sprawdź konfigurację DATABASE_URL.'
-			}
-		}
+		console.log('[REGISTER] Final error message:', errorMessage)
+		console.log('[REGISTER] ===== REGISTRATION END (ERROR) =====')
 		
-		console.log('[REGISTER] Redirecting with error message:', errorMessage)
-		// redirect() automatycznie przerywa wykonanie w Next.js 15 Server Actions
 		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
@@ -203,22 +109,22 @@ export async function loginAction(formData: FormData) {
 	const password = formData.get('password') as string
 	const returnTo = formData.get('returnTo') as string | null
 
+	console.log('[LOGIN] ===== LOGIN START =====')
+	console.log('[LOGIN] Email:', email)
+
 	if (!email || !password) {
 		redirect('/strefa-partnera?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-		return
 	}
 
-	// W Next.js 15, cookies() MUSI być wywołane na początku Server Action, przed operacjami async
-	// Inaczej może powodować błędy "cookies() was called after async operation"
+	// Pobierz cookies na początku
 	const cookieStore = await cookies()
 	
 	try {
+		console.log('[LOGIN] Finding user...')
 		const user = await prisma.user.findUnique({
 			where: { email },
 			include: {
-				// Legacy support
 				company: true,
-				// New many-to-many
 				companies: {
 					include: {
 						company: {
@@ -232,30 +138,29 @@ export async function loginAction(formData: FormData) {
 		})
 
 		if (!user) {
+			console.log('[LOGIN] User not found')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-			return
 		}
 
-		// Sprawdzamy czy konto jest zweryfikowane
 		if (!user.emailVerified) {
+			console.log('[LOGIN] Email not verified')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Konto nieaktywne. Sprawdź e-mail weryfikacyjny.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-			return
 		}
 
-		// Sprawdzamy czy użytkownik ma hasło (OAuth users nie mają hasła)
 		if (!user.password) {
+			console.log('[LOGIN] No password (OAuth user)')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-			return
 		}
 
+		console.log('[LOGIN] Comparing password...')
 		const isPasswordValid = await bcrypt.compare(password, user.password)
 
 		if (!isPasswordValid) {
+			console.log('[LOGIN] Invalid password')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
-			return
 		}
 
-		// Auto-migracja: jeśli użytkownik ma companyId ale nie ma CompanyUser
+		// Auto-migracja
 		if (user.companyId && user.companies.length === 0) {
 			try {
 				await prisma.companyUser.create({
@@ -265,13 +170,12 @@ export async function loginAction(formData: FormData) {
 						role: 'OWNER',
 					},
 				})
-			} catch (error) {
-				// Ignore if already exists or company doesn't exist
-				console.log('Auto-migration note:', error)
+			} catch (e) {
+				console.log('[LOGIN] Auto-migration note:', e)
 			}
 		}
 
-		// Używamy cookieStore już pobranego na początku
+		console.log('[LOGIN] Setting session cookie...')
 		cookieStore.set('session_user_id', user.id, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
@@ -279,34 +183,27 @@ export async function loginAction(formData: FormData) {
 			path: '/',
 		})
 
-		// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
+		console.log('[LOGIN] Redirecting...')
 		if (returnTo) {
 			redirect(returnTo)
 		} else {
 			redirect('/dashboard')
 		}
-	} catch (error) {
-		// Sprawdź czy to błąd redirect z Next.js - jeśli tak, rzuć go dalej (nie łap go)
-		if (error && typeof error === 'object' && 'digest' in error) {
-			const digest = String((error as any).digest)
-			// Next.js redirect errors mają digest zaczynający się od "NEXT_REDIRECT"
-			if (digest.includes('NEXT_REDIRECT')) {
-				throw error // Rzuć błąd redirect dalej - Next.js go obsłuży
-			}
+	} catch (error: any) {
+		console.log('[LOGIN] ===== ERROR CAUGHT =====')
+		console.log('[LOGIN] Error:', error?.message, error?.digest, error?.code)
+		
+		// WAŻNE: redirect() rzuca błąd z digest - musi być rzucony dalej
+		if (error?.digest?.includes?.('NEXT_REDIRECT')) {
+			throw error
 		}
 		
-		console.error('Login error:', error)
-		
-		// Handle errors - redirect z komunikatem błędu
 		let errorMessage = 'Wystąpił błąd podczas logowania. Spróbuj ponownie.'
-		if (error instanceof Error) {
-			// Jeśli to błąd bazy danych, zwróć ogólny komunikat
-			if (error.message.includes('Prisma') || error.message.includes('database')) {
-				errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
-			}
+		if (error?.code?.startsWith?.('P') || error?.message?.includes?.('Prisma')) {
+			errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
 		}
 		
-		// redirect() automatycznie przerywa wykonanie w Next.js 15 Server Actions
+		console.log('[LOGIN] ===== LOGIN END (ERROR) =====')
 		redirect('/strefa-partnera?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
