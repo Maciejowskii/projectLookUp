@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { checkAdminAuth } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { injectBacklinks } from '@/lib/backlinks'
 
 interface FormState {
@@ -243,8 +244,22 @@ export async function deletePost(id: string) {
 
 export async function generatePostAIForm(formData: FormData) {
 	await checkAdminAuth()
-	await generatePostAI(formData)
-	revalidatePath('/admin/blog')
+	
+	// Sprawdź klucz API przed próbą generowania
+	if (!process.env.OPENAI_API_KEY) {
+		console.error('❌ BRAK OPENAI_API_KEY w zmiennych środowiskowych!')
+		redirect('/admin/blog?error=' + encodeURIComponent('Brak klucza OPENAI_API_KEY w zmiennych środowiskowych!'))
+	}
+	
+	try {
+		await generatePostAI(formData)
+		revalidatePath('/admin/blog')
+		revalidatePath('/blog')
+		redirect('/admin/blog?success=' + encodeURIComponent('Post został wygenerowany!'))
+	} catch (error: any) {
+		console.error('❌ BŁĄD generowania posta AI:', error.message)
+		redirect('/admin/blog?error=' + encodeURIComponent(error.message || 'Wystąpił błąd podczas generowania posta'))
+	}
 }
 
 // --- SYSTEM PLANOWANIA ---

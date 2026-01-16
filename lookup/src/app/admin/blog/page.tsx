@@ -25,7 +25,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-export default async function AdminBlogPage() {
+export default async function AdminBlogPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ error?: string; success?: string }>
+}) {
+	const params = await searchParams
 	const [posts, scheduled] = await Promise.all([
 		prisma.post.findMany({
 			orderBy: { createdAt: 'desc' },
@@ -37,6 +42,20 @@ export default async function AdminBlogPage() {
 
 	return (
 		<div className='space-y-12'>
+			{/* Komunikaty błędów/sukcesu */}
+			{params.error && (
+				<div className='p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3'>
+					<AlertCircle className='text-red-600 flex-shrink-0' size={20} />
+					<p className='text-red-800 font-medium'>{decodeURIComponent(params.error)}</p>
+				</div>
+			)}
+			{params.success && (
+				<div className='p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3'>
+					<CheckCircle className='text-green-600 flex-shrink-0' size={20} />
+					<p className='text-green-800 font-medium'>{decodeURIComponent(params.success)}</p>
+				</div>
+			)}
+
 			<div className='flex justify-between items-end'>
 				<div>
 					<h1 className='text-2xl font-bold text-gray-900'>Zarządzanie Blogiem</h1>
@@ -56,7 +75,7 @@ export default async function AdminBlogPage() {
 				{/* KARTA 1: GENERATOR AI */}
 				<div className='bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl border border-indigo-100 shadow-sm'>
 					<h2 className='font-bold text-indigo-900 flex items-center gap-2 mb-4'>
-						<Sparkles className='text-purple-600' size={20} /> Generator AI (Gemini)
+						<Sparkles className='text-purple-600' size={20} /> Generator AI (OpenAI)
 					</h2>
 					<form action={generatePostAIForm} className='space-y-4'>
 						<div>
