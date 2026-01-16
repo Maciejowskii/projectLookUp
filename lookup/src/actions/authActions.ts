@@ -25,6 +25,10 @@ export async function registerAction(formData: FormData) {
 		return
 	}
 
+	// W Next.js 15, cookies() MUSI być wywołane na początku Server Action, przed operacjami async
+	// Inaczej może powodować błędy "cookies() was called after async operation"
+	const cookieStore = await cookies()
+	
 	try {
 		console.log('[REGISTER] Checking if user exists...')
 		// Sprawdź czy użytkownik już istnieje
@@ -55,9 +59,8 @@ export async function registerAction(formData: FormData) {
 		console.log('[REGISTER] User created successfully:', user.id)
 
 		console.log('[REGISTER] Setting session cookie...')
-		// Auto-login po rejestracji
+		// Auto-login po rejestracji - używamy cookieStore już pobranego na początku
 		try {
-			const cookieStore = await cookies()
 			cookieStore.set('session_user_id', user.id, {
 				httpOnly: true,
 				secure: process.env.NODE_ENV === 'production',
@@ -153,6 +156,10 @@ export async function loginAction(formData: FormData) {
 		return
 	}
 
+	// W Next.js 15, cookies() MUSI być wywołane na początku Server Action, przed operacjami async
+	// Inaczej może powodować błędy "cookies() was called after async operation"
+	const cookieStore = await cookies()
+	
 	try {
 		const user = await prisma.user.findUnique({
 			where: { email },
@@ -212,7 +219,7 @@ export async function loginAction(formData: FormData) {
 			}
 		}
 
-		const cookieStore = await cookies()
+		// Używamy cookieStore już pobranego na początku
 		cookieStore.set('session_user_id', user.id, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
