@@ -60,9 +60,14 @@ export async function registerAction(formData: FormData) {
 			redirect('/dashboard')
 		}
 	} catch (error) {
-		// Next.js 15 Server Actions automatycznie obsługują błędy redirect()
-		// Jeśli redirect() został wywołany w try-catch, Next.js automatycznie go obsłuży
-		// Wystarczy po prostu wywołać redirect() - nie musimy sprawdzać typu błędu
+		// Sprawdź czy to błąd redirect z Next.js - jeśli tak, rzuć go dalej (nie łap go)
+		if (error && typeof error === 'object' && 'digest' in error) {
+			const digest = String((error as any).digest)
+			// Next.js redirect errors mają digest zaczynający się od "NEXT_REDIRECT"
+			if (digest.includes('NEXT_REDIRECT')) {
+				throw error // Rzuć błąd redirect dalej - Next.js go obsłuży
+			}
+		}
 		
 		console.error('Registration error:', error)
 		
@@ -91,77 +96,102 @@ export async function loginAction(formData: FormData) {
 		return
 	}
 
-	const user = await prisma.user.findUnique({
-		where: { email },
-		include: {
-			// Legacy support
-			company: true,
-			// New many-to-many
-			companies: {
-				include: {
-					company: {
-						include: {
-							category: true,
+	try {
+		const user = await prisma.user.findUnique({
+			where: { email },
+			include: {
+				// Legacy support
+				company: true,
+				// New many-to-many
+				companies: {
+					include: {
+						company: {
+							include: {
+								category: true,
+							},
 						},
 					},
 				},
 			},
-		},
-	})
+		})
 
-	if (!user) {
-		redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło'))
-		return
-	}
-
-	// Sprawdzamy czy konto jest zweryfikowane
-	if (!user.emailVerified) {
-		redirect('/strefa-partnera?error=' + encodeURIComponent('Konto nieaktywne. Sprawdź e-mail weryfikacyjny.'))
-		return
-	}
-
-	// Sprawdzamy czy użytkownik ma hasło (OAuth users nie mają hasła)
-	if (!user.password) {
-		redirect('/strefa-partnera?error=' + encodeURIComponent('To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.'))
-		return
-	}
-
-	const isPasswordValid = await bcrypt.compare(password, user.password)
-
-	if (!isPasswordValid) {
-		redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło'))
-		return
-	}
-
-	// Auto-migracja: jeśli użytkownik ma companyId ale nie ma CompanyUser
-	if (user.companyId && user.companies.length === 0) {
-		try {
-			await prisma.companyUser.create({
-				data: {
-					userId: user.id,
-					companyId: user.companyId,
-					role: 'OWNER',
-				},
-			})
-		} catch (error) {
-			// Ignore if already exists or company doesn't exist
-			console.log('Auto-migration note:', error)
+		if (!user) {
+			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
+			return
 		}
-	}
 
-	const cookieStore = await cookies()
-	cookieStore.set('session_user_id', user.id, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		maxAge: 60 * 60 * 24 * 7,
-		path: '/',
-	})
+		// Sprawdzamy czy konto jest zweryfikowane
+		if (!user.emailVerified) {
+			redirect('/strefa-partnera?error=' + encodeURIComponent('Konto nieaktywne. Sprawdź e-mail weryfikacyjny.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
+			return
+		}
 
-	// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
-	if (returnTo) {
-		redirect(returnTo)
-	} else {
-		redirect('/dashboard')
+		// Sprawdzamy czy użytkownik ma hasło (OAuth users nie mają hasła)
+		if (!user.password) {
+			redirect('/strefa-partnera?error=' + encodeURIComponent('To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
+			return
+		}
+
+		const isPasswordValid = await bcrypt.compare(password, user.password)
+
+		if (!isPasswordValid) {
+			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
+			return
+		}
+
+		// Auto-migracja: jeśli użytkownik ma companyId ale nie ma CompanyUser
+		if (user.companyId && user.companies.length === 0) {
+			try {
+				await prisma.companyUser.create({
+					data: {
+						userId: user.id,
+						companyId: user.companyId,
+						role: 'OWNER',
+					},
+				})
+			} catch (error) {
+				// Ignore if already exists or company doesn't exist
+				console.log('Auto-migration note:', error)
+			}
+		}
+
+		const cookieStore = await cookies()
+		cookieStore.set('session_user_id', user.id, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			maxAge: 60 * 60 * 24 * 7,
+			path: '/',
+		})
+
+		// Jeśli jest returnTo, przekieruj tam, w przeciwnym razie do dashboard
+		if (returnTo) {
+			redirect(returnTo)
+		} else {
+			redirect('/dashboard')
+		}
+	} catch (error) {
+		// Sprawdź czy to błąd redirect z Next.js - jeśli tak, rzuć go dalej (nie łap go)
+		if (error && typeof error === 'object' && 'digest' in error) {
+			const digest = String((error as any).digest)
+			// Next.js redirect errors mają digest zaczynający się od "NEXT_REDIRECT"
+			if (digest.includes('NEXT_REDIRECT')) {
+				throw error // Rzuć błąd redirect dalej - Next.js go obsłuży
+			}
+		}
+		
+		console.error('Login error:', error)
+		
+		// Handle errors - redirect z komunikatem błędu
+		let errorMessage = 'Wystąpił błąd podczas logowania. Spróbuj ponownie.'
+		if (error instanceof Error) {
+			// Jeśli to błąd bazy danych, zwróć ogólny komunikat
+			if (error.message.includes('Prisma') || error.message.includes('database')) {
+				errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
+			}
+		}
+		
+		// redirect() automatycznie przerywa wykonanie w Next.js 15 Server Actions
+		redirect('/strefa-partnera?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
 
