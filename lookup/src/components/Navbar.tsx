@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, X, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { UserMenu } from "./UserMenu";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -66,10 +67,10 @@ export const Navbar = () => {
           </div>
 
           {/* --- RIGHT SIDE --- */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
             <Link
               href="/dodaj-firme"
-              className="group relative inline-flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5"
+              className="group relative inline-flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-full text-sm font-semibold overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
               <span className="relative flex items-center gap-2">
@@ -80,6 +81,7 @@ export const Navbar = () => {
                 Dodaj firmę
               </span>
             </Link>
+            <UserMenu />
           </div>
 
           {/* --- MOBILE HAMBURGER --- */}
@@ -99,6 +101,11 @@ export const Navbar = () => {
         }`}
       >
         <div className="flex flex-col gap-4 text-lg font-medium">
+          {/* User menu na górze mobile */}
+          <div className="pb-4 border-b border-gray-100">
+            <UserMenu />
+          </div>
+          
           {navLinks.map((link) => (
             <Link
               key={link.href}
