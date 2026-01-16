@@ -18,4 +18,6 @@ RUN npx next build
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+# Uruchamiamy migracje przed startem aplikacji
+# prisma migrate deploy zastosuje wszystkie oczekujące migracje
+CMD npx prisma migrate deploy && npm run start
