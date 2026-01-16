@@ -19,5 +19,7 @@ RUN npx next build
 EXPOSE 3000
 
 # Uruchamiamy migracje przed startem aplikacji
-# prisma migrate deploy zastosuje wszystkie oczekujące migracje
-CMD npx prisma migrate deploy && npm run start
+# 1. Rozwiązujemy zablokowaną migrację (oznaczamy jako applied - obiekty już istnieją w DB)
+# 2. Aplikujemy pozostałe oczekujące migracje (w tym OAuth która doda kolumny name i image)
+CMD npx prisma migrate resolve --applied 20260111011940_add_premium_until 2>/dev/null || true; \
+    npx prisma migrate deploy && npm run start
