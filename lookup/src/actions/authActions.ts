@@ -11,43 +11,27 @@ export async function registerAction(formData: FormData) {
 	const password = formData.get('password') as string
 	const returnTo = formData.get('returnTo') as string | null
 
-	console.log('[REGISTER] ===== REGISTRATION START =====')
-	console.log('[REGISTER] Email:', email)
-	console.log('[REGISTER] Has password:', !!password)
-	console.log('[REGISTER] ReturnTo:', returnTo)
-
 	if (!email || !password) {
-		console.log('[REGISTER] Validation failed: missing email or password')
 		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 
 	if (password.length < 8) {
-		console.log('[REGISTER] Validation failed: password too short')
 		redirect('/rejestracja?error=' + encodeURIComponent('Hasło musi mieć minimum 8 znaków') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 
-	// Pobierz cookies na początku
-	console.log('[REGISTER] Getting cookies...')
 	const cookieStore = await cookies()
-	console.log('[REGISTER] Cookies obtained')
 	
 	try {
-		console.log('[REGISTER] Checking if user exists...')
 		const existingUser = await prisma.user.findUnique({
 			where: { email },
 		})
-		console.log('[REGISTER] User exists check complete:', !!existingUser)
 
 		if (existingUser) {
-			console.log('[REGISTER] User already exists, redirecting...')
 			redirect('/rejestracja?error=' + encodeURIComponent('Użytkownik z tym emailem już istnieje') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		}
 
-		console.log('[REGISTER] Hashing password...')
 		const hashedPassword = await bcrypt.hash(password, 10)
-		console.log('[REGISTER] Password hashed, length:', hashedPassword.length)
 
-		console.log('[REGISTER] Creating user in database...')
 		const user = await prisma.user.create({
 			data: {
 				email,
@@ -55,39 +39,25 @@ export async function registerAction(formData: FormData) {
 				emailVerified: new Date(),
 			},
 		})
-		console.log('[REGISTER] User created successfully, ID:', user.id)
 
-		console.log('[REGISTER] Setting session cookie...')
 		cookieStore.set('session_user_id', user.id, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
 			maxAge: 60 * 60 * 24 * 7,
 			path: '/',
 		})
-		console.log('[REGISTER] Session cookie set')
 
-		console.log('[REGISTER] Redirecting to dashboard...')
 		if (returnTo) {
 			redirect(returnTo)
 		} else {
 			redirect('/dashboard')
 		}
 	} catch (error: any) {
-		console.log('[REGISTER] ===== ERROR CAUGHT =====')
-		console.log('[REGISTER] Error type:', error?.constructor?.name)
-		console.log('[REGISTER] Error message:', error?.message)
-		console.log('[REGISTER] Has digest:', 'digest' in (error || {}))
-		console.log('[REGISTER] Digest value:', error?.digest)
-		console.log('[REGISTER] Has code:', 'code' in (error || {}))
-		console.log('[REGISTER] Code value:', error?.code)
-		
-		// WAŻNE: Sprawdź czy to błąd redirect - jeśli tak, MUSI być rzucony dalej
+		// Redirect errors muszą być przekazane dalej
 		if (error?.digest?.includes?.('NEXT_REDIRECT')) {
-			console.log('[REGISTER] This is a redirect error, re-throwing...')
 			throw error
 		}
 		
-		// Określ komunikat błędu
 		let errorMessage = 'Wystąpił błąd podczas rejestracji. Spróbuj ponownie.'
 		
 		if (error?.code === 'P2002' || error?.message?.includes('Unique constraint')) {
@@ -95,9 +65,6 @@ export async function registerAction(formData: FormData) {
 		} else if (error?.code?.startsWith?.('P') || error?.message?.includes?.('Prisma') || error?.message?.includes?.('database')) {
 			errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
 		}
-		
-		console.log('[REGISTER] Final error message:', errorMessage)
-		console.log('[REGISTER] ===== REGISTRATION END (ERROR) =====')
 		
 		redirect('/rejestracja?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
@@ -109,18 +76,13 @@ export async function loginAction(formData: FormData) {
 	const password = formData.get('password') as string
 	const returnTo = formData.get('returnTo') as string | null
 
-	console.log('[LOGIN] ===== LOGIN START =====')
-	console.log('[LOGIN] Email:', email)
-
 	if (!email || !password) {
 		redirect('/strefa-partnera?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 
-	// Pobierz cookies na początku
 	const cookieStore = await cookies()
 	
 	try {
-		console.log('[LOGIN] Finding user...')
 		const user = await prisma.user.findUnique({
 			where: { email },
 			include: {
@@ -138,29 +100,24 @@ export async function loginAction(formData: FormData) {
 		})
 
 		if (!user) {
-			console.log('[LOGIN] User not found')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		}
 
 		if (!user.emailVerified) {
-			console.log('[LOGIN] Email not verified')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Konto nieaktywne. Sprawdź e-mail weryfikacyjny.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		}
 
 		if (!user.password) {
-			console.log('[LOGIN] No password (OAuth user)')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('To konto używa logowania przez Google/Facebook. Użyj przycisku OAuth.') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		}
 
-		console.log('[LOGIN] Comparing password...')
 		const isPasswordValid = await bcrypt.compare(password, user.password)
 
 		if (!isPasswordValid) {
-			console.log('[LOGIN] Invalid password')
 			redirect('/strefa-partnera?error=' + encodeURIComponent('Nieprawidłowy email lub hasło') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 		}
 
-		// Auto-migracja
+		// Auto-migracja legacy companyId → CompanyUser
 		if (user.companyId && user.companies.length === 0) {
 			try {
 				await prisma.companyUser.create({
@@ -171,11 +128,10 @@ export async function loginAction(formData: FormData) {
 					},
 				})
 			} catch (e) {
-				console.log('[LOGIN] Auto-migration note:', e)
+				// Ignoruj jeśli już istnieje
 			}
 		}
 
-		console.log('[LOGIN] Setting session cookie...')
 		cookieStore.set('session_user_id', user.id, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
@@ -183,17 +139,13 @@ export async function loginAction(formData: FormData) {
 			path: '/',
 		})
 
-		console.log('[LOGIN] Redirecting...')
 		if (returnTo) {
 			redirect(returnTo)
 		} else {
 			redirect('/dashboard')
 		}
 	} catch (error: any) {
-		console.log('[LOGIN] ===== ERROR CAUGHT =====')
-		console.log('[LOGIN] Error:', error?.message, error?.digest, error?.code)
-		
-		// WAŻNE: redirect() rzuca błąd z digest - musi być rzucony dalej
+		// Redirect errors muszą być przekazane dalej
 		if (error?.digest?.includes?.('NEXT_REDIRECT')) {
 			throw error
 		}
@@ -203,7 +155,6 @@ export async function loginAction(formData: FormData) {
 			errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
 		}
 		
-		console.log('[LOGIN] ===== LOGIN END (ERROR) =====')
 		redirect('/strefa-partnera?error=' + encodeURIComponent(errorMessage) + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 }
