@@ -3,27 +3,19 @@
 import { prisma } from '@/lib/prisma'
 import { checkAdminAuth } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { injectBacklinks } from '@/lib/backlinks'
 
 interface FormState {
 	message?: string
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || '')
-
 // --- GŁÓWNY GENERATOR AI (ULEPSZONA WERSJA) ---
 export async function generatePostAI(formData: FormData): Promise<string> {
 	const topic = formData.get('topic') as string
-	if (!process.env.GOOGLE_AI_KEY) {
-		console.error('BŁĄD: Brak GOOGLE_AI_KEY w env!')
+	if (!process.env.OPENAI_API_KEY) {
+		console.error('BŁĄD: Brak OPENAI_API_KEY w env!')
 		throw new Error('Brak klucza AI')
 	}
-
-	const model = genAI.getGenerativeModel({
-		model: 'gemini-2.5-flash',
-		generationConfig: { responseMimeType: 'application/json' },
-	})
 
 	// ⭐ ULEPSZONE - SEO + 5 sekcji + spis treści + wiele obrazków
 	const prompt = `
@@ -58,8 +50,39 @@ export async function generatePostAI(formData: FormData): Promise<string> {
   `
 
 	try {
-		const result = await model.generateContent(prompt)
-		const responseText = result.response.text()
+		// Wywołanie OpenAI API
+		const response = await fetch('https://api.openai.com/v1/chat/completions', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: 'gpt-4o-mini',
+				messages: [
+					{
+						role: 'system',
+						content: 'Jesteś ekspertem SEO i copywriterem. Odpowiadasz TYLKO w formacie JSON bez żadnych dodatkowych komentarzy.',
+					},
+					{
+						role: 'user',
+						content: prompt,
+					},
+				],
+				temperature: 0.7,
+				max_tokens: 4096,
+				response_format: { type: 'json_object' },
+			}),
+		})
+
+		if (!response.ok) {
+			const errorData = await response.json()
+			console.error('BŁĄD OpenAI:', errorData)
+			throw new Error(`OpenAI API error: ${response.status}`)
+		}
+
+		const openaiResult = await response.json()
+		const responseText = openaiResult.choices[0]?.message?.content || ''
 
 		// Wycinanie JSON (na wypadek markdown)
 		const firstBrace = responseText.indexOf('{')
