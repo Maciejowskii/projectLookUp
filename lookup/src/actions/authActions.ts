@@ -105,8 +105,34 @@ export async function registerAction(formData: FormData) {
 			// Check for unique constraint violation (Prisma error code P2002)
 			if (error.message.includes('Unique constraint') || error.message.includes('P2002') || error.message.includes('email')) {
 				errorMessage = 'Użytkownik z tym emailem już istnieje'
-			} else if (error.message.includes('Prisma') || error.message.includes('database')) {
+			} else if (
+				error.message.includes('Prisma') || 
+				error.message.includes('database') || 
+				error.message.includes('DATABASE_URL') ||
+				error.message.includes('connection') ||
+				error.message.includes('connect') ||
+				(error && typeof error === 'object' && 'code' in error && String((error as any).code).startsWith('P'))
+			) {
+				// Błędy Prisma związane z połączeniem
+				console.error('[REGISTER] Prisma connection error detected')
 				errorMessage = 'Błąd połączenia z bazą danych. Spróbuj ponownie później.'
+				
+				// Sprawdź czy DATABASE_URL jest ustawione
+				if (!process.env.DATABASE_URL) {
+					console.error('[REGISTER] DATABASE_URL nie jest ustawione!')
+					errorMessage = 'Błąd konfiguracji: brak połączenia z bazą danych. Skontaktuj się z administratorem.'
+				}
+			}
+		}
+		
+		// Dodatkowa weryfikacja - czy to błąd Prisma
+		if (error && typeof error === 'object' && 'code' in error) {
+			const prismaCode = (error as any).code
+			console.error('[REGISTER] Prisma error code:', prismaCode)
+			
+			// Błędy połączenia Prisma (P1001, P1000, etc.)
+			if (String(prismaCode).startsWith('P1')) {
+				errorMessage = 'Błąd połączenia z bazą danych. Sprawdź konfigurację DATABASE_URL.'
 			}
 		}
 		
