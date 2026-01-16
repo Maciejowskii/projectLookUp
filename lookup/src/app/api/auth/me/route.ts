@@ -19,7 +19,6 @@ export async function GET() {
 				id: true,
 				email: true,
 				name: true,
-				fullName: true,
 				image: true,
 			},
 		})
@@ -28,8 +27,8 @@ export async function GET() {
 			return NextResponse.json({ user: null })
 		}
 
-		// Zwróć nazwę wyświetlaną (preferuj fullName, potem name, potem email)
-		const displayName = user.fullName || user.name || user.email.split('@')[0]
+		// Zwróć nazwę wyświetlaną (preferuj name, potem email)
+		const displayName = user.name || user.email.split('@')[0]
 
 		return NextResponse.json({
 			user: {
