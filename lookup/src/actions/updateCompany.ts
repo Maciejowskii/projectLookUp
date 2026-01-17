@@ -51,6 +51,8 @@ export async function updateCompanyAction(formData: FormData) {
   const phone = formData.get("phone") as string;
   const email = formData.get("email") as string;
   const address = formData.get("address") as string;
+  const openingHoursRaw = formData.get("openingHours") as string;
+  const openingHours = openingHoursRaw ? JSON.parse(openingHoursRaw) : undefined;
 
   // 5. Pobieramy slug firmy dla revalidatePath
   const company = await prisma.company.findUnique({
@@ -67,6 +69,7 @@ export async function updateCompanyAction(formData: FormData) {
       phone,
       email,
       address,
+      openingHours,
     },
   });
 

@@ -6,7 +6,9 @@ import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CityCrossLinks } from '@/components/CityCrossLinks'
-import { MapPin, Globe, Mail, Calendar, FileText, CheckCircle, ChevronRight } from 'lucide-react'
+import { MapPin, Globe, Mail, FileText, CheckCircle, ChevronRight } from 'lucide-react'
+import { OpeningHoursDisplay } from '@/components/OpeningHoursDisplay'
+import type { OpeningHours } from '@/components/OpeningHoursEditor'
 import { ReviewSection } from '@/components/ReviewSection'
 import { PhoneRevealButton } from '@/components/PhoneRevealButton'
 import { Metadata } from 'next'
@@ -82,6 +84,21 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			  ).toFixed(1)
 			: undefined
 
+	// Konwertuj godziny otwarcia na format Schema.org
+	const formatOpeningHoursForSchema = (hours: OpeningHours | null): string[] => {
+		if (!hours) return ['Mo-Fr 08:00-17:00']
+		const dayMap: Record<string, string> = {
+			mon: 'Mo', tue: 'Tu', wed: 'We', thu: 'Th', fri: 'Fr', sat: 'Sa', sun: 'Su'
+		}
+		const result: string[] = []
+		for (const [key, schedule] of Object.entries(hours)) {
+			if (!schedule.closed) {
+				result.push(`${dayMap[key]} ${schedule.open}-${schedule.close}`)
+			}
+		}
+		return result.length > 0 ? result : ['Mo-Fr 08:00-17:00']
+	}
+
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'LocalBusiness',
@@ -98,7 +115,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		telephone: company.phone,
 		description: company.description || `Profil firmy ${company.name} w miejscowości ${company.city}.`,
 		priceRange: 'PLN',
-		openingHours: ['Mo-Fr 08:00-17:00'],
+		openingHours: formatOpeningHoursForSchema(company.openingHours as OpeningHours | null),
 		...(reviewCount > 0 && {
 			aggregateRating: {
 				'@type': 'AggregateRating',
@@ -279,25 +296,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</div>
 					</div>
 
-					<div className='bg-white p-6 rounded-3xl shadow-sm border border-gray-100'>
-						<h3 className='font-bold flex items-center gap-2 mb-4 text-gray-900'>
-							<Calendar size={18} className='text-blue-600' /> Godziny otwarcia
-						</h3>
-						<div className='text-sm space-y-3'>
-							<div className='flex justify-between border-b border-gray-50 pb-2'>
-								<span className='text-gray-600'>Poniedziałek – Piątek</span>
-								<span className='font-bold text-gray-900'>08:00 – 17:00</span>
-							</div>
-							<div className='flex justify-between border-b border-gray-50 pb-2'>
-								<span className='text-gray-600'>Sobota</span>
-								<span className='font-bold text-gray-900'>09:00 – 14:00</span>
-							</div>
-							<div className='flex justify-between text-gray-400'>
-								<span>Niedziela</span>
-								<span>Zamknięte</span>
-							</div>
-						</div>
-					</div>
+<OpeningHoursDisplay hours={company.openingHours as OpeningHours | null} />
 				</aside>
 			</main>
 			<CityCrossLinks city={company.city || undefined} />

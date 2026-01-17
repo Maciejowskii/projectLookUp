@@ -54,6 +54,8 @@ model Company {
   email   String?
   website String?
   logo    String?
+  
+  openingHours Json? // { mon: {open, close}, tue: {open, close}, ... }
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])

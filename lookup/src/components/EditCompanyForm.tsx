@@ -17,6 +17,7 @@ import {
 	Zap,
 	Sparkles,
 } from 'lucide-react'
+import { OpeningHoursEditor, type OpeningHours } from './OpeningHoursEditor'
 import { UploadButton } from '@/lib/uploadthing'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -31,6 +32,7 @@ interface CompanyData {
 	logo: string | null
 	plan: 'FREE' | 'PREMIUM'
 	premiumUntil: Date | null
+	openingHours: OpeningHours | null
 }
 
 export function EditCompanyForm({ company }: { company: CompanyData }) {
@@ -299,6 +301,14 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 						</div>
 					</div>
 				</div>
+
+				<div className='w-full h-px bg-gray-100 my-8'></div>
+
+				{/* Godziny otwarcia */}
+				<OpeningHoursEditor 
+					name='openingHours' 
+					initialValue={company.openingHours} 
+				/>
 
 				<div className='pt-6 flex items-center justify-between border-t border-gray-100 mt-8'>
 					<p className='text-sm text-gray-500 hidden md:block'>Pamiętaj, aby zapisywać zmiany regularnie.</p>
