@@ -20,7 +20,7 @@ export async function generateMetadata({
 
   return {
     title: `${post.title} | Blog katalogo`,
-    description: post.excerpt,
+    description: post.excerpt ?? undefined,
     robots: {
       index: true,
       follow: true,
@@ -30,7 +30,7 @@ export async function generateMetadata({
     },
     openGraph: {
       title: post.title,
-      description: post.excerpt,
+      description: post.excerpt ?? undefined,
       type: 'article',
       images: post.image ? [post.image] : [],
     },
