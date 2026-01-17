@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { deleteReview } from "@/actions/adminActions";
 import { Star, Trash2, MessageSquare } from "lucide-react";
+import Link from "next/link";
 
 export default async function AdminReviewsPage() {
   const reviews = await prisma.review.findMany({
@@ -55,9 +56,12 @@ export default async function AdminReviewsPage() {
                   {review.userName}
                 </span>
                 <span className="text-gray-400 text-xs">•</span>
-                <span className="text-blue-600 font-medium text-sm">
+                <Link 
+                  href={`/firma/${review.company.slug}`}
+                  className="text-blue-600 font-medium text-sm hover:underline"
+                >
                   {review.company.name}
-                </span>
+                </Link>
                 <span className="text-gray-400 text-xs ml-auto">
                   {new Date(review.createdAt).toLocaleDateString()}
                 </span>
