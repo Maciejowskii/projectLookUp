@@ -52,7 +52,16 @@ export async function updateCompanyAction(formData: FormData) {
   const email = formData.get("email") as string;
   const address = formData.get("address") as string;
   const openingHoursRaw = formData.get("openingHours") as string;
-  const openingHours = openingHoursRaw ? JSON.parse(openingHoursRaw) : undefined;
+  
+  let openingHours = undefined;
+  if (openingHoursRaw) {
+    try {
+      openingHours = JSON.parse(openingHoursRaw);
+    } catch (e) {
+      console.error("Failed to parse openingHours:", e);
+      // Ignorujemy błąd parsowania - zostanie undefined
+    }
+  }
 
   // 5. Pobieramy slug firmy dla revalidatePath
   const company = await prisma.company.findUnique({
