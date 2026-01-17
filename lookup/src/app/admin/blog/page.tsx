@@ -24,6 +24,7 @@ import {
 	RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
+import { AIGeneratorForm } from '@/components/admin/AIGeneratorForm'
 
 export default async function AdminBlogPage({
 	searchParams,
@@ -77,23 +78,7 @@ export default async function AdminBlogPage({
 					<h2 className='font-bold text-indigo-900 flex items-center gap-2 mb-4'>
 						<Sparkles className='text-purple-600' size={20} /> Generator AI (OpenAI)
 					</h2>
-					<form action={generatePostAIForm} className='space-y-4'>
-						<div>
-							<label className='block text-xs font-bold text-indigo-400 uppercase mb-1'>Temat artykułu</label>
-							<input
-								name='topic'
-								required
-								placeholder='np. Jak wybrać dobrego hydraulika?'
-								className='w-full p-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-purple-400 outline-none'
-							/>
-						</div>
-						<button className='w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex justify-center items-center gap-2 shadow-lg shadow-indigo-200'>
-							<Sparkles size={18} /> Wygeneruj i Opublikuj
-						</button>
-						<p className='text-xs text-indigo-400 text-center'>
-							To zajmie ok. 5-10 sekund. Artykuł pojawi się na liście poniżej.
-						</p>
-					</form>
+					<AIGeneratorForm action={generatePostAIForm} />
 				</div>
 
 				{/* KARTA 2: DODAJ RĘCZNIE (Uproszczona) */}
