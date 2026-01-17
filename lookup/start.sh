@@ -33,6 +33,9 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fullName" TEXT;
 -- Upewnij się że companyId jest nullable
 ALTER TABLE "User" ALTER COLUMN "companyId" DROP NOT NULL;
 
+-- Dodaj kolumnę openingHours do Company jeśli nie istnieje
+ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openingHours" JSONB;
+
 -- Utwórz tabelę CompanyUser jeśli nie istnieje
 CREATE TABLE IF NOT EXISTS "CompanyUser" (
     "id" TEXT NOT NULL,
