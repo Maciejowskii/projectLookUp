@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { updateSettings } from "@/actions/adminActions";
-import { Save, Settings, DollarSign, Phone, Mail } from "lucide-react";
+import { Save, Settings, DollarSign, Phone, Mail, Bell, Info } from "lucide-react";
 
 export default async function AdminSettingsPage() {
   // Pobieramy obecne ustawienia
@@ -26,6 +26,35 @@ export default async function AdminSettingsPage() {
         action={updateSettings}
         className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 space-y-6"
       >
+        {/* Sekcja: Powiadomienia */}
+        <div>
+          <h3 className="font-bold text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
+            <Bell size={18} className="text-amber-500" />
+            Powiadomienia Email
+          </h3>
+          <div className="grid gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Adresy email do powiadomień o przejęciach firm
+              </label>
+              <textarea
+                name="notification_emails"
+                defaultValue={get("notification_emails")}
+                placeholder="admin@example.com&#10;manager@example.com&#10;owner@example.com"
+                rows={4}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none font-mono text-sm text-gray-900 placeholder:text-gray-400"
+              />
+              <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+                <Info size={14} className="mt-0.5 flex-shrink-0" />
+                <span>
+                  Wpisz każdy adres email w nowej linii. Powiadomienia o nowych zgłoszeniach
+                  przejęcia firm będą wysyłane na wszystkie podane adresy.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Sekcja: Kontakt */}
         <div>
           <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">
@@ -44,7 +73,8 @@ export default async function AdminSettingsPage() {
                 <input
                   name="contact_email"
                   defaultValue={get("contact_email")}
-                  className="pl-10 w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="kontakt@twojafirma.pl"
+                  className="pl-10 w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 placeholder:text-gray-400"
                 />
               </div>
             </div>
@@ -60,7 +90,8 @@ export default async function AdminSettingsPage() {
                 <input
                   name="contact_phone"
                   defaultValue={get("contact_phone")}
-                  className="pl-10 w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="+48 123 456 789"
+                  className="pl-10 w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 placeholder:text-gray-400"
                 />
               </div>
             </div>
@@ -86,7 +117,8 @@ export default async function AdminSettingsPage() {
                   name="price_premium"
                   type="number"
                   defaultValue={get("price_premium")}
-                  className="pl-10 w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="99"
+                  className="pl-10 w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 placeholder:text-gray-400"
                 />
               </div>
             </div>
@@ -106,7 +138,7 @@ export default async function AdminSettingsPage() {
               name="site_title_suffix"
               defaultValue={get("site_title_suffix")}
               placeholder="| Najlepszy Katalog Firm"
-              className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 placeholder:text-gray-400"
             />
           </div>
         </div>

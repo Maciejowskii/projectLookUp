@@ -2,13 +2,15 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { checkAdminAuth } from '@/lib/adminAuth'
+import { checkAdminAuth, logAdminAction } from '@/lib/adminAuth'
 
 export async function approveClaim(claimId: string) {
-	await checkAdminAuth()
+	const admin = await checkAdminAuth()
+
 	// 1. Pobierz zgłoszenie
 	const claim = await prisma.claimRequest.findUnique({
 		where: { id: claimId },
+		include: { company: { select: { name: true } } },
 	})
 
 	if (!claim) throw new Error('Nie znaleziono zgłoszenia')
@@ -47,13 +49,10 @@ export async function approveClaim(claimId: string) {
 	})
 
 	// 6. Zaktualizuj firmę (zweryfikuj ją)
-	// NIE nadpisujemy istniejących danych - tylko ustawiamy isVerified
-	// Email aktualizujemy tylko jeśli firma nie ma jeszcze emailu
 	const updateData: { isVerified: boolean; email?: string } = {
 		isVerified: true,
 	}
 
-	// Aktualizuj email tylko jeśli firma nie ma jeszcze emailu
 	if (claim.email && (!company || !company.email)) {
 		updateData.email = claim.email
 	}
@@ -63,37 +62,70 @@ export async function approveClaim(claimId: string) {
 		data: updateData,
 	})
 
+	// Audit log
+	await logAdminAction(admin.id, 'APPROVE_CLAIM', claimId, {
+		companyId: claim.companyId,
+		companyName: claim.company?.name,
+		claimEmail: claim.email,
+	})
+
 	revalidatePath('/admin/zgloszenia')
-	revalidatePath(`/firma`) // Odśwież widok publiczny
+	revalidatePath(`/firma`)
 }
 
 export async function rejectClaim(claimId: string) {
-	await checkAdminAuth()
+	const admin = await checkAdminAuth()
+
+	const claim = await prisma.claimRequest.findUnique({
+		where: { id: claimId },
+		include: { company: { select: { name: true } } },
+	})
+
 	await prisma.claimRequest.update({
 		where: { id: claimId },
 		data: { status: 'REJECTED' },
 	})
+
+	// Audit log
+	await logAdminAction(admin.id, 'REJECT_CLAIM', claimId, {
+		companyId: claim?.companyId,
+		companyName: claim?.company?.name,
+	})
+
 	revalidatePath('/admin/zgloszenia')
 }
 
 export async function deleteReview(reviewId: string) {
-	await checkAdminAuth()
+	const admin = await checkAdminAuth()
+
+	const review = await prisma.review.findUnique({
+		where: { id: reviewId },
+		include: { company: { select: { name: true } } },
+	})
+
 	await prisma.review.delete({
 		where: { id: reviewId },
 	})
+
+	// Audit log
+	await logAdminAction(admin.id, 'DELETE_REVIEW', reviewId, {
+		companyId: review?.companyId,
+		companyName: review?.company?.name,
+		userName: review?.userName,
+		rating: review?.rating,
+	})
+
 	revalidatePath('/admin/reviews')
 }
-
-// ... (istniejące importy i funkcje)
 
 // --- KATEGORIE ---
 
 export async function createCategory(formData: FormData) {
-	await checkAdminAuth()
-	const name = formData.get('name') as string
-	const tenantId = 'default' // Lub pobierz z konfiguracji, jeśli masz multitenancy
+	const admin = await checkAdminAuth()
 
-	// Prosty slug generator: "Usługi Prawne" -> "uslugi-prawne"
+	const name = formData.get('name') as string
+
+	// Prosty slug generator
 	const slug = name
 		.toLowerCase()
 		.replace(/ł/g, 'l')
@@ -111,34 +143,52 @@ export async function createCategory(formData: FormData) {
 	const defaultTenant = await prisma.tenant.findFirst()
 	if (!defaultTenant) throw new Error('Brak Tenanta w bazie!')
 
-	await prisma.category.create({
+	const category = await prisma.category.create({
 		data: {
 			name,
 			slug,
-			tenantId: defaultTenant.id, // Używamy ID znalezionego tenanta
+			tenantId: defaultTenant.id,
 		},
+	})
+
+	// Audit log
+	await logAdminAction(admin.id, 'CREATE_CATEGORY', category.id, {
+		name,
+		slug,
 	})
 
 	revalidatePath('/admin/categories')
 }
 
 export async function deleteCategory(id: string) {
-	await checkAdminAuth()
-	// Opcjonalnie: sprawdź czy kategoria nie ma firm przed usunięciem
+	const admin = await checkAdminAuth()
+
+	const category = await prisma.category.findUnique({
+		where: { id },
+		select: { name: true },
+	})
+
 	await prisma.category.delete({ where: { id } })
+
+	// Audit log
+	await logAdminAction(admin.id, 'DELETE_CATEGORY', id, {
+		name: category?.name,
+	})
+
 	revalidatePath('/admin/categories')
 }
 
 // --- USTAWIENIA GLOBALNE ---
 
 export async function updateSettings(formData: FormData) {
-	await checkAdminAuth()
-	// Pobieramy wszystkie pola z formularza
+	const admin = await checkAdminAuth()
+
 	const entries = Array.from(formData.entries())
+	const changes: Record<string, string> = {}
 
 	for (const [key, value] of entries) {
-		// Ignorujemy pola systemowe next.js (zaczynające się od $)
 		if (!key.startsWith('$')) {
+			changes[key] = value as string
 			await prisma.setting.upsert({
 				where: { key },
 				update: { value: value as string },
@@ -147,11 +197,14 @@ export async function updateSettings(formData: FormData) {
 		}
 	}
 
+	// Audit log
+	await logAdminAction(admin.id, 'UPDATE_SETTINGS', undefined, { changes })
+
 	revalidatePath('/admin/settings')
 }
 
 export async function updateCategory(formData: FormData) {
-	await checkAdminAuth()
+	const admin = await checkAdminAuth()
 
 	const id = formData.get('id') as string
 	const name = formData.get('name') as string
@@ -159,6 +212,11 @@ export async function updateCategory(formData: FormData) {
 	if (!id || !name || name.trim().length < 2) {
 		throw new Error('Nazwa kategorii musi mieć minimum 2 znaki')
 	}
+
+	const oldCategory = await prisma.category.findUnique({
+		where: { id },
+		select: { name: true },
+	})
 
 	await prisma.category.update({
 		where: { id },
@@ -171,5 +229,90 @@ export async function updateCategory(formData: FormData) {
 		},
 	})
 
+	// Audit log
+	await logAdminAction(admin.id, 'UPDATE_CATEGORY', id, {
+		oldName: oldCategory?.name,
+		newName: name.trim(),
+	})
+
 	revalidatePath('/admin/categories')
+}
+
+// --- ZARZĄDZANIE FIRMAMI ---
+
+export async function deleteCompany(companyId: string) {
+	const admin = await checkAdminAuth()
+
+	const company = await prisma.company.findUnique({
+		where: { id: companyId },
+		select: { name: true, nip: true },
+	})
+
+	if (!company) throw new Error('Firma nie istnieje')
+
+	// Usuń powiązane dane
+	await prisma.$transaction([
+		prisma.lead.deleteMany({ where: { companyId } }),
+		prisma.review.deleteMany({ where: { companyId } }),
+		prisma.claimRequest.deleteMany({ where: { companyId } }),
+		prisma.companyUser.deleteMany({ where: { companyId } }),
+		prisma.company.delete({ where: { id: companyId } }),
+	])
+
+	// Audit log
+	await logAdminAction(admin.id, 'DELETE_COMPANY', companyId, {
+		name: company.name,
+		nip: company.nip,
+	})
+
+	revalidatePath('/admin/companies')
+}
+
+export async function verifyCompany(companyId: string) {
+	const admin = await checkAdminAuth()
+
+	const company = await prisma.company.findUnique({
+		where: { id: companyId },
+		select: { name: true, isVerified: true },
+	})
+
+	if (!company) throw new Error('Firma nie istnieje')
+
+	await prisma.company.update({
+		where: { id: companyId },
+		data: { isVerified: !company.isVerified },
+	})
+
+	// Audit log
+	await logAdminAction(admin.id, company.isVerified ? 'UNVERIFY_COMPANY' : 'VERIFY_COMPANY', companyId, {
+		name: company.name,
+	})
+
+	revalidatePath('/admin/companies')
+}
+
+export async function setCompanyPremium(companyId: string, isPremium: boolean) {
+	const admin = await checkAdminAuth()
+
+	const company = await prisma.company.findUnique({
+		where: { id: companyId },
+		select: { name: true },
+	})
+
+	if (!company) throw new Error('Firma nie istnieje')
+
+	await prisma.company.update({
+		where: { id: companyId },
+		data: {
+			plan: isPremium ? 'PREMIUM' : 'FREE',
+			premiumUntil: isPremium ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : null,
+		},
+	})
+
+	// Audit log
+	await logAdminAction(admin.id, isPremium ? 'SET_PREMIUM' : 'REMOVE_PREMIUM', companyId, {
+		name: company.name,
+	})
+
+	revalidatePath('/admin/companies')
 }

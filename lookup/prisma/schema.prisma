@@ -137,6 +137,12 @@ model Setting {
   value String
 }
 
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -144,11 +150,18 @@ model User {
   emailVerified DateTime?
   name          String? // Imię i nazwisko (dla OAuth)
   image         String? // Avatar URL (dla OAuth)
+  role          UserRole  @default(USER) // Rola użytkownika
 
   // OAuth accounts
   accounts Account[]
   // NextAuth sessions
   sessions Session[]
+
+  // Admin audit logs
+  adminLogs AdminAuditLog[]
+
+  // Admin sessions
+  adminSessions AdminSession[]
 
   // Legacy field - kept for backward compatibility
   // Will be auto-migrated to CompanyUser on first dashboard access
@@ -160,6 +173,37 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Bezpieczna sesja admina
+model AdminSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// Audit log dla operacji admina
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // np. "APPROVE_CLAIM", "REJECT_CLAIM", "DELETE_REVIEW", "UPDATE_SETTINGS"
+  target    String?  // ID obiektu, na którym wykonano akcję
+  details   Json?    // Dodatkowe szczegóły operacji
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 // NextAuth Account model for OAuth
