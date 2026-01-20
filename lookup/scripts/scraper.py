@@ -226,27 +226,62 @@ def normalize_province(raw: str | None) -> str | None:
 def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20) -> requests.Response:
     delay = HTTP_BACKOFF_INITIAL
     last_exc = None
+    proxy_failed = False
+    current_proxy_url = None
 
     for attempt in range(1, HTTP_MAX_RETRIES + 1):
         try:
             # Rotuj User-Agent przy każdym request
             session.headers["User-Agent"] = random.choice(USER_AGENTS)
             
-            # Użyj proxy jeśli dostępne
-            proxies = proxy_manager.get_proxy() if PROXY_ENABLED else None
+            # Użyj proxy jeśli dostępne (ale tylko jeśli poprzednie nie zawiodło)
+            proxies = None
+            if PROXY_ENABLED and not proxy_failed:
+                proxies = proxy_manager.get_proxy()
+                current_proxy_url = proxy_manager.get_current_proxy_url()
             
             resp = session.get(url, timeout=timeout, proxies=proxies)
 
             if resp.status_code in (429, 500, 502, 503, 504):
-                # Rotuj proxy przy błędzie
-                if PROXY_ENABLED:
+                # Rotuj proxy przy błędzie HTTP
+                if PROXY_ENABLED and proxies:
                     proxy_manager.rotate()
                 raise RuntimeError(f"HTTP {resp.status_code}")
 
             return resp
 
+        except requests.exceptions.ProxyError as e:
+            # Błąd proxy - rotuj i spróbuj następnego
+            if PROXY_ENABLED and current_proxy_url:
+                proxy_manager.mark_failed(current_proxy_url)
+                proxy_manager.rotate()
+                log(f"Proxy failed, rotating... ({current_proxy_url[:30]}...)")
+                time.sleep(2)  # Krótka pauza przed retry z nowym proxy
+                continue
+            else:
+                # Wszystkie proxy zawiodły - użyj bezpośredniego połączenia
+                proxy_failed = True
+                log("All proxies failed, falling back to direct connection")
+                time.sleep(2)
+                continue
+                
         except Exception as e:
             last_exc = e
+            error_str = str(e)
+            # Jeśli to błąd proxy, rotuj
+            if PROXY_ENABLED and ("proxy" in error_str.lower() or "tunnel" in error_str.lower()):
+                if current_proxy_url:
+                    proxy_manager.mark_failed(current_proxy_url)
+                    proxy_manager.rotate()
+                    log(f"Proxy error detected, rotating...")
+                    time.sleep(2)
+                    continue
+                else:
+                    proxy_failed = True
+                    log("Proxy errors, falling back to direct connection")
+                    time.sleep(2)
+                    continue
+            
             log(f"HTTP error attempt {attempt}/{HTTP_MAX_RETRIES} url={url}: {e}")
             time.sleep(min(delay, HTTP_BACKOFF_MAX) + random.uniform(0, 1.0))
             delay *= 2
