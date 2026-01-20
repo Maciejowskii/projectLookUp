@@ -62,13 +62,26 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 
+# Proxy - format: http://user:pass@host:port lub http://host:port
+# Można podać wiele proxy oddzielonych przecinkiem: proxy1,proxy2,proxy3
+PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
+PROXY_LIST = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
+PROXY_ENABLED = len(PROXY_LIST) > 0
+
 BASE_URL = "https://panoramafirm.pl"
 
+# Lista User-Agents do rotacji (pomaga unikać blokad)
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
+]
+
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": random.choice(USER_AGENTS),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
 }
@@ -92,6 +105,56 @@ DEFAULT_TENANT_SUBDOMAIN = "katalog"
 ai_usage_counter = 0
 total_inserted = 0
 client = None
+
+
+# =========================
+# PROXY MANAGER
+# =========================
+class ProxyManager:
+    def __init__(self, proxy_list: list[str]):
+        self.proxies = proxy_list.copy() if proxy_list else []
+        self.current_index = 0
+        self.failed_proxies = set()
+    
+    def get_proxy(self) -> dict | None:
+        if not self.proxies:
+            return None
+        
+        # Znajdź działające proxy
+        attempts = 0
+        while attempts < len(self.proxies):
+            proxy_url = self.proxies[self.current_index]
+            if proxy_url not in self.failed_proxies:
+                return {
+                    "http": proxy_url,
+                    "https": proxy_url,
+                }
+            self.current_index = (self.current_index + 1) % len(self.proxies)
+            attempts += 1
+        
+        # Wszystkie proxy zawiodły - reset i spróbuj ponownie
+        log("All proxies failed, resetting...")
+        self.failed_proxies.clear()
+        return self.get_proxy() if self.proxies else None
+    
+    def rotate(self):
+        """Przejdź do następnego proxy"""
+        if self.proxies:
+            self.current_index = (self.current_index + 1) % len(self.proxies)
+            log(f"Rotating to proxy #{self.current_index + 1}/{len(self.proxies)}")
+    
+    def mark_failed(self, proxy_url: str):
+        """Oznacz proxy jako niedziałające"""
+        self.failed_proxies.add(proxy_url)
+        log(f"Proxy marked as failed: {proxy_url[:30]}...")
+    
+    def get_current_proxy_url(self) -> str | None:
+        if not self.proxies:
+            return None
+        return self.proxies[self.current_index]
+
+
+proxy_manager = ProxyManager(PROXY_LIST)
 
 
 def log(msg: str):
@@ -166,9 +229,18 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
 
     for attempt in range(1, HTTP_MAX_RETRIES + 1):
         try:
-            resp = session.get(url, timeout=timeout)
+            # Rotuj User-Agent przy każdym request
+            session.headers["User-Agent"] = random.choice(USER_AGENTS)
+            
+            # Użyj proxy jeśli dostępne
+            proxies = proxy_manager.get_proxy() if PROXY_ENABLED else None
+            
+            resp = session.get(url, timeout=timeout, proxies=proxies)
 
             if resp.status_code in (429, 500, 502, 503, 504):
+                # Rotuj proxy przy błędzie
+                if PROXY_ENABLED:
+                    proxy_manager.rotate()
                 raise RuntimeError(f"HTTP {resp.status_code}")
 
             return resp
@@ -1827,6 +1899,14 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             )
             if is_blocked or len(resp.text) < 20000:
                 block_retries += 1
+                
+                # Rotuj proxy przy blokadzie
+                if PROXY_ENABLED:
+                    proxy_manager.rotate()
+                    log(f"    BLOCKED! Rotated to new proxy. Retry {block_retries}/{max_block_retries}...")
+                    time.sleep(5)  # Krótka pauza przed retry z nowym proxy
+                    continue
+                
                 if block_retries > max_block_retries:
                     log(f"    BLOCKED! Max retries exceeded. Skipping category.")
                     break
@@ -2211,6 +2291,10 @@ def main():
         f"Mode={SCRAPER_MODE} | REQUIRE_AI={'YES' if REQUIRE_AI else 'NO'} | "
         f"MAX_PAGES_PER_CATEGORY={MAX_PAGES_PER_CATEGORY} | AI_MODEL={OPENAI_MODEL}"
     )
+    if PROXY_ENABLED:
+        log(f"PROXY ENABLED: {len(PROXY_LIST)} proxies configured")
+    else:
+        log("PROXY DISABLED: No proxies configured (set PROXY_LIST env variable)")
 
     conn = connect_db()
     categories = scrape_all_categories()
