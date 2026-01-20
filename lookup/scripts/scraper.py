@@ -5,9 +5,12 @@ import uuid
 import time
 import random
 import warnings
+import socket
 from urllib.parse import unquote, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.connection import create_connection
 from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
@@ -16,6 +19,41 @@ from openai import OpenAI
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 load_dotenv()
+
+
+# =========================
+# IPv6 SUPPORT
+# =========================
+class IPv6HTTPAdapter(HTTPAdapter):
+    """Adapter wymuszający użycie IPv6"""
+    def init_poolmanager(self, *args, **kwargs):
+        # Override create_connection żeby używać IPv6
+        import urllib3.util.connection as urllib3_connection
+        original_create_connection = urllib3_connection.create_connection
+        
+        def create_connection_ipv6(address, *args, **kwargs):
+            host, port = address
+            # Wymuś IPv6 - najpierw spróbuj IPv6
+            try:
+                # Resolve DNS na IPv6
+                addrinfo = socket.getaddrinfo(host, port, socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+                if addrinfo:
+                    # Użyj pierwszego IPv6 adresu
+                    family, socktype, proto, canonname, sockaddr = addrinfo[0]
+                    sock = socket.socket(family, socktype, proto)
+                    sock.connect(sockaddr)
+                    return sock
+            except (socket.gaierror, OSError, socket.error) as e:
+                # Jeśli IPv6 nie działa, fallback na IPv4
+                log(f"IPv6 connection failed for {host}, falling back to IPv4: {e}")
+                return original_create_connection(address, *args, **kwargs)
+            # Fallback na oryginalną funkcję
+            return original_create_connection(address, *args, **kwargs)
+        
+        # Monkey-patch urllib3
+        urllib3_connection.create_connection = create_connection_ipv6
+        
+        return super().init_poolmanager(*args, **kwargs)
 
 
 # =========================
@@ -67,6 +105,9 @@ DB_PASS = os.getenv("DB_PASS")
 PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
 PROXY_LIST = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
 PROXY_ENABLED = len(PROXY_LIST) > 0
+
+# IPv6 - wymuś użycie IPv6 zamiast IPv4
+FORCE_IPV6 = os.getenv("FORCE_IPV6", "false").lower() == "true"
 
 BASE_URL = "https://panoramafirm.pl"
 
@@ -2330,6 +2371,11 @@ def main():
         log(f"PROXY ENABLED: {len(PROXY_LIST)} proxies configured")
     else:
         log("PROXY DISABLED: No proxies configured (set PROXY_LIST env variable)")
+    
+    if FORCE_IPV6:
+        log("IPv6 FORCED: Using IPv6 connections only")
+    else:
+        log("IPv4/IPv6: Using default IP version")
 
     conn = connect_db()
     categories = scrape_all_categories()
@@ -2337,6 +2383,12 @@ def main():
 
     session = requests.Session()
     session.headers.update(HEADERS)
+    
+    # Dodaj IPv6 adapter jeśli wymuszony
+    if FORCE_IPV6:
+        adapter = IPv6HTTPAdapter()
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
 
     try:
         for i, cat in enumerate(categories, 1):
