@@ -1817,6 +1817,9 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             # Fallback na stary selektor dla kompatybilności
             links = soup.select("h2 a.company-name, a.company-name")
         if not links:
+            # Debug: sprawdz czy strona w ogole ma content
+            all_links = soup.select("a")
+            log(f"    DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)}")
             break
 
         new_count = 0
