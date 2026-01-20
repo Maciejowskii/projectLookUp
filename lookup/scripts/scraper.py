@@ -45,10 +45,10 @@ MIN_RAW_DESC_FOR_DIRECT_USE = int(os.getenv("MIN_RAW_DESC_FOR_DIRECT_USE", "50")
 MIN_AI_DESC_LEN = int(os.getenv("MIN_AI_DESC_LEN", "400"))
 
 # HTTP pacing
-REQUEST_DELAY_MIN = float(os.getenv("REQUEST_DELAY_MIN", "0.6"))
-REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "1.2"))
-LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "1.0"))
-LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "2.0"))
+REQUEST_DELAY_MIN = float(os.getenv("REQUEST_DELAY_MIN", "2.0"))
+REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "4.0"))
+LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "3.0"))
+LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "6.0"))
 
 # API retry (PanoramaFirm)
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "6"))
@@ -498,53 +498,7 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/wyroby_wiklinowe_i_bambusowe",
-        "https://panoramafirm.pl/wywóz_śmieci_i_odpadów",
-        "https://panoramafirm.pl/zamki_i_kłódki",
-        "https://panoramafirm.pl/zamki_i_zabezpieczenia_antywłamaniowe",
-        "https://panoramafirm.pl/zapalniczki_i_zapałki",
-        "https://panoramafirm.pl/zasłony,_firanki_i_karnisze",
-        "https://panoramafirm.pl/zawiesia_linowe,_łańcuchowe_i_pasowe",
-        "https://panoramafirm.pl/ślusarstwo_i_dorabianie_kluczy",
-        "https://panoramafirm.pl/ślusarze",
-        "https://panoramafirm.pl/środki_ochrony_roślin",
-        "https://panoramafirm.pl/świece_i_znicze",
-        "https://panoramafirm.pl/artykuły_dziecięce",
-        "https://panoramafirm.pl/artykuły_papiernicze",
-        "https://panoramafirm.pl/artykuły_szkolne",
-        "https://panoramafirm.pl/domy_dziecka",
-        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
-        "https://panoramafirm.pl/hurtownie_i_producenci_artykułów_dziecięcych",
-        "https://panoramafirm.pl/hurtownie_zabawek",
-        "https://panoramafirm.pl/logopedzi",
-        "https://panoramafirm.pl/odzież_dziecięca",
-        "https://panoramafirm.pl/opieka_nad_dziećmi",
-        "https://panoramafirm.pl/ośrodki_adopcyjno-wychowawcze",
-        "https://panoramafirm.pl/ośrodki_szkolno-wychowawcze",
-        "https://panoramafirm.pl/ośrodki_wychowawcze",
-        "https://panoramafirm.pl/parki_rozrywki",
-        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
-        "https://panoramafirm.pl/produkcja_zabawek",
-        "https://panoramafirm.pl/projektowanie_i_montaż_placów_zabaw",
-        "https://panoramafirm.pl/przedszkola_prywatne",
-        "https://panoramafirm.pl/przedszkola_publiczne",
-        "https://panoramafirm.pl/sale_zabaw",
-        "https://panoramafirm.pl/sklepy_z_zabawkami",
-        "https://panoramafirm.pl/zabawki_edukacyjne",
-        "https://panoramafirm.pl/świetlice_środowiskowe",
-        "https://panoramafirm.pl/żłobki_prywatne",
-        "https://panoramafirm.pl/żłobki_publiczne",
-        "https://panoramafirm.pl/banki",
-        "https://panoramafirm.pl/bankomaty",
-        "https://panoramafirm.pl/biura_rachunkowe",
-        "https://panoramafirm.pl/doradztwo_finansowe_i_kredytowe",
-        "https://panoramafirm.pl/doradztwo_podatkowe",
-        "https://panoramafirm.pl/fundusze_emerytalne",
-        "https://panoramafirm.pl/fundusze_inwestycyjne",
-        "https://panoramafirm.pl/giełdy",
-        "https://panoramafirm.pl/kantory",
-        "https://panoramafirm.pl/karty_kredytowe,_płatnicze_i_programy_lojalnościowe",
-        "https://panoramafirm.pl/kredyty_i_finansowanie",
+
         "https://panoramafirm.pl/leasing",
         "https://panoramafirm.pl/maklerzy_giełdowi",
         "https://panoramafirm.pl/oddłużanie",
@@ -1758,6 +1712,53 @@ def scrape_all_categories():
         "https://panoramafirm.pl/wykończenia_wnętrz",
         "https://panoramafirm.pl/wyposażenie_kuchni",
         "https://panoramafirm.pl/wyposażenie_łazienek",
+        "https://panoramafirm.pl/wyroby_wiklinowe_i_bambusowe",
+        "https://panoramafirm.pl/wywóz_śmieci_i_odpadów",
+        "https://panoramafirm.pl/zamki_i_kłódki",
+        "https://panoramafirm.pl/zamki_i_zabezpieczenia_antywłamaniowe",
+        "https://panoramafirm.pl/zapalniczki_i_zapałki",
+        "https://panoramafirm.pl/zasłony,_firanki_i_karnisze",
+        "https://panoramafirm.pl/zawiesia_linowe,_łańcuchowe_i_pasowe",
+        "https://panoramafirm.pl/ślusarstwo_i_dorabianie_kluczy",
+        "https://panoramafirm.pl/ślusarze",
+        "https://panoramafirm.pl/środki_ochrony_roślin",
+        "https://panoramafirm.pl/świece_i_znicze",
+        "https://panoramafirm.pl/artykuły_dziecięce",
+        "https://panoramafirm.pl/artykuły_papiernicze",
+        "https://panoramafirm.pl/artykuły_szkolne",
+        "https://panoramafirm.pl/domy_dziecka",
+        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
+        "https://panoramafirm.pl/hurtownie_i_producenci_artykułów_dziecięcych",
+        "https://panoramafirm.pl/hurtownie_zabawek",
+        "https://panoramafirm.pl/logopedzi",
+        "https://panoramafirm.pl/odzież_dziecięca",
+        "https://panoramafirm.pl/opieka_nad_dziećmi",
+        "https://panoramafirm.pl/ośrodki_adopcyjno-wychowawcze",
+        "https://panoramafirm.pl/ośrodki_szkolno-wychowawcze",
+        "https://panoramafirm.pl/ośrodki_wychowawcze",
+        "https://panoramafirm.pl/parki_rozrywki",
+        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
+        "https://panoramafirm.pl/produkcja_zabawek",
+        "https://panoramafirm.pl/projektowanie_i_montaż_placów_zabaw",
+        "https://panoramafirm.pl/przedszkola_prywatne",
+        "https://panoramafirm.pl/przedszkola_publiczne",
+        "https://panoramafirm.pl/sale_zabaw",
+        "https://panoramafirm.pl/sklepy_z_zabawkami",
+        "https://panoramafirm.pl/zabawki_edukacyjne",
+        "https://panoramafirm.pl/świetlice_środowiskowe",
+        "https://panoramafirm.pl/żłobki_prywatne",
+        "https://panoramafirm.pl/żłobki_publiczne",
+        "https://panoramafirm.pl/banki",
+        "https://panoramafirm.pl/bankomaty",
+        "https://panoramafirm.pl/biura_rachunkowe",
+        "https://panoramafirm.pl/doradztwo_finansowe_i_kredytowe",
+        "https://panoramafirm.pl/doradztwo_podatkowe",
+        "https://panoramafirm.pl/fundusze_emerytalne",
+        "https://panoramafirm.pl/fundusze_inwestycyjne",
+        "https://panoramafirm.pl/giełdy",
+        "https://panoramafirm.pl/kantory",
+        "https://panoramafirm.pl/karty_kredytowe,_płatnicze_i_programy_lojalnościowe",
+        "https://panoramafirm.pl/kredyty_i_finansowanie",
     ]
 
     for url in popular:
@@ -1792,6 +1793,8 @@ def scrape_all_categories():
 def scrape_category_listing_until_end(session: requests.Session, listing_url: str):
     results = []
     seen_urls = set()
+    block_retries = 0
+    max_block_retries = 3
 
     page = 1
     while True:
@@ -1811,15 +1814,35 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Wykrywanie blokady/rate-limit (strona < 50KB = prawdopodobnie błąd/CAPTCHA)
+        if len(resp.text) < 50000:
+            html_lower = resp.text.lower()
+            is_blocked = (
+                "captcha" in html_lower or 
+                "recaptcha" in html_lower or
+                "robot" in html_lower or
+                "blocked" in html_lower or
+                "too many requests" in html_lower
+            )
+            if is_blocked or len(resp.text) < 20000:
+                block_retries += 1
+                if block_retries > max_block_retries:
+                    log(f"    BLOCKED! Max retries exceeded. Skipping category.")
+                    break
+                wait_time = 300 * block_retries  # 5, 10, 15 minut
+                log(f"    BLOCKED DETECTED! HTML size: {len(resp.text)}. Retry {block_retries}/{max_block_retries}. Sleeping {wait_time//60} minutes...")
+                time.sleep(wait_time)
+                continue  # retry same page
+        
         # Nowy selektor - PanoramaFirm zmienila strukture HTML (2025+)
         links = soup.select("a[class*='company_name']")
         if not links:
             # Fallback na stary selektor dla kompatybilności
             links = soup.select("h2 a.company-name, a.company-name")
         if not links:
-            # Debug: sprawdz czy strona w ogole ma content
             all_links = soup.select("a")
-            log(f"    DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)}")
+            log(f"    No company links. Total links: {len(all_links)}, HTML size: {len(resp.text)}")
             break
 
         new_count = 0
