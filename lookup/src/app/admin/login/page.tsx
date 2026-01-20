@@ -136,7 +136,7 @@ export default function AdminLoginPage() {
 
 				{/* Footer */}
 				<p className="text-center text-slate-600 text-xs mt-6">
-					© {new Date().getFullYear()} LookUp Admin Panel
+					© {new Date().getFullYear()} Katalogo Admin Panel
 				</p>
 			</div>
 		</div>

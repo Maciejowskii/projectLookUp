@@ -121,7 +121,7 @@ export async function submitClaimRequest(formData: FormData) {
           </div>
           <div class="footer">
             <p>To powiadomienie zostało wygenerowane automatycznie.</p>
-            <p>LookUp Admin Panel</p>
+            <p>Katalogo Admin Panel</p>
           </div>
         </div>
       </body>
@@ -132,7 +132,7 @@ export async function submitClaimRequest(formData: FormData) {
     const sendPromises = notificationEmails.map(async (recipientEmail) => {
       try {
         await resend.emails.send({
-          from: "LookUp System <onboarding@resend.dev>",
+          from: "Katalogo System <onboarding@resend.dev>",
           to: recipientEmail,
           subject: `🔥 Nowe zgłoszenie przejęcia: ${claim.company.name}`,
           html: emailHtml,
