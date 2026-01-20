@@ -1811,7 +1811,11 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        links = soup.select("h2 a.company-name, a.company-name")
+        # Nowy selektor - PanoramaFirm zmienila strukture HTML (2025+)
+        links = soup.select("a[class*='company_name']")
+        if not links:
+            # Fallback na stary selektor dla kompatybilności
+            links = soup.select("h2 a.company-name, a.company-name")
         if not links:
             break
 
@@ -1833,9 +1837,10 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
     return results
 
 
-def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
+def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
     """
-    Zwraca: (js_data, html_text) - html_text jest tylko do fallbacków.
+    Pobiera stronę firmy i zwraca dane z JSON-LD + HTML.
+    Zwraca: (parsed_data, html_text) lub (None, None) przy błędzie.
     """
     url = safe_url(company_url)
     if not url:
@@ -1848,14 +1853,125 @@ def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict 
                 return (None, None)
 
             html = resp.text
-            data = extract_company_variable(html)
-            return (data, html)
+            
+            # Najpierw próbuj stary sposób (var company =)
+            js_data = extract_company_variable(html)
+            if js_data:
+                return (parse_company_from_js_legacy(js_data, html), html)
+            
+            # Nowy sposób - JSON-LD + HTML (2025+)
+            parsed = parse_company_from_json_ld(html, company_url)
+            if parsed:
+                return (parsed, html)
+            
+            return (None, html)
         except Exception as e:
             log(f"  Company fetch error: {e}. Retrying after cooldown...")
             continue
 
 
-def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> dict:
+def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
+    """
+    Parsuje dane firmy z JSON-LD (LocalBusiness) + HTML.
+    Nowa struktura PanoramaFirm (2025+).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    data = {}
+    
+    # Szukamy JSON-LD z LocalBusiness
+    json_ld_scripts = soup.select('script[type="application/ld+json"]')
+    ld_data = None
+    
+    for script in json_ld_scripts:
+        try:
+            parsed = json.loads(script.string)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if item.get("@type") == "LocalBusiness":
+                        ld_data = item
+                        break
+            elif isinstance(parsed, dict) and parsed.get("@type") == "LocalBusiness":
+                ld_data = parsed
+            if ld_data:
+                break
+        except Exception:
+            continue
+    
+    if not ld_data:
+        return None
+    
+    # Podstawowe dane z JSON-LD
+    data["name"] = ld_data.get("name")
+    data["phone"] = ld_data.get("telephone")
+    
+    # Adres z JSON-LD
+    addr = ld_data.get("address", {})
+    data["city"] = addr.get("addressLocality")
+    data["address"] = addr.get("streetAddress")
+    data["zip"] = addr.get("postalCode")
+    
+    # Koordynaty z JSON-LD (jeśli są)
+    geo = ld_data.get("geo", {})
+    data["lat"] = geo.get("latitude")
+    data["lng"] = geo.get("longitude")
+    
+    # Province z URL (format: /wojewodztwo,,miasto,ulica/nazwa.html)
+    try:
+        url_path = source_url.split("panoramafirm.pl")[-1] if "panoramafirm.pl" in source_url else source_url
+        url_parts = url_path.strip("/").split("/")
+        if url_parts:
+            location_part = url_parts[0]  # np. "podlaskie,,białystok,ogrodowa,19"
+            loc_parts = location_part.split(",")
+            if loc_parts:
+                province_raw = loc_parts[0].replace("_", "-")
+                data["province"] = normalize_province(province_raw)
+    except Exception:
+        data["province"] = None
+    
+    # Email z HTML
+    email_link = soup.select_one('a[href^="mailto:"]')
+    if email_link:
+        email = email_link.get("href", "").replace("mailto:", "").split("?")[0]
+        data["email"] = email if "@" in email else None
+    else:
+        data["email"] = None
+    
+    # WWW z HTML (szukamy linku zewnętrznego)
+    www = None
+    for link in soup.select('a[href^="http"]'):
+        href = link.get("href", "")
+        # Pomijamy linki do PanoramaFirm, social media, itp.
+        skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin", "youtube"]
+        if not any(domain in href.lower() for domain in skip_domains):
+            www = href
+            break
+    data["website"] = normalize_website(www)
+    
+    # NIP z HTML
+    data["nip"] = extract_nip_from_profile_html(html)
+    
+    # Opis - szukamy w różnych miejscach
+    raw_desc = ""
+    desc_selectors = [
+        '[class*="description"]', '[class*="about"]', 
+        '#description', '#about', '[class*="info-text"]'
+    ]
+    for selector in desc_selectors:
+        el = soup.select_one(selector)
+        if el:
+            text = el.get_text(separator="\n", strip=True)
+            if len(text) > len(raw_desc):
+                raw_desc = text
+    data["raw_desc"] = raw_desc
+    
+    return data
+
+
+def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None) -> dict:
+    """
+    Stary parser dla struktur z var company = {...}
+    Zachowany dla kompatybilności wstecznej.
+    """
     data = {}
 
     # --- NIP (preferuj JS, fallback HTML) ---
@@ -1914,6 +2030,9 @@ def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> di
         if len(txt) >= 10:
             parts.append(txt)
     data["raw_desc"] = "\n\n".join(parts).strip()
+    
+    # Dodaj nazwę z js_data
+    data["name"] = js_data.get("name")
 
     return data
 
@@ -1986,14 +2105,12 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     category_id = get_or_create_category(conn, tenant_id, category_name)
 
-    js_data, html = fetch_company_js(session, profile_url)
-    if not js_data:
+    parsed, html = fetch_company_data(session, profile_url)
+    if not parsed:
         return False
 
-    parsed = parse_company_from_js(js_data, html_fallback=html)
-
-    # preferuj nazwę z JS (zachowuje cudzysłowy/pełną nazwę)
-    company_name = normalize_text(js_data.get("name") or listing_name)
+    # preferuj nazwę z parsowanych danych (zachowuje cudzysłowy/pełną nazwę)
+    company_name = normalize_text(parsed.get("name") or listing_name)
     if not company_name:
         company_name = listing_name
 
