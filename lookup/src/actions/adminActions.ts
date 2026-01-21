@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { checkAdminAuth, logAdminAction } from '@/lib/adminAuth'
+import { getResend } from '@/lib/resend'
 
 export async function approveClaim(claimId: string) {
 	const admin = await checkAdminAuth()
@@ -68,6 +69,77 @@ export async function approveClaim(claimId: string) {
 		companyName: claim.company?.name,
 		claimEmail: claim.email,
 	})
+
+	// Wyślij mail powitalny do użytkownika
+	if (claim.email) {
+		const resend = getResend()
+		if (resend) {
+			try {
+				const baseUrl = process.env.NEXT_PUBLIC_URL ?? 'https://www.katalogo.pl'
+				const emailHtml = `
+				<!DOCTYPE html>
+				<html>
+				<head>
+					<style>
+						body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+						.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+						.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+						.content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+						.message { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea; }
+						.button { display: inline-block; background: #667eea; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px; }
+						.footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+					</style>
+				</head>
+				<body>
+					<div class="container">
+						<div class="header">
+							<h1 style="margin: 0; font-size: 24px;">✅ Wizytówka została przejęta!</h1>
+							<p style="margin: 10px 0 0; opacity: 0.9;">Gratulujemy przejęcia profilu firmy</p>
+						</div>
+						<div class="content">
+							<div class="message">
+								<p style="margin: 0 0 15px; font-size: 16px;">Dzień dobry ${claim.fullName || claim.email},</p>
+								<p style="margin: 0 0 15px; font-size: 16px;">
+									Dziękujemy za przejęcie wizytówki firmy <strong>${claim.company?.name || 'Twojej firmy'}</strong>!
+								</p>
+								<p style="margin: 0 0 15px; font-size: 16px;">
+									Twoja wizytówka została zweryfikowana i jest teraz w pełni Twoja. Możesz teraz zarządzać profilem, odpowiadać na opinie i edytować dane firmy.
+								</p>
+								<p style="margin: 0; font-size: 16px;">
+									Jeśli chcesz zwiększyć widoczność swojej firmy w internecie i przyciągnąć więcej klientów, zapraszamy do współpracy z naszą agencją marketingową:
+								</p>
+							</div>
+							<div style="text-align: center;">
+								<a href="https://quickpick.pl/" class="button" target="_blank" rel="noopener noreferrer">
+									Poznaj QuickPick - Agencja SEO/SEM →
+								</a>
+							</div>
+						</div>
+						<div class="footer">
+							<p>To powiadomienie zostało wygenerowane automatycznie.</p>
+							<p>Katalogo - Twój Katalog Firm</p>
+						</div>
+					</div>
+				</body>
+				</html>
+			`
+
+			await resend.emails.send({
+				from: 'Katalogo <onboarding@resend.dev>',
+				to: claim.email,
+				subject: `✅ Wizytówka ${claim.company?.name || 'firmy'} została przejęta!`,
+				html: emailHtml,
+			})
+
+				console.log(`✅ Mail powitalny wysłany do: ${claim.email}`)
+			} catch (error) {
+				console.error(`❌ Błąd wysyłania maila powitalnego do ${claim.email}:`, error)
+				// Nie przerywamy procesu, jeśli mail się nie wyśle
+			}
+		} else {
+			console.warn('⚠️ Brak RESEND_API_KEY - mail powitalny nie został wysłany')
+		}
+	}
 
 	revalidatePath('/admin/zgloszenia')
 	revalidatePath(`/firma`)

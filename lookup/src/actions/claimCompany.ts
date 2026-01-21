@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getResend } from '@/lib/resend'
 
 export async function claimCompanyAction(formData: FormData) {
 	const cookieStore = await cookies()
@@ -42,7 +43,7 @@ export async function claimCompanyAction(formData: FormData) {
 	// Sprawdź legacy companyId (dla użytkowników z poprzednią strukturą)
 	const user = await prisma.user.findUnique({
 		where: { id: userId },
-		select: { companyId: true },
+		select: { companyId: true, email: true, name: true },
 	})
 
 	if (user?.companyId === company.id) {
@@ -83,6 +84,77 @@ export async function claimCompanyAction(formData: FormData) {
 			where: { id: company.id },
 			data: { isVerified: true },
 		})
+
+		// Wyślij mail powitalny do użytkownika
+		if (user?.email) {
+			const resend = getResend()
+			if (resend) {
+				try {
+					const baseUrl = process.env.NEXT_PUBLIC_URL ?? 'https://www.katalogo.pl'
+					const emailHtml = `
+					<!DOCTYPE html>
+					<html>
+					<head>
+						<style>
+							body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+							.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+							.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+							.content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+							.message { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea; }
+							.button { display: inline-block; background: #667eea; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px; }
+							.footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+						</style>
+					</head>
+					<body>
+						<div class="container">
+							<div class="header">
+								<h1 style="margin: 0; font-size: 24px;">✅ Wizytówka została przejęta!</h1>
+								<p style="margin: 10px 0 0; opacity: 0.9;">Gratulujemy przejęcia profilu firmy</p>
+							</div>
+							<div class="content">
+								<div class="message">
+									<p style="margin: 0 0 15px; font-size: 16px;">Dzień dobry ${user.name || user.email},</p>
+									<p style="margin: 0 0 15px; font-size: 16px;">
+										Dziękujemy za przejęcie wizytówki firmy <strong>${company.name}</strong>!
+									</p>
+									<p style="margin: 0 0 15px; font-size: 16px;">
+										Twoja wizytówka została zweryfikowana i jest teraz w pełni Twoja. Możesz teraz zarządzać profilem, odpowiadać na opinie i edytować dane firmy.
+									</p>
+									<p style="margin: 0; font-size: 16px;">
+										Jeśli chcesz zwiększyć widoczność swojej firmy w internecie i przyciągnąć więcej klientów, zapraszamy do współpracy z naszą agencją marketingową:
+									</p>
+								</div>
+								<div style="text-align: center;">
+									<a href="https://quickpick.pl/" class="button" target="_blank" rel="noopener noreferrer">
+										Poznaj QuickPick - Agencja SEO/SEM →
+									</a>
+								</div>
+							</div>
+							<div class="footer">
+								<p>To powiadomienie zostało wygenerowane automatycznie.</p>
+								<p>Katalogo - Twój Katalog Firm</p>
+							</div>
+						</div>
+					</body>
+					</html>
+				`
+
+				await resend.emails.send({
+					from: 'Katalogo <onboarding@resend.dev>',
+					to: user.email,
+					subject: `✅ Wizytówka ${company.name} została przejęta!`,
+					html: emailHtml,
+				})
+
+					console.log(`✅ Mail powitalny wysłany do: ${user.email}`)
+				} catch (error) {
+					console.error(`❌ Błąd wysyłania maila powitalnego do ${user.email}:`, error)
+					// Nie przerywamy procesu, jeśli mail się nie wyśle
+				}
+			} else {
+				console.warn('⚠️ Brak RESEND_API_KEY - mail powitalny nie został wysłany')
+			}
+		}
 
 		redirect(`/dashboard?companyId=${company.id}&status=claimed_successfully`)
 	}
