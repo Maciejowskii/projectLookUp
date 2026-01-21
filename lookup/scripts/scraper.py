@@ -1811,15 +1811,88 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        # Nowy selektor - PanoramaFirm zmienila strukture HTML (2025+)
-        links = soup.select("a[class*='company_name']")
+        
+        # Próbuj różne selektory - PanoramaFirm często zmienia strukturę HTML
+        links = []
+        
+        # 1. Nowy selektor (2025+) - class zawierający 'company'
+        links = soup.select("a[class*='company'], a[class*='Company']")
+        
+        # 2. Selektor z data-attribute
         if not links:
-            # Fallback na stary selektor dla kompatybilności
-            links = soup.select("h2 a.company-name, a.company-name")
+            links = soup.select("a[data-company], a[href*='/firma/'], a[href*='/company/']")
+        
+        # 3. Selektor w sekcji z wynikami
         if not links:
-            # Debug: sprawdz czy strona w ogole ma content
-            all_links = soup.select("a")
+            links = soup.select(".results a, .listing a, .companies a, .firmy a")
+        
+        # 4. Selektor z h2/h3 (nagłówki z linkami do firm)
+        if not links:
+            links = soup.select("h2 a, h3 a, .company-title a, .title a")
+        
+        # 5. Stary selektor dla kompatybilności
+        if not links:
+            links = soup.select("a.company-name, .company-name a")
+        
+        # 6. Szukaj linków które prowadzą do profili firm (zawierają /firma/ lub podobne)
+        if not links:
+            all_links = soup.select("a[href]")
+            links = [a for a in all_links if a.get("href") and (
+                "/firma/" in a.get("href", "") or 
+                "/company/" in a.get("href", "") or
+                (a.get("href", "").startswith("/") and len(a.get("href", "").split("/")) >= 3)
+            )]
+            # Filtruj linki które wyglądają jak profile firm (nie kategorie, nie strony główne)
+            links = [a for a in links if not any(
+                exclude in a.get("href", "").lower() 
+                for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:"]
+            )]
+        
+        if not links:
+            # Debug: sprawdz jakie linki są na stronie
+            all_links = soup.select("a[href]")
+            sample_links = [a.get("href", "")[:80] for a in all_links[:10]]
             log(f"    DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)}")
+            log(f"    DEBUG: Sample links: {sample_links}")
+            
+            # Sprawdź czy strona ma jakieś elementy które mogą zawierać firmy
+            possible_containers = soup.select(".result, .listing-item, .company-item, .firma, [class*='company'], [class*='firma']")
+            log(f"    DEBUG: Found {len(possible_containers)} possible company containers")
+            
+            # Sprawdź czy strona może być pusta (brak firm w kategorii) lub używa JS do ładowania
+            page_text = soup.get_text()
+            if "brak wyników" in page_text.lower() or "no results" in page_text.lower() or "nie znaleziono" in page_text.lower():
+                log(f"    INFO: Page appears to have no results message")
+                break
+            
+            # Sprawdź czy są jakieś linki które mogą być firmami (zawierają nazwy firm)
+            potential_company_links = []
+            for link in all_links[:50]:  # Sprawdź pierwsze 50 linków
+                href = link.get("href", "")
+                text = link.get_text(strip=True)
+                # Linki które mogą być firmami: mają tekst, nie są do kategorii, nie są do stron głównych
+                if (text and len(text) > 3 and 
+                    href and href.startswith("/") and 
+                    "/firmy," not in href and 
+                    "/kategoria/" not in href and
+                    "/category/" not in href):
+                    potential_company_links.append(f"{text[:40]} -> {href[:60]}")
+            
+            if potential_company_links:
+                log(f"    DEBUG: Found {len(potential_company_links)} potential company links (first 5):")
+                for pl in potential_company_links[:5]:
+                    log(f"      - {pl}")
+            
+            # Zapisz HTML do pliku debugowego (tylko pierwsza strona z problemem)
+            if page == 1:
+                debug_file = f"debug_listing_{int(time.time())}.html"
+                try:
+                    with open(debug_file, "w", encoding="utf-8") as f:
+                        f.write(resp.text)
+                    log(f"    DEBUG: Saved HTML to {debug_file} for inspection")
+                except Exception as e:
+                    log(f"    DEBUG: Could not save HTML: {e}")
+            
             break
 
         new_count = 0
