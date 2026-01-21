@@ -1834,7 +1834,20 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         if not links:
             links = soup.select("a.company-name, .company-name a")
         
-        # 6. Szukaj linków które prowadzą do profili firm (zawierają /firma/ lub podobne)
+        # 6. Szukaj w sekcjach z wynikami - różne możliwe struktury
+        if not links:
+            # Spróbuj znaleźć kontenery z wynikami
+            result_containers = soup.select("article, .card, .item, .entry, [class*='result'], [class*='item'], [class*='entry'], [class*='listing']")
+            for container in result_containers:
+                container_links = container.select("a[href]")
+                for link in container_links:
+                    href = link.get("href", "")
+                    if href and href.startswith("/") and len(href) > 5:
+                        # Sprawdź czy to może być link do firmy
+                        if not any(exclude in href.lower() for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/"]):
+                            links.append(link)
+        
+        # 7. Szukaj linków które prowadzą do profili firm (zawierają /firma/ lub podobne)
         if not links:
             all_links = soup.select("a[href]")
             links = [a for a in all_links if a.get("href") and (
@@ -1843,10 +1856,18 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 (a.get("href", "").startswith("/") and len(a.get("href", "").split("/")) >= 3)
             )]
             # Filtruj linki które wyglądają jak profile firm (nie kategorie, nie strony główne)
-            links = [a for a in links if not any(
-                exclude in a.get("href", "").lower() 
-                for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:"]
-            )]
+            # Ale zachowaj linki które mogą być firmami (mają tekst i wyglądają jak profile)
+            filtered_links = []
+            for a in links:
+                href = a.get("href", "").lower()
+                text = a.get_text(strip=True)
+                # Wyklucz znane nie-firmy
+                if any(exclude in href for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", "/page/", "/kontakt", "/o-nas"]):
+                    continue
+                # Jeśli link ma tekst (nazwę) i wygląda jak profil firmy, dodaj go
+                if text and len(text) > 2 and href.startswith("/") and len(href.split("/")) >= 3:
+                    filtered_links.append(a)
+            links = filtered_links
         
         if not links:
             # Debug: sprawdz jakie linki są na stronie
@@ -1890,6 +1911,24 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     with open(debug_file, "w", encoding="utf-8") as f:
                         f.write(resp.text)
                     log(f"    DEBUG: Saved HTML to {debug_file} for inspection")
+                    
+                    # Dodatkowe debugowanie - sprawdź strukturę HTML
+                    main_content = soup.select("main, .content, .main, #content, #main")
+                    log(f"    DEBUG: Found {len(main_content)} main/content containers")
+                    
+                    # Sprawdź czy są jakieś listy lub tabele
+                    lists = soup.select("ul, ol, .list, [class*='list']")
+                    log(f"    DEBUG: Found {len(lists)} list elements")
+                    
+                    # Sprawdź czy są jakieś divy z klasami które mogą zawierać wyniki
+                    divs_with_classes = soup.select("div[class]")
+                    unique_classes = set()
+                    for div in divs_with_classes[:100]:  # Sprawdź pierwsze 100
+                        classes = div.get("class", [])
+                        if classes:
+                            unique_classes.update(classes)
+                    log(f"    DEBUG: Found {len(unique_classes)} unique CSS classes (sample): {list(unique_classes)[:20]}")
+                    
                 except Exception as e:
                     log(f"    DEBUG: Could not save HTML: {e}")
             
