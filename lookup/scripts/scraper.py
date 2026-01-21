@@ -498,129 +498,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/drzwi_antywłamaniowe",
-        "https://panoramafirm.pl/dywany_i_wykładziny",
-        "https://panoramafirm.pl/elektroinstalatorstwo",
-        "https://panoramafirm.pl/filtry",
-        "https://panoramafirm.pl/folie_i_foliowanie",
-        "https://panoramafirm.pl/gres,_terakota_i_płytki_ceramiczne",
-        "https://panoramafirm.pl/grzejnictwo_elektryczne",
-        "https://panoramafirm.pl/hurtownie_artykułów_higienicznych",
-        "https://panoramafirm.pl/hurtownie_dywanów_i_wykładzin",
-        "https://panoramafirm.pl/hurtownie_gresu,_terakoty_i_płytek_ceramicznych",
-        "https://panoramafirm.pl/hurtownie_parkietu_i_paneli_podłogowych",
-        "https://panoramafirm.pl/hurtownie_rtv",
-        "https://panoramafirm.pl/hurtownie_sprzętu_agd",
-        "https://panoramafirm.pl/hurtownie_szkła_ozdobnego_i_kryształów",
-        "https://panoramafirm.pl/hurtownie_urządzeń_elektrycznych",
-        "https://panoramafirm.pl/hurtownie_urządzeń_sanitarnych",
-        "https://panoramafirm.pl/hurtownie_zasłon,_firanek_i_karniszy",
-        "https://panoramafirm.pl/hurtownie_żaluzji_i_rolet",
-        "https://panoramafirm.pl/hydraulicy",
-        "https://panoramafirm.pl/hydraulika_siłowa",
-        "https://panoramafirm.pl/instalacja_i_serwis_ogrzewania",
-        "https://panoramafirm.pl/instalacja_systemów_alarmowych",
-        "https://panoramafirm.pl/kominiarze",
-        "https://panoramafirm.pl/kominki",
-        "https://panoramafirm.pl/kominy",
-        "https://panoramafirm.pl/kryształy_i_szkło_ozdobne",
-        "https://panoramafirm.pl/lampy_i_oświetlenie_wnętrz",
-        "https://panoramafirm.pl/lustra",
-        "https://panoramafirm.pl/magiel",
-        "https://panoramafirm.pl/malowanie_i_tapetowanie",
-        "https://panoramafirm.pl/maszyny_dziewiarskie",
-        "https://panoramafirm.pl/materace",
-        "https://panoramafirm.pl/materiały_do_wykańczania_wnętrz",
-        "https://panoramafirm.pl/materiały_drewnopochodne",
-        "https://panoramafirm.pl/materiały_elektryczne",
-        "https://panoramafirm.pl/materiały_tapicerskie",
-        "https://panoramafirm.pl/meble",
-        "https://panoramafirm.pl/meble_biurowe",
-        "https://panoramafirm.pl/meble_kuchenne",
-        "https://panoramafirm.pl/meble_metalowe",
-        "https://panoramafirm.pl/meble_na_zamówienie",
-        "https://panoramafirm.pl/meble_ogrodowe",
-        "https://panoramafirm.pl/meble_specjalistyczne",
-        "https://panoramafirm.pl/montaż_i_produkcja_basenów_i_fontann",
-        "https://panoramafirm.pl/montaż_i_sprzedaż_żaluzji_i_rolet",
-        "https://panoramafirm.pl/napełnianie_butli_gazowych",
-        "https://panoramafirm.pl/nośniki_danych_i_płyty_cd_i_dvd",
-        "https://panoramafirm.pl/obrusy",
-        "https://panoramafirm.pl/oczyszczanie_ścieków",
-        "https://panoramafirm.pl/odkurzacze_centralne",
-        "https://panoramafirm.pl/ogrodnictwo",
-        "https://panoramafirm.pl/ogrzewanie_elektryczne",
-        "https://panoramafirm.pl/okleiny",
-        "https://panoramafirm.pl/okna",
-        "https://panoramafirm.pl/okna_dachowe",
-        "https://panoramafirm.pl/okna_drewniane",
-        "https://panoramafirm.pl/oświetlenie",
-        "https://panoramafirm.pl/ozdoby_świąteczne",
-        "https://panoramafirm.pl/panele_i_podłogi",
-        "https://panoramafirm.pl/parapety",
-        "https://panoramafirm.pl/parkiet_i_panele_podłogowe",
-        "https://panoramafirm.pl/pomoc_domowa",
-        "https://panoramafirm.pl/porcelana_i_fajans",
-        "https://panoramafirm.pl/poręcze_i_balustrady",
-        "https://panoramafirm.pl/posadzki_przemysłowe",
-        "https://panoramafirm.pl/producenci_domów_drewnianych",
-        "https://panoramafirm.pl/produkcja_artykułów_higienicznych",
-        "https://panoramafirm.pl/produkcja_i_hurtownie_narzędzi",
-        "https://panoramafirm.pl/produkcja_i_montaż_domofonów",
-        "https://panoramafirm.pl/produkcja_kryształów_i_szkła_ozdobnego",
-        "https://panoramafirm.pl/produkcja_parkietu_i_paneli_podłogowych",
-        "https://panoramafirm.pl/produkcja_roślin_i_nasion",
-        "https://panoramafirm.pl/produkcja_sprzętu_agd",
-        "https://panoramafirm.pl/produkcja_sprzętu_rtv",
-        "https://panoramafirm.pl/produkcja_systemów_alarmowych",
-        "https://panoramafirm.pl/produkcja_urządzeń_elektronicznych",
-        "https://panoramafirm.pl/produkcja_urządzeń_elektrycznych",
-        "https://panoramafirm.pl/produkcja_urządzeń_sanitarnych",
-        "https://panoramafirm.pl/produkcja_zasłon,_firanek_i_karniszy",
-        "https://panoramafirm.pl/produkcja_żaluzji_i_rolet",
-        "https://panoramafirm.pl/ramy_i_oprawy_obrazów",
-        "https://panoramafirm.pl/renowacja_mebli",
-        "https://panoramafirm.pl/renowacje_i_remonty",
-        "https://panoramafirm.pl/ręczniki,_koce_i_pościel",
-        "https://panoramafirm.pl/rośliny_sztuczne",
-        "https://panoramafirm.pl/rośliny,_nasiona_i_cebulki",
-        "https://panoramafirm.pl/schody",
-        "https://panoramafirm.pl/serwis_rtv",
-        "https://panoramafirm.pl/serwis_sprzętu_agd",
-        "https://panoramafirm.pl/serwis_urządzeń_elektrycznych",
-        "https://panoramafirm.pl/sklepy_ze_sprzętem_agd",
-        "https://panoramafirm.pl/sklepy_ze_sprzętem_rtv",
-        "https://panoramafirm.pl/sprzątanie_wnętrz_i_mycie_okien",
-        "https://panoramafirm.pl/sprzęt_do_malowania_i_tapetowania",
-        "https://panoramafirm.pl/sprzęt_i_materiały_hydrauliczne",
-        "https://panoramafirm.pl/sprzęt_i_zabezpieczenia_przeciwpożarowe",
-        "https://panoramafirm.pl/stolarze",
-        "https://panoramafirm.pl/studnie",
-        "https://panoramafirm.pl/sufity_podwieszane",
-        "https://panoramafirm.pl/systemy_audiowizualne",
-        "https://panoramafirm.pl/systemy_dźwiękowe_i_audio",
-        "https://panoramafirm.pl/systemy_zabudowy_wnętrz",
-        "https://panoramafirm.pl/szklarze",
-        "https://panoramafirm.pl/tapety",
-        "https://panoramafirm.pl/telewizja_kablowa",
-        "https://panoramafirm.pl/telewizja_satelitarna",
-        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
-        "https://panoramafirm.pl/układanie_wykładzin_podłogowych",
-        "https://panoramafirm.pl/urządzenia_elektroniczne",
-        "https://panoramafirm.pl/urządzenia_elektryczne",
-        "https://panoramafirm.pl/urządzenia_grzewcze",
-        "https://panoramafirm.pl/urządzenia_sanitarne",
-        "https://panoramafirm.pl/usługi_gazownicze",
-        "https://panoramafirm.pl/usługi_kamieniarskie",
-        "https://panoramafirm.pl/usługi_posadzkarskie",
-        "https://panoramafirm.pl/usługi_tapicerskie",
-        "https://panoramafirm.pl/uszczelki_i_uszczelnienia",
-        "https://panoramafirm.pl/witraże",
-        "https://panoramafirm.pl/wodociągi_i_kanalizacja",
-        "https://panoramafirm.pl/wycieraczki_i_maty",
-        "https://panoramafirm.pl/wykończenia_wnętrz",
-        "https://panoramafirm.pl/wyposażenie_kuchni",
-        "https://panoramafirm.pl/wyposażenie_łazienek",
         "https://panoramafirm.pl/wyroby_wiklinowe_i_bambusowe",
         "https://panoramafirm.pl/wywóz_śmieci_i_odpadów",
         "https://panoramafirm.pl/zamki_i_kłódki",
@@ -1796,6 +1673,91 @@ def scrape_all_categories():
         "https://panoramafirm.pl/materiały_tapicerskie",
         "https://panoramafirm.pl/meble",
         "https://panoramafirm.pl/meble_biurowe",
+        "https://panoramafirm.pl/meble_kuchenne",
+        "https://panoramafirm.pl/meble_metalowe",
+        "https://panoramafirm.pl/meble_na_zamówienie",
+        "https://panoramafirm.pl/meble_ogrodowe",
+        "https://panoramafirm.pl/meble_specjalistyczne",
+        "https://panoramafirm.pl/montaż_i_produkcja_basenów_i_fontann",
+        "https://panoramafirm.pl/montaż_i_sprzedaż_żaluzji_i_rolet",
+        "https://panoramafirm.pl/napełnianie_butli_gazowych",
+        "https://panoramafirm.pl/nośniki_danych_i_płyty_cd_i_dvd",
+        "https://panoramafirm.pl/obrusy",
+        "https://panoramafirm.pl/oczyszczanie_ścieków",
+        "https://panoramafirm.pl/odkurzacze_centralne",
+        "https://panoramafirm.pl/ogrodnictwo",
+        "https://panoramafirm.pl/ogrzewanie_elektryczne",
+        "https://panoramafirm.pl/okleiny",
+        "https://panoramafirm.pl/okna",
+        "https://panoramafirm.pl/okna_dachowe",
+        "https://panoramafirm.pl/okna_drewniane",
+        "https://panoramafirm.pl/oświetlenie",
+        "https://panoramafirm.pl/ozdoby_świąteczne",
+        "https://panoramafirm.pl/panele_i_podłogi",
+        "https://panoramafirm.pl/parapety",
+        "https://panoramafirm.pl/parkiet_i_panele_podłogowe",
+        "https://panoramafirm.pl/pomoc_domowa",
+        "https://panoramafirm.pl/porcelana_i_fajans",
+        "https://panoramafirm.pl/poręcze_i_balustrady",
+        "https://panoramafirm.pl/posadzki_przemysłowe",
+        "https://panoramafirm.pl/producenci_domów_drewnianych",
+        "https://panoramafirm.pl/produkcja_artykułów_higienicznych",
+        "https://panoramafirm.pl/produkcja_i_hurtownie_narzędzi",
+        "https://panoramafirm.pl/produkcja_i_montaż_domofonów",
+        "https://panoramafirm.pl/produkcja_kryształów_i_szkła_ozdobnego",
+        "https://panoramafirm.pl/produkcja_parkietu_i_paneli_podłogowych",
+        "https://panoramafirm.pl/produkcja_roślin_i_nasion",
+        "https://panoramafirm.pl/produkcja_sprzętu_agd",
+        "https://panoramafirm.pl/produkcja_sprzętu_rtv",
+        "https://panoramafirm.pl/produkcja_systemów_alarmowych",
+        "https://panoramafirm.pl/produkcja_urządzeń_elektronicznych",
+        "https://panoramafirm.pl/produkcja_urządzeń_elektrycznych",
+        "https://panoramafirm.pl/produkcja_urządzeń_sanitarnych",
+        "https://panoramafirm.pl/produkcja_zasłon,_firanek_i_karniszy",
+        "https://panoramafirm.pl/produkcja_żaluzji_i_rolet",
+        "https://panoramafirm.pl/ramy_i_oprawy_obrazów",
+        "https://panoramafirm.pl/renowacja_mebli",
+        "https://panoramafirm.pl/renowacje_i_remonty",
+        "https://panoramafirm.pl/ręczniki,_koce_i_pościel",
+        "https://panoramafirm.pl/rośliny_sztuczne",
+        "https://panoramafirm.pl/rośliny,_nasiona_i_cebulki",
+        "https://panoramafirm.pl/schody",
+        "https://panoramafirm.pl/serwis_rtv",
+        "https://panoramafirm.pl/serwis_sprzętu_agd",
+        "https://panoramafirm.pl/serwis_urządzeń_elektrycznych",
+        "https://panoramafirm.pl/sklepy_ze_sprzętem_agd",
+        "https://panoramafirm.pl/sklepy_ze_sprzętem_rtv",
+        "https://panoramafirm.pl/sprzątanie_wnętrz_i_mycie_okien",
+        "https://panoramafirm.pl/sprzęt_do_malowania_i_tapetowania",
+        "https://panoramafirm.pl/sprzęt_i_materiały_hydrauliczne",
+        "https://panoramafirm.pl/sprzęt_i_zabezpieczenia_przeciwpożarowe",
+        "https://panoramafirm.pl/stolarze",
+        "https://panoramafirm.pl/studnie",
+        "https://panoramafirm.pl/sufity_podwieszane",
+        "https://panoramafirm.pl/systemy_audiowizualne",
+        "https://panoramafirm.pl/systemy_dźwiękowe_i_audio",
+        "https://panoramafirm.pl/systemy_zabudowy_wnętrz",
+        "https://panoramafirm.pl/szklarze",
+        "https://panoramafirm.pl/tapety",
+        "https://panoramafirm.pl/telewizja_kablowa",
+        "https://panoramafirm.pl/telewizja_satelitarna",
+        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
+        "https://panoramafirm.pl/układanie_wykładzin_podłogowych",
+        "https://panoramafirm.pl/urządzenia_elektroniczne",
+        "https://panoramafirm.pl/urządzenia_elektryczne",
+        "https://panoramafirm.pl/urządzenia_grzewcze",
+        "https://panoramafirm.pl/urządzenia_sanitarne",
+        "https://panoramafirm.pl/usługi_gazownicze",
+        "https://panoramafirm.pl/usługi_kamieniarskie",
+        "https://panoramafirm.pl/usługi_posadzkarskie",
+        "https://panoramafirm.pl/usługi_tapicerskie",
+        "https://panoramafirm.pl/uszczelki_i_uszczelnienia",
+        "https://panoramafirm.pl/witraże",
+        "https://panoramafirm.pl/wodociągi_i_kanalizacja",
+        "https://panoramafirm.pl/wycieraczki_i_maty",
+        "https://panoramafirm.pl/wykończenia_wnętrz",
+        "https://panoramafirm.pl/wyposażenie_kuchni",
+        "https://panoramafirm.pl/wyposażenie_łazienek",
     ]
 
     for url in popular:
@@ -1849,8 +1811,15 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        links = soup.select("h2 a.company-name, a.company-name")
+        # Nowy selektor - PanoramaFirm zmienila strukture HTML (2025+)
+        links = soup.select("a[class*='company_name']")
         if not links:
+            # Fallback na stary selektor dla kompatybilności
+            links = soup.select("h2 a.company-name, a.company-name")
+        if not links:
+            # Debug: sprawdz czy strona w ogole ma content
+            all_links = soup.select("a")
+            log(f"    DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)}")
             break
 
         new_count = 0
@@ -1871,9 +1840,10 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
     return results
 
 
-def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
+def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
     """
-    Zwraca: (js_data, html_text) - html_text jest tylko do fallbacków.
+    Pobiera stronę firmy i zwraca dane z JSON-LD + HTML.
+    Zwraca: (parsed_data, html_text) lub (None, None) przy błędzie.
     """
     url = safe_url(company_url)
     if not url:
@@ -1886,14 +1856,125 @@ def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict 
                 return (None, None)
 
             html = resp.text
-            data = extract_company_variable(html)
-            return (data, html)
+
+            # Najpierw próbuj stary sposób (var company =)
+            js_data = extract_company_variable(html)
+            if js_data:
+                return (parse_company_from_js_legacy(js_data, html), html)
+
+            # Nowy sposób - JSON-LD + HTML (2025+)
+            parsed = parse_company_from_json_ld(html, company_url)
+            if parsed:
+                return (parsed, html)
+
+            return (None, html)
         except Exception as e:
             log(f"  Company fetch error: {e}. Retrying after cooldown...")
             continue
 
 
-def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> dict:
+def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
+    """
+    Parsuje dane firmy z JSON-LD (LocalBusiness) + HTML.
+    Nowa struktura PanoramaFirm (2025+).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    data = {}
+
+    # Szukamy JSON-LD z LocalBusiness
+    json_ld_scripts = soup.select('script[type="application/ld+json"]')
+    ld_data = None
+
+    for script in json_ld_scripts:
+        try:
+            parsed = json.loads(script.string)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if item.get("@type") == "LocalBusiness":
+                        ld_data = item
+                        break
+            elif isinstance(parsed, dict) and parsed.get("@type") == "LocalBusiness":
+                ld_data = parsed
+            if ld_data:
+                break
+        except Exception:
+            continue
+
+    if not ld_data:
+        return None
+
+    # Podstawowe dane z JSON-LD
+    data["name"] = ld_data.get("name")
+    data["phone"] = ld_data.get("telephone")
+
+    # Adres z JSON-LD
+    addr = ld_data.get("address", {})
+    data["city"] = addr.get("addressLocality")
+    data["address"] = addr.get("streetAddress")
+    data["zip"] = addr.get("postalCode")
+
+    # Koordynaty z JSON-LD (jeśli są)
+    geo = ld_data.get("geo", {})
+    data["lat"] = geo.get("latitude")
+    data["lng"] = geo.get("longitude")
+
+    # Province z URL (format: /wojewodztwo,,miasto,ulica/nazwa.html)
+    try:
+        url_path = source_url.split("panoramafirm.pl")[-1] if "panoramafirm.pl" in source_url else source_url
+        url_parts = url_path.strip("/").split("/")
+        if url_parts:
+            location_part = url_parts[0]  # np. "podlaskie,,białystok,ogrodowa,19"
+            loc_parts = location_part.split(",")
+            if loc_parts:
+                province_raw = loc_parts[0].replace("_", "-")
+                data["province"] = normalize_province(province_raw)
+    except Exception:
+        data["province"] = None
+
+    # Email z HTML
+    email_link = soup.select_one('a[href^="mailto:"]')
+    if email_link:
+        email = email_link.get("href", "").replace("mailto:", "").split("?")[0]
+        data["email"] = email if "@" in email else None
+    else:
+        data["email"] = None
+
+    # WWW z HTML (szukamy linku zewnętrznego)
+    www = None
+    for link in soup.select('a[href^="http"]'):
+        href = link.get("href", "")
+        # Pomijamy linki do PanoramaFirm, social media, itp.
+        skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin", "youtube"]
+        if not any(domain in href.lower() for domain in skip_domains):
+            www = href
+            break
+    data["website"] = normalize_website(www)
+
+    # NIP z HTML
+    data["nip"] = extract_nip_from_profile_html(html)
+
+    # Opis - szukamy w różnych miejscach
+    raw_desc = ""
+    desc_selectors = [
+        '[class*="description"]', '[class*="about"]', 
+        '#description', '#about', '[class*="info-text"]'
+    ]
+    for selector in desc_selectors:
+        el = soup.select_one(selector)
+        if el:
+            text = el.get_text(separator="\n", strip=True)
+            if len(text) > len(raw_desc):
+                raw_desc = text
+    data["raw_desc"] = raw_desc
+
+    return data
+
+
+def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None) -> dict:
+    """
+    Stary parser dla struktur z var company = {...}
+    Zachowany dla kompatybilności wstecznej.
+    """
     data = {}
 
     # --- NIP (preferuj JS, fallback HTML) ---
@@ -1952,6 +2033,9 @@ def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> di
         if len(txt) >= 10:
             parts.append(txt)
     data["raw_desc"] = "\n\n".join(parts).strip()
+
+    # Dodaj nazwę z js_data
+    data["name"] = js_data.get("name")
 
     return data
 
@@ -2024,14 +2108,12 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     category_id = get_or_create_category(conn, tenant_id, category_name)
 
-    js_data, html = fetch_company_js(session, profile_url)
-    if not js_data:
+    parsed, html = fetch_company_data(session, profile_url)
+    if not parsed:
         return False
 
-    parsed = parse_company_from_js(js_data, html_fallback=html)
-
-    # preferuj nazwę z JS (zachowuje cudzysłowy/pełną nazwę)
-    company_name = normalize_text(js_data.get("name") or listing_name)
+    # preferuj nazwę z parsowanych danych (zachowuje cudzysłowy/pełną nazwę)
+    company_name = normalize_text(parsed.get("name") or listing_name)
     if not company_name:
         company_name = listing_name
 
@@ -2135,3 +2217,4 @@ def main():
 
 
 if __name__ == "__main__":
+    main()
