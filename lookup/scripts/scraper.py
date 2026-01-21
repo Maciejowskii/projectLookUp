@@ -1844,9 +1844,23 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         
         # 2. Selektor z data-attribute
         if not links:
-            links = soup.select("a[data-company], a[href*='/firma/'], a[href*='/company/']")
-            if links:
-                log(f"  DEBUG: Found {len(links)} links via selector 2 (data-company, /firma/, /company/)")
+            raw_links = soup.select("a[data-company], a[href*='/firma/'], a[href*='/company/']")
+            # Filtruj - wyklucz LinkedIn i inne zewnętrzne domeny
+            links = []
+            for link in raw_links:
+                href = link.get("href", "")
+                # Wyklucz LinkedIn i inne zewnętrzne domeny
+                if "linkedin.com" in href.lower() or "facebook.com" in href.lower() or "twitter.com" in href.lower():
+                    continue
+                # Akceptuj tylko linki do panoramafirm.pl lub relatywne linki
+                if href.startswith("/") or "panoramafirm.pl" in href.lower():
+                    # Sprawdź czy to faktycznie link do firmy (zawiera /firma/ lub podobne)
+                    if "/firma/" in href.lower() or (href.startswith("/") and len(href.split("/")) >= 3):
+                        links.append(link)
+            if raw_links and not links:
+                log(f"  DEBUG: Found {len(raw_links)} links via selector 2, but all were filtered out (external links)")
+            elif links:
+                log(f"  DEBUG: Found {len(links)} links via selector 2 (after filtering external links)")
         
         # 3. Selektor w sekcji z wynikami
         if not links:
@@ -1922,8 +1936,10 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 # 3. LUB są linkami zewnętrznymi do panoramafirm.pl z nazwą firmy
                 is_company_link = False
                 
-                if "/firma/" in href_lower or "/company/" in href_lower:
-                    is_company_link = True
+                if "/firma/" in href_lower:
+                    # Upewnij się że to nie jest LinkedIn lub inna zewnętrzna domena
+                    if "linkedin.com" not in href_lower and "facebook.com" not in href_lower and "twitter.com" not in href_lower:
+                        is_company_link = True
                 elif href.startswith("/") and len(href.split("/")) >= 3:
                     # Link relatywny z 3+ segmentami (np. /miasto/firma/nazwa)
                     if text and len(text) > 2:
