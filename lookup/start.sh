@@ -9,6 +9,7 @@ npx prisma migrate resolve --applied 20260111011940_add_premium_until 2>/dev/nul
 npx prisma migrate resolve --applied 20260114213634_add_userid_to_claim_request 2>/dev/null || true
 npx prisma migrate resolve --applied 20260114215643_add_company_user_many_to_many 2>/dev/null || true
 npx prisma migrate resolve --applied 20260114222417_add_oauth_support 2>/dev/null || true
+npx prisma migrate resolve --applied 20250115000000_add_description_and_source_to_leads 2>/dev/null || true
 
 # 2. Aplikuj oczekujące migracje (jeśli są jakieś nowe)
 echo "Applying pending migrations..."
@@ -82,6 +83,17 @@ CREATE INDEX IF NOT EXISTS "Account_userId_idx" ON "Account"("userId");
 CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
 CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
 CREATE INDEX IF NOT EXISTS "Session_userId_idx" ON "Session"("userId");
+
+-- Dodaj kolumny description i source do Lead (bezpieczne - tylko jeśli nie istnieją)
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Lead' AND column_name='description') THEN
+        ALTER TABLE "Lead" ADD COLUMN "description" TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Lead' AND column_name='source') THEN
+        ALTER TABLE "Lead" ADD COLUMN "source" TEXT;
+    END IF;
+END \$\$;
 EOF
 
 echo "Database schema synchronized!"

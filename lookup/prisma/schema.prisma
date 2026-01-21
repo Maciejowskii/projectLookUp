@@ -100,6 +100,8 @@ model Lead {
   contactName String
   phone       String
   email       String
+  description String? @db.Text // Opis/zapytanie od użytkownika
+  source      String? // Źródło: "PHONE_REVEAL", "REGISTRATION", "LOGIN", "CONTACT_FORM"
   status      String @default("NEW")
 
   createdAt DateTime @default(now())

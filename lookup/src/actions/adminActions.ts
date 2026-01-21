@@ -316,3 +316,144 @@ export async function setCompanyPremium(companyId: string, isPremium: boolean) {
 
 	revalidatePath('/admin/companies')
 }
+
+// --- IMPORT CSV ---
+
+export async function importLeadsCSV(formData: FormData) {
+	const admin = await checkAdminAuth()
+
+	const file = formData.get('file') as File
+	if (!file) {
+		return { success: false, message: 'Nie wybrano pliku' }
+	}
+
+	try {
+		const text = await file.text()
+		const lines = text.split('\n').filter(line => line.trim())
+		
+		if (lines.length < 2) {
+			return { success: false, message: 'Plik CSV jest pusty lub zawiera tylko nagłówek' }
+		}
+
+		// Pomijamy nagłówek (pierwsza linia)
+		const dataLines = lines.slice(1)
+		let imported = 0
+		let errors = 0
+
+		// Pobierz wszystkie firmy do mapowania nazw na ID
+		const companies = await prisma.company.findMany({
+			select: { id: true, name: true, slug: true },
+		})
+		const companyMap = new Map<string, string>()
+		companies.forEach(c => {
+			companyMap.set(c.name.toLowerCase(), c.id)
+			companyMap.set(c.slug.toLowerCase(), c.id)
+		})
+
+		for (const line of dataLines) {
+			try {
+				// Parsuj CSV (obsługa cudzysłowów)
+				const values: string[] = []
+				let current = ''
+				let inQuotes = false
+
+				for (let i = 0; i < line.length; i++) {
+					const char = line[i]
+					if (char === '"') {
+						if (inQuotes && line[i + 1] === '"') {
+							current += '"'
+							i++
+						} else {
+							inQuotes = !inQuotes
+						}
+					} else if (char === ',' && !inQuotes) {
+						values.push(current.trim())
+						current = ''
+					} else {
+						current += char
+					}
+				}
+				values.push(current.trim())
+
+				// Format: Data, Imię/Nazwa, Email, Telefon, Firma (nazwa lub ID), Opis, Źródło, Status
+				if (values.length < 4) continue // Minimum: Data, Imię, Email, Telefon
+
+				const [dateStr, contactName, email, phone, companyNameOrId, description, source, status] = values
+
+				if (!contactName || !email || !phone) continue // Wymagane pola
+
+				// Znajdź companyId
+				let companyId: string | null = null
+				if (companyNameOrId) {
+					// Spróbuj znaleźć po ID
+					const companyById = companies.find(c => c.id === companyNameOrId)
+					if (companyById) {
+						companyId = companyById.id
+					} else {
+						// Spróbuj znaleźć po nazwie
+						const companyByName = companyMap.get(companyNameOrId.toLowerCase())
+						if (companyByName) {
+							companyId = companyByName
+						}
+					}
+				}
+
+				// Jeśli nie znaleziono firmy, pomiń ten lead (lub utwórz bez firmy - ale to wymaga zmiany schematu)
+				if (!companyId) {
+					errors++
+					continue
+				}
+
+				// Parsuj datę
+				let createdAt = new Date()
+				if (dateStr) {
+					const parsedDate = new Date(dateStr)
+					if (!isNaN(parsedDate.getTime())) {
+						createdAt = parsedDate
+					}
+				}
+
+				// Utwórz lead
+				await prisma.lead.create({
+					data: {
+						companyId,
+						contactName: contactName || 'Nie podano',
+						email: email || 'brak@email.pl',
+						phone: phone || 'Nie podano',
+						description: description || null,
+						source: source || 'CSV_IMPORT',
+						status: status || 'NEW',
+						createdAt,
+					},
+				})
+
+				imported++
+			} catch (error) {
+				console.error('Błąd parsowania linii CSV:', error)
+				errors++
+			}
+		}
+
+		// Audit log
+		await logAdminAction(admin.id, 'IMPORT_LEADS_CSV', undefined, {
+			imported,
+			errors,
+			fileName: file.name,
+		})
+
+		revalidatePath('/admin/leads')
+
+		return {
+			success: true,
+			message: `Import zakończony pomyślnie`,
+			imported,
+			errors,
+		}
+	} catch (error: any) {
+		console.error('Błąd importu CSV:', error)
+		return {
+			success: false,
+			message: `Błąd podczas importu: ${error.message || 'Nieznany błąd'}`,
+		}
+	}
+}

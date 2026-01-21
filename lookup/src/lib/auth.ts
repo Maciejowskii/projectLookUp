@@ -100,6 +100,14 @@ const authOptions = {
 						maxAge: 60 * 60 * 24 * 7,
 						path: '/',
 					})
+
+					// Track new user registration through OAuth
+					if (isNewUser && user?.email) {
+						const { trackUserRegistration } = await import('@/actions/trackLead')
+						trackUserRegistration(user.id, user.email, user.name).catch(err =>
+							console.error('Błąd zapisu leada rejestracji OAuth:', err)
+						)
+					}
 				}
 			} catch (error) {
 				// Silently fail if cookies() is not available (e.g., during initialization)

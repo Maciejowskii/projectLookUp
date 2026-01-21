@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
-import { Mail, Phone, ArrowRight } from 'lucide-react'
+import { Mail, Phone, ArrowRight, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
+import { LeadsImportForm } from '@/components/admin/LeadsImportForm'
+import { LeadsCharts } from '@/components/admin/LeadsCharts'
 
 export default async function LeadsPage() {
 	const leads = await prisma.lead.findMany({
 		orderBy: { createdAt: 'desc' },
 		include: { company: true },
-		take: 100,
 	})
 
 	return (
@@ -17,10 +18,25 @@ export default async function LeadsPage() {
 					<h1 className='text-2xl font-bold text-gray-900 tracking-tight'>Leady Użytkowników</h1>
 					<p className='text-sm text-gray-500'>Osoby, które próbowały skontaktować się z firmami przez Twój portal.</p>
 				</div>
-				<div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100'>
-					Total: {leads.length}
+				<div className='flex items-center gap-3'>
+					<div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100'>
+						Total: {leads.length}
+					</div>
+					<a
+						href='/admin/leads/export'
+						className='flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm'
+					>
+						<FileSpreadsheet size={16} />
+						Eksportuj CSV
+					</a>
 				</div>
 			</div>
+
+			{/* Import CSV */}
+			<LeadsImportForm />
+
+			{/* Wykresy i statystyki */}
+			{leads.length > 0 && <LeadsCharts leads={leads} />}
 
 			<div className='bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden'>
 				<table className='w-full text-left text-sm'>
@@ -29,6 +45,7 @@ export default async function LeadsPage() {
 							<th className='px-6 py-4 font-semibold'>Klient (Kontakt)</th>
 							<th className='px-6 py-4 font-semibold'>Szczegóły kontaktu</th>
 							<th className='px-6 py-4 font-semibold'>Zainteresowany firmą</th>
+							<th className='px-6 py-4 font-semibold'>Opis/Źródło</th>
 							<th className='px-6 py-4 font-semibold'>Data</th>
 						</tr>
 					</thead>
@@ -66,6 +83,25 @@ export default async function LeadsPage() {
 										<span className='text-red-400 italic'>Firma usunięta</span>
 									)}
 								</td>
+								<td className='px-6 py-4 max-w-xs'>
+									<div className='flex flex-col gap-1'>
+										{lead.description && (
+											<p className='text-xs text-gray-600 italic line-clamp-2' title={lead.description}>
+												{lead.description}
+											</p>
+										)}
+										{lead.source && (
+											<span className='text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium w-fit'>
+												{lead.source === 'PHONE_REVEAL' && 'Kliknięcie telefonu'}
+												{lead.source === 'PHONE_REVEAL_LOGGED_IN' && 'Kliknięcie (zalogowany)'}
+												{lead.source === 'REGISTRATION' && 'Rejestracja'}
+												{lead.source === 'LOGIN' && 'Logowanie'}
+												{lead.source === 'CONTACT_FORM' && 'Formularz kontaktowy'}
+												{!['PHONE_REVEAL', 'PHONE_REVEAL_LOGGED_IN', 'REGISTRATION', 'LOGIN', 'CONTACT_FORM'].includes(lead.source) && lead.source}
+											</span>
+										)}
+									</div>
+								</td>
 								<td className='px-6 py-4 text-gray-400 text-xs'>
 									{new Date(lead.createdAt).toLocaleDateString('pl-PL', {
 										day: 'numeric',
@@ -80,7 +116,7 @@ export default async function LeadsPage() {
 
 						{leads.length === 0 && (
 							<tr>
-								<td colSpan={4} className='py-12 text-center text-gray-400'>
+								<td colSpan={5} className='py-12 text-center text-gray-400'>
 									Jeszcze nikt nie skontaktował się z żadną firmą.
 								</td>
 							</tr>

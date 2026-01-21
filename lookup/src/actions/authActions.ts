@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
+import { trackUserRegistration } from './trackLead'
 
 // --- 0. REJESTRACJA ---
 export async function registerAction(formData: FormData) {
@@ -51,6 +52,11 @@ export async function registerAction(formData: FormData) {
 			maxAge: 60 * 60 * 24 * 7,
 			path: '/',
 		})
+
+		// Zapisz lead rejestracji (w tle, nie blokuje procesu)
+		trackUserRegistration(user.id, email).catch(err => 
+			console.error('Błąd zapisu leada rejestracji:', err)
+		)
 
 		if (returnTo) {
 			redirect(returnTo)
@@ -143,6 +149,9 @@ export async function loginAction(formData: FormData) {
 			maxAge: 60 * 60 * 24 * 7,
 			path: '/',
 		})
+
+		// Opcjonalnie: można dodać tracking logowania (nie dodajemy, aby nie zaśmiecać bazy)
+		// trackUserLogin(user.id).catch(err => console.error('Błąd zapisu leada logowania:', err))
 
 		if (returnTo) {
 			redirect(returnTo)
