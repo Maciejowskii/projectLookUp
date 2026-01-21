@@ -1808,9 +1808,23 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             continue
 
         if resp.status_code != 200:
+            log(f"  Status code: {resp.status_code}, skipping...")
+            break
+
+        # Sprawdź czy to nie jest redirect lub pusta strona
+        if len(resp.text) < 1000:
+            log(f"  Page seems too short ({len(resp.text)} bytes), might be empty or redirect")
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Sprawdź czy strona nie jest przekierowaniem lub błędem
+        page_title = soup.find("title")
+        if page_title:
+            title_text = page_title.get_text().lower()
+            if any(keyword in title_text for keyword in ["404", "not found", "błąd", "error", "przekierowanie"]):
+                log(f"  Page appears to be error/redirect page: {title_text[:50]}")
+                break
         
         # Próbuj różne selektory - PanoramaFirm często zmienia strukturę HTML
         links = []
@@ -1837,7 +1851,7 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         # 6. Szukaj w sekcjach z wynikami - różne możliwe struktury
         if not links:
             # Spróbuj znaleźć kontenery z wynikami
-            result_containers = soup.select("article, .card, .item, .entry, [class*='result'], [class*='item'], [class*='entry'], [class*='listing']")
+            result_containers = soup.select("article, .card, .item, .entry, [class*='result'], [class*='item'], [class*='entry'], [class*='listing'], [class*='company'], [class*='firma'], [class*='business']")
             for container in result_containers:
                 container_links = container.select("a[href]")
                 for link in container_links:
@@ -1847,34 +1861,77 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                         if not any(exclude in href.lower() for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/"]):
                             links.append(link)
         
-        # 7. Szukaj linków które prowadzą do profili firm (zawierają /firma/ lub podobne)
+        # 6b. Szukaj w tabelach (może być tabela z wynikami)
+        if not links:
+            tables = soup.select("table")
+            for table in tables:
+                table_links = table.select("a[href]")
+                for link in table_links:
+                    href = link.get("href", "")
+                    text = link.get_text(strip=True)
+                    if href and text and len(text) > 3 and href.startswith("/"):
+                        if not any(exclude in href.lower() for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:"]):
+                            links.append(link)
+        
+        # 7. Agresywne szukanie - wszystkie linki które mogą być firmami
         if not links:
             all_links = soup.select("a[href]")
-            links = [a for a in all_links if a.get("href") and (
-                "/firma/" in a.get("href", "") or 
-                "/company/" in a.get("href", "") or
-                (a.get("href", "").startswith("/") and len(a.get("href", "").split("/")) >= 3)
-            )]
-            # Filtruj linki które wyglądają jak profile firm (nie kategorie, nie strony główne)
-            # Ale zachowaj linki które mogą być firmami (mają tekst i wyglądają jak profile)
             filtered_links = []
-            for a in links:
-                href = a.get("href", "").lower()
-                text = a.get_text(strip=True)
-                # Wyklucz znane nie-firmy
-                if any(exclude in href for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", "/page/", "/kontakt", "/o-nas"]):
+            
+            for a in all_links:
+                href = a.get("href", "")
+                if not href:
                     continue
-                # Jeśli link ma tekst (nazwę) i wygląda jak profil firmy, dodaj go
-                if text and len(text) > 2 and href.startswith("/") and len(href.split("/")) >= 3:
+                    
+                href_lower = href.lower()
+                text = a.get_text(strip=True)
+                
+                # Wyklucz znane nie-firmy
+                exclude_patterns = [
+                    "/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,",
+                    ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", 
+                    "/page/", "/kontakt", "/o-nas", "/regulamin", "/polityka", "/cookies",
+                    "/szukaj", "/dodaj", "/login", "/rejestracja", "/admin", "/api/",
+                    "/biuro", "/pomoc", "/cennik", "/dla-firm"
+                ]
+                
+                if any(exclude in href_lower for exclude in exclude_patterns):
+                    continue
+                
+                # Akceptuj linki które:
+                # 1. Zawierają /firma/ lub /company/
+                # 2. LUB są relatywne (/...), mają tekst i wyglądają jak profile (3+ segmenty w URL)
+                # 3. LUB są linkami zewnętrznymi do panoramafirm.pl z nazwą firmy
+                is_company_link = False
+                
+                if "/firma/" in href_lower or "/company/" in href_lower:
+                    is_company_link = True
+                elif href.startswith("/") and len(href.split("/")) >= 3:
+                    # Link relatywny z 3+ segmentami (np. /miasto/firma/nazwa)
+                    if text and len(text) > 2:
+                        is_company_link = True
+                elif "panoramafirm.pl" in href_lower and text and len(text) > 3:
+                    # Link zewnętrzny do PanoramaFirm z tekstem
+                    if "/firma/" in href_lower or "/company/" in href_lower:
+                        is_company_link = True
+                
+                if is_company_link:
                     filtered_links.append(a)
+            
             links = filtered_links
         
         if not links:
             # Debug: sprawdz jakie linki są na stronie
             all_links = soup.select("a[href]")
-            sample_links = [a.get("href", "")[:80] for a in all_links[:10]]
+            sample_links = [a.get("href", "")[:80] for a in all_links[:15]]
             log(f"    DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)}")
-            log(f"    DEBUG: Sample links: {sample_links}")
+            log(f"    DEBUG: Sample links (first 15): {sample_links}")
+            
+            # Sprawdź czy może być problem z JavaScript (sprawdź czy są skrypty które ładują treść)
+            scripts = soup.select("script")
+            js_loaders = [s for s in scripts if s.string and ("fetch" in s.string or "ajax" in s.string or "load" in s.string.lower())]
+            if js_loaders:
+                log(f"    WARNING: Found {len(js_loaders)} scripts that might load content via JavaScript - page might need JS to render")
             
             # Sprawdź czy strona ma jakieś elementy które mogą zawierać firmy
             possible_containers = soup.select(".result, .listing-item, .company-item, .firma, [class*='company'], [class*='firma']")
