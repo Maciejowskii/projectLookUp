@@ -189,11 +189,20 @@ export async function generateReviewsForCompanies() {
 
   console.log(`📊 Znaleziono ${allCompanies.length} firm\n`)
 
-  // Wybierz 80% firm losowo
-  const companiesToReview = allCompanies.sort(() => Math.random() - 0.5).slice(
+  // Wybierz 80% firm losowo (lub maksymalnie tyle ile w MAX_COMPANIES_FOR_REVIEWS)
+  const maxCompaniesEnv = process.env.MAX_COMPANIES_FOR_REVIEWS
+  const maxCompanies = maxCompaniesEnv ? parseInt(maxCompaniesEnv, 10) : undefined
+  
+  let companiesToReview = allCompanies.sort(() => Math.random() - 0.5).slice(
     0, 
     Math.floor(allCompanies.length * 0.8)
   )
+  
+  // Jeśli jest limit, zastosuj go
+  if (maxCompanies && companiesToReview.length > maxCompanies) {
+    companiesToReview = companiesToReview.slice(0, maxCompanies)
+    console.log(`⚠️  Limit MAX_COMPANIES_FOR_REVIEWS: ${maxCompanies}, przetworzę tylko tyle firm\n`)
+  }
 
   console.log(`🎲 Wybrano ${companiesToReview.length} firm do dodania opinii (80%)\n`)
 

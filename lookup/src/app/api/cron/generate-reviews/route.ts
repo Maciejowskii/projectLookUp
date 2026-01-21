@@ -20,7 +20,6 @@ export async function GET(request: Request) {
     const result = await generateReviewsForCompanies()
 
     return NextResponse.json({
-      success: true,
       message: 'Generowanie opinii zakończone',
       ...result
     })
