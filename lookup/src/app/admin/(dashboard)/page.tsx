@@ -38,6 +38,9 @@ async function getStats() {
 		leadsPrev30Days,
 		// Dane do wykresów - ostatnie 6 miesięcy
 		monthlyData,
+		// Dane do wykresów leadów
+		leadsBySource,
+		leadsDailyData,
 		// Ostatnie aktywności
 		recentLeads,
 		recentClaims,
@@ -62,6 +65,10 @@ async function getStats() {
 		}),
 		// Dane miesięczne (ostatnie 6 miesięcy)
 		getMonthlyGrowthData(),
+		// Dane do wykresu leadów według źródła
+		getLeadsBySource(),
+		// Dane do wykresu leadów w czasie (ostatnie 30 dni)
+		getLeadsDailyData(),
 		// Ostatnie aktywności
 		prisma.lead.findMany({
 			take: 5,
@@ -100,6 +107,8 @@ async function getStats() {
 		leadsChange,
 		conversionRate,
 		monthlyData,
+		leadsBySource,
+		leadsDailyData,
 		recentLeads,
 		recentClaims,
 		recentReviews,
@@ -136,6 +145,68 @@ async function getMonthlyGrowthData() {
 	}
 
 	return months
+}
+
+// Dane leadów według źródła
+async function getLeadsBySource() {
+	// Pobierz wszystkie leady i pogrupuj ręcznie (source może być nullable)
+	const allLeads = await prisma.lead.findMany({})
+
+	// Grupuj ręcznie
+	const sourceCounts: Record<string, number> = {}
+	for (const lead of allLeads) {
+		// Używamy any ponieważ Prisma Client może nie mieć zaktualizowanych typów
+		const source = (lead as any).source || 'UNKNOWN'
+		sourceCounts[source] = (sourceCounts[source] || 0) + 1
+	}
+
+	const sourceLabels: Record<string, string> = {
+		PHONE_REVEAL: 'Kliknięcie telefonu',
+		PHONE_REVEAL_LOGGED_IN: 'Kliknięcie (zalogowany)',
+		REGISTRATION: 'Rejestracja',
+		LOGIN: 'Logowanie',
+		CONTACT_FORM: 'Formularz kontaktowy',
+		CSV_IMPORT: 'Import CSV',
+		UNKNOWN: 'Nieznane',
+	}
+
+	return Object.entries(sourceCounts).map(([source, count]) => ({
+		name: sourceLabels[source] || source,
+		value: count,
+		source: source,
+	}))
+}
+
+// Dane leadów dziennie (ostatnie 30 dni)
+async function getLeadsDailyData() {
+	const days = []
+	const now = new Date()
+
+	for (let i = 29; i >= 0; i--) {
+		const date = new Date(now)
+		date.setDate(date.getDate() - i)
+		date.setHours(0, 0, 0, 0)
+
+		const nextDay = new Date(date)
+		nextDay.setDate(nextDay.getDate() + 1)
+
+		const count = await prisma.lead.count({
+			where: {
+				createdAt: {
+					gte: date,
+					lt: nextDay,
+				},
+			},
+		})
+
+		days.push({
+			name: date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
+			leady: count,
+			fullDate: date.toISOString(),
+		})
+	}
+
+	return days
 }
 
 export default async function AdminDashboard() {
@@ -203,6 +274,8 @@ export default async function AdminDashboard() {
 							{ name: 'Premium', value: stats.premiumCompanies },
 						]}
 						conversionRate={stats.conversionRate}
+						leadsBySource={stats.leadsBySource}
+						leadsDailyData={stats.leadsDailyData}
 					/>
 				</div>
 

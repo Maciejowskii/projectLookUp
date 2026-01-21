@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
-import { Mail, Phone, ArrowRight, FileSpreadsheet } from 'lucide-react'
+import { Mail, Phone, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { LeadsImportForm } from '@/components/admin/LeadsImportForm'
 import { LeadsCharts } from '@/components/admin/LeadsCharts'
+import { LeadsExportForm } from '@/components/admin/LeadsExportForm'
 
 export default async function LeadsPage() {
 	const leads = await prisma.lead.findMany({
@@ -18,22 +19,16 @@ export default async function LeadsPage() {
 					<h1 className='text-2xl font-bold text-gray-900 tracking-tight'>Leady Użytkowników</h1>
 					<p className='text-sm text-gray-500'>Osoby, które próbowały skontaktować się z firmami przez Twój portal.</p>
 				</div>
-				<div className='flex items-center gap-3'>
-					<div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100'>
-						Total: {leads.length}
-					</div>
-					<a
-						href='/admin/leads/export'
-						className='flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm'
-					>
-						<FileSpreadsheet size={16} />
-						Eksportuj CSV
-					</a>
+				<div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100'>
+					Total: {leads.length}
 				</div>
 			</div>
 
-			{/* Import CSV */}
-			<LeadsImportForm />
+			{/* Eksport i Import */}
+			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+				<LeadsExportForm />
+				<LeadsImportForm />
+			</div>
 
 			{/* Wykresy i statystyki */}
 			{leads.length > 0 && <LeadsCharts leads={leads} />}

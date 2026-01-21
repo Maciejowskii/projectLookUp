@@ -38,8 +38,13 @@ const navItems = [
 		section: 'Monetyzacja',
 		items: [
 			{ href: '/admin/zgloszenia', icon: ShieldCheck, label: 'Przejęcia (Claims)', badge: true },
-			{ href: '/admin/leads', icon: Users, label: 'Leady Użytkowników' },
 			{ href: '/admin/blog', icon: PenTool, label: 'Blog & AI' },
+		],
+	},
+	{
+		section: 'Leady i Kontakty',
+		items: [
+			{ href: '/admin/leads', icon: Users, label: 'Leady Użytkowników' },
 		],
 	},
 	{
