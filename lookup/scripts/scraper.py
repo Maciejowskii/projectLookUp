@@ -22,37 +22,117 @@ load_dotenv()
 
 
 # =========================
+# FREE PROXY FETCHER
+# =========================
+class FreeProxyFetcher:
+    """Pobiera i testuje darmowe proxy z publicznych źródeł"""
+    
+    PROXY_SOURCES = [
+        "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
+        "https://www.proxy-list.download/api/v1/get?type=http",
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
+        "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
+    ]
+    
+    def __init__(self):
+        self.working_proxies = []
+        self.test_url = "http://httpbin.org/ip"
+    
+    def fetch_proxies(self) -> list[str]:
+        """Pobiera listę proxy ze wszystkich źródeł"""
+        all_proxies = set()
+        
+        log("Fetching free proxies from public sources...")
+        for source in self.PROXY_SOURCES:
+            try:
+                resp = requests.get(source, timeout=10)
+                if resp.status_code == 200:
+                    # Parsuj proxy (format: IP:PORT)
+                    proxies = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}', resp.text)
+                    all_proxies.update(proxies)
+                    log(f"  Found {len(proxies)} proxies from {source[:50]}...")
+            except Exception as e:
+                log(f"  Failed to fetch from {source[:50]}: {e}")
+        
+        log(f"Total unique proxies collected: {len(all_proxies)}")
+        return list(all_proxies)
+    
+    def test_proxy(self, proxy: str, timeout: int = 5) -> bool:
+        """Testuje czy proxy działa"""
+        try:
+            proxy_dict = {
+                "http": f"http://{proxy}",
+                "https": f"http://{proxy}",
+            }
+            resp = requests.get(self.test_url, proxies=proxy_dict, timeout=timeout)
+            return resp.status_code == 200
+        except:
+            return False
+    
+    def get_working_proxies(self, max_proxies: int = 20, test_batch: int = 50) -> list[str]:
+        """Pobiera i testuje proxy, zwraca działające"""
+        if self.working_proxies:
+            return self.working_proxies
+        
+        all_proxies = self.fetch_proxies()
+        if not all_proxies:
+            log("WARNING: No proxies found! Using direct connection.")
+            return []
+        
+        # Tasuj i testuj tylko część (żeby nie czekać godzinami)
+        random.shuffle(all_proxies)
+        test_proxies = all_proxies[:test_batch]
+        
+        log(f"Testing {len(test_proxies)} proxies (timeout 5s each)...")
+        working = []
+        
+        for i, proxy in enumerate(test_proxies, 1):
+            if len(working) >= max_proxies:
+                break
+            
+            if self.test_proxy(proxy):
+                proxy_url = f"http://{proxy}"
+                working.append(proxy_url)
+                log(f"  ✓ Working proxy {len(working)}/{max_proxies}: {proxy}")
+            
+            # Pokazuj progress co 10 prób
+            if i % 10 == 0:
+                log(f"  Progress: {i}/{len(test_proxies)} tested, {len(working)} working")
+        
+        self.working_proxies = working
+        log(f"Found {len(working)} working proxies!")
+        
+        if not working:
+            log("WARNING: No working proxies found! Scraper will use direct connection.")
+        
+        return working
+
+
+# =========================
 # IPv6 SUPPORT
 # =========================
 class IPv6HTTPAdapter(HTTPAdapter):
     """Adapter wymuszający użycie IPv6"""
     def init_poolmanager(self, *args, **kwargs):
-        # Override create_connection żeby używać IPv6
         import urllib3.util.connection as urllib3_connection
         original_create_connection = urllib3_connection.create_connection
         
         def create_connection_ipv6(address, *args, **kwargs):
             host, port = address
-            # Wymuś IPv6 - najpierw spróbuj IPv6
             try:
-                # Resolve DNS na IPv6
                 addrinfo = socket.getaddrinfo(host, port, socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP)
                 if addrinfo:
-                    # Użyj pierwszego IPv6 adresu
                     family, socktype, proto, canonname, sockaddr = addrinfo[0]
                     sock = socket.socket(family, socktype, proto)
                     sock.connect(sockaddr)
                     return sock
             except (socket.gaierror, OSError, socket.error) as e:
-                # Jeśli IPv6 nie działa, fallback na IPv4
                 log(f"IPv6 connection failed for {host}, falling back to IPv4: {e}")
                 return original_create_connection(address, *args, **kwargs)
-            # Fallback na oryginalną funkcję
             return original_create_connection(address, *args, **kwargs)
         
-        # Monkey-patch urllib3
         urllib3_connection.create_connection = create_connection_ipv6
-        
         return super().init_poolmanager(*args, **kwargs)
 
 
@@ -62,14 +142,13 @@ class IPv6HTTPAdapter(HTTPAdapter):
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano").strip()
 
-SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN / TEST
+SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()
 REQUIRE_AI = os.getenv("REQUIRE_AI", "true").lower() == "true"
 
-# AI rewrite tylko w MAIN
 USE_AI_REWRITE = (SCRAPER_MODE == "MAIN")
 
 SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "TRUE"
-MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "0"))  # 0 = bez limitu
+MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "0"))
 
 # AI
 MAX_AI_REQUESTS = int(os.getenv("MAX_AI_REQUESTS", "5000"))
@@ -88,7 +167,7 @@ REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "4.0"))
 LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "3.0"))
 LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "6.0"))
 
-# API retry (PanoramaFirm)
+# API retry
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "6"))
 HTTP_BACKOFF_INITIAL = float(os.getenv("HTTP_BACKOFF_INITIAL", "1.0"))
 HTTP_BACKOFF_MAX = float(os.getenv("HTTP_BACKOFF_MAX", "30"))
@@ -100,18 +179,20 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 
-# Proxy - format: http://user:pass@host:port lub http://host:port
-# Można podać wiele proxy oddzielonych przecinkiem: proxy1,proxy2,proxy3
-PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
-PROXY_LIST = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
-PROXY_ENABLED = len(PROXY_LIST) > 0
+# FREE PROXY CONFIG - NOWE!
+USE_FREE_PROXY = os.getenv("USE_FREE_PROXY", "true").lower() == "true"
+MAX_FREE_PROXIES = int(os.getenv("MAX_FREE_PROXIES", "20"))  # Ile proxy pobrać
+PROXY_TEST_BATCH = int(os.getenv("PROXY_TEST_BATCH", "50"))  # Ile proxy przetestować
 
-# IPv6 - wymuś użycie IPv6 zamiast IPv4
+# Fallback na ręczne proxy (jeśli ktoś chce)
+PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
+PROXY_LIST_MANUAL = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
+
+# IPv6
 FORCE_IPV6 = os.getenv("FORCE_IPV6", "false").lower() == "true"
 
 BASE_URL = "https://panoramafirm.pl"
 
-# Lista User-Agents do rotacji (pomaga unikać blokad)
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -146,26 +227,46 @@ DEFAULT_TENANT_SUBDOMAIN = "katalog"
 ai_usage_counter = 0
 total_inserted = 0
 client = None
+proxy_fetcher = None
 
 
 # =========================
-# PROXY MANAGER
+# PROXY MANAGER - ZMODYFIKOWANY
 # =========================
 class ProxyManager:
-    def __init__(self, proxy_list: list[str]):
-        self.proxies = proxy_list.copy() if proxy_list else []
+    def __init__(self, proxy_list: list[str], auto_fetch: bool = False):
+        if auto_fetch:
+            # Pobierz darmowe proxy automatycznie
+            global proxy_fetcher
+            if proxy_fetcher is None:
+                proxy_fetcher = FreeProxyFetcher()
+            free_proxies = proxy_fetcher.get_working_proxies(
+                max_proxies=MAX_FREE_PROXIES,
+                test_batch=PROXY_TEST_BATCH
+            )
+            self.proxies = free_proxies + proxy_list
+        else:
+            self.proxies = proxy_list.copy() if proxy_list else []
+        
         self.current_index = 0
         self.failed_proxies = set()
+        self.use_count = {}  # Licznik użyć dla każdego proxy
+        self.rotation_interval = 5  # Co ile requestów rotować proxy
     
     def get_proxy(self) -> dict | None:
         if not self.proxies:
             return None
         
-        # Znajdź działające proxy
         attempts = 0
         while attempts < len(self.proxies):
             proxy_url = self.proxies[self.current_index]
             if proxy_url not in self.failed_proxies:
+                # Auto-rotacja co N użyć
+                self.use_count[proxy_url] = self.use_count.get(proxy_url, 0) + 1
+                if self.use_count[proxy_url] >= self.rotation_interval:
+                    self.use_count[proxy_url] = 0
+                    self.rotate()
+                
                 return {
                     "http": proxy_url,
                     "https": proxy_url,
@@ -173,10 +274,21 @@ class ProxyManager:
             self.current_index = (self.current_index + 1) % len(self.proxies)
             attempts += 1
         
-        # Wszystkie proxy zawiodły - reset i spróbuj ponownie
-        log("All proxies failed, resetting...")
+        # Reset i refresh proxy
+        log("All proxies failed, refreshing proxy list...")
         self.failed_proxies.clear()
-        return self.get_proxy() if self.proxies else None
+        self.use_count.clear()
+        
+        # Spróbuj pobrać nowe proxy
+        if proxy_fetcher:
+            proxy_fetcher.working_proxies = []  # Reset cache
+            new_proxies = proxy_fetcher.get_working_proxies(max_proxies=10, test_batch=30)
+            if new_proxies:
+                self.proxies = new_proxies
+                self.current_index = 0
+                return self.get_proxy()
+        
+        return None
     
     def rotate(self):
         """Przejdź do następnego proxy"""
@@ -188,6 +300,8 @@ class ProxyManager:
         """Oznacz proxy jako niedziałające"""
         self.failed_proxies.add(proxy_url)
         log(f"Proxy marked as failed: {proxy_url[:30]}...")
+        # Natychmiast rotuj po błędzie
+        self.rotate()
     
     def get_current_proxy_url(self) -> str | None:
         if not self.proxies:
@@ -195,7 +309,14 @@ class ProxyManager:
         return self.proxies[self.current_index]
 
 
-proxy_manager = ProxyManager(PROXY_LIST)
+# Inicjalizacja proxy managera
+if USE_FREE_PROXY:
+    log("Initializing FREE PROXY mode...")
+    proxy_manager = ProxyManager(PROXY_LIST_MANUAL, auto_fetch=True)
+    PROXY_ENABLED = len(proxy_manager.proxies) > 0
+else:
+    proxy_manager = ProxyManager(PROXY_LIST_MANUAL, auto_fetch=False)
+    PROXY_ENABLED = len(PROXY_LIST_MANUAL) > 0
 
 
 def log(msg: str):
@@ -218,13 +339,11 @@ def connect_db():
 
 
 def normalize_text(s: str) -> str:
-    s = (s or "").strip()  # tylko białe znaki
+    s = (s or "").strip()
     if re.search(r"%[0-9A-Fa-f]{2}", s):
         s = unquote(s)
 
-    # ujednolicaj, ale nie usuwaj cudzysłowów
-    s = s.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
-
+    s = s.replace(""", '"').replace(""", '"').replace("„", '"').replace("'", "'")
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -257,12 +376,12 @@ def normalize_province(raw: str | None) -> str | None:
         return None
     s = raw.strip().lower()
     s = s.replace("–", "-").replace("—", "-")
-    s = re.sub(r"\s+", "-", s)  # np. "kujawsko pomorskie"
+    s = re.sub(r"\s+", "-", s)
     return s if s in CANONICAL_VOIVODESHIPS else None
 
 
 # =========================
-# REQUESTS (retry + backoff)
+# REQUESTS (retry + backoff) - BEZ ZMIAN W LOGICE
 # =========================
 def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20) -> requests.Response:
     delay = HTTP_BACKOFF_INITIAL
@@ -272,10 +391,8 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
 
     for attempt in range(1, HTTP_MAX_RETRIES + 1):
         try:
-            # Rotuj User-Agent przy każdym request
             session.headers["User-Agent"] = random.choice(USER_AGENTS)
             
-            # Użyj proxy jeśli dostępne (ale tylko jeśli poprzednie nie zawiodło)
             proxies = None
             if PROXY_ENABLED and not proxy_failed:
                 proxies = proxy_manager.get_proxy()
@@ -284,7 +401,6 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
             resp = session.get(url, timeout=timeout, proxies=proxies)
 
             if resp.status_code in (429, 500, 502, 503, 504):
-                # Rotuj proxy przy błędzie HTTP
                 if PROXY_ENABLED and proxies:
                     proxy_manager.rotate()
                 raise RuntimeError(f"HTTP {resp.status_code}")
@@ -292,15 +408,12 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
             return resp
 
         except requests.exceptions.ProxyError as e:
-            # Błąd proxy - rotuj i spróbuj następnego
             if PROXY_ENABLED and current_proxy_url:
                 proxy_manager.mark_failed(current_proxy_url)
-                proxy_manager.rotate()
                 log(f"Proxy failed, rotating... ({current_proxy_url[:30]}...)")
-                time.sleep(2)  # Krótka pauza przed retry z nowym proxy
+                time.sleep(2)
                 continue
             else:
-                # Wszystkie proxy zawiodły - użyj bezpośredniego połączenia
                 proxy_failed = True
                 log("All proxies failed, falling back to direct connection")
                 time.sleep(2)
@@ -309,11 +422,9 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
         except Exception as e:
             last_exc = e
             error_str = str(e)
-            # Jeśli to błąd proxy, rotuj
             if PROXY_ENABLED and ("proxy" in error_str.lower() or "tunnel" in error_str.lower()):
                 if current_proxy_url:
                     proxy_manager.mark_failed(current_proxy_url)
-                    proxy_manager.rotate()
                     log(f"Proxy error detected, rotating...")
                     time.sleep(2)
                     continue
@@ -333,7 +444,7 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
 
 
 # =========================
-# HELPERS
+# HELPERS - BEZ ZMIAN
 # =========================
 def slugify(text: str) -> str:
     if not text:
@@ -433,9 +544,6 @@ def extract_company_variable(html_content: str) -> dict | None:
     return None
 
 
-# =========================
-# FALLBACK: NIP z HTML (#contact)
-# =========================
 def extract_nip_from_profile_html(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     contact = soup.select_one("#contact")
@@ -459,7 +567,7 @@ def extract_nip_from_profile_html(html: str) -> str | None:
 
 
 # =========================
-# TENANT / CATEGORY
+# TENANT / CATEGORY - BEZ ZMIAN
 # =========================
 def get_tenant_id_by_category(conn, category_name: str):
     cat_lower = (category_name or "").lower()
@@ -511,9 +619,6 @@ def get_or_create_category(conn, tenant_id: str, name: str):
     return cat_id
 
 
-# =========================
-# DEDUPE (sourceUrl)
-# =========================
 def company_exists_by_source_url(conn, source_url: str) -> bool:
     cur = conn.cursor()
     cur.execute('SELECT 1 FROM "Company" WHERE "sourceUrl" = %s LIMIT 1', (source_url,))
@@ -539,13 +644,9 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 
 
 # =========================
-# OPENAI (strict-ish)
+# OPENAI - BEZ ZMIAN
 # =========================
 def ensure_openai_available_forever():
-    """
-    Jeśli REQUIRE_AI=true, to bez klucza albo przy problemach z inicjalizacją
-    nie kończymy procesu - śpimy i próbujemy ponownie co godzinę.
-    """
     global client
 
     while True:
@@ -584,8 +685,8 @@ JĘZYK I FORMA:
 - Zwróć WYŁĄCZNIE gotowy opis jako PLAIN TEXT.
 - Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (podwójny enter).
 - Bez list punktowanych i numerowanych.
-- Bez nagłówków typu „O firmie” i bez emoji.
-- Nie kończ CTA typu „zapraszamy do kontaktu”.
+- Bez nagłówków typu „O firmie" i bez emoji.
+- Nie kończ CTA typu „zapraszamy do kontaktu".
 
 DŁUGOŚĆ:
 - 900–1400 znaków (ze spacjami).
@@ -640,13 +741,12 @@ Wygeneruj wyłącznie opis.
 
 
 # =========================
-# SCRAPING
+# SCRAPING - BEZ ZMIAN W LOGICE
 # =========================
 def scrape_all_categories():
     categories = []
 
     popular = [
-
         "https://panoramafirm.pl/leasing",
         "https://panoramafirm.pl/maklerzy_giełdowi",
         "https://panoramafirm.pl/oddłużanie",
@@ -1926,7 +2026,6 @@ def scrape_all_categories():
         except Exception as e:
             log(f"Błąd pobierania kategorii: {e}")
 
-    # dedupe bez zmiany kolejności
     seen = set()
     unique = []
     for cat in categories:
@@ -1963,7 +2062,6 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
 
         soup = BeautifulSoup(resp.text, "html.parser")
         
-        # Wykrywanie blokady/rate-limit (strona < 50KB = prawdopodobnie błąd/CAPTCHA)
         if len(resp.text) < 50000:
             html_lower = resp.text.lower()
             is_blocked = (
@@ -1976,25 +2074,22 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             if is_blocked or len(resp.text) < 20000:
                 block_retries += 1
                 
-                # Rotuj proxy przy blokadzie
                 if PROXY_ENABLED:
                     proxy_manager.rotate()
                     log(f"    BLOCKED! Rotated to new proxy. Retry {block_retries}/{max_block_retries}...")
-                    time.sleep(5)  # Krótka pauza przed retry z nowym proxy
+                    time.sleep(5)
                     continue
                 
                 if block_retries > max_block_retries:
                     log(f"    BLOCKED! Max retries exceeded. Skipping category.")
                     break
-                wait_time = 300 * block_retries  # 5, 10, 15 minut
+                wait_time = 300 * block_retries
                 log(f"    BLOCKED DETECTED! HTML size: {len(resp.text)}. Retry {block_retries}/{max_block_retries}. Sleeping {wait_time//60} minutes...")
                 time.sleep(wait_time)
-                continue  # retry same page
+                continue
         
-        # Nowy selektor - PanoramaFirm zmienila strukture HTML (2025+)
         links = soup.select("a[class*='company_name']")
         if not links:
-            # Fallback na stary selektor dla kompatybilności
             links = soup.select("h2 a.company-name, a.company-name")
         if not links:
             all_links = soup.select("a")
@@ -2020,10 +2115,6 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
 
 
 def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
-    """
-    Pobiera stronę firmy i zwraca dane z JSON-LD + HTML.
-    Zwraca: (parsed_data, html_text) lub (None, None) przy błędzie.
-    """
     url = safe_url(company_url)
     if not url:
         return (None, None)
@@ -2036,12 +2127,10 @@ def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dic
 
             html = resp.text
             
-            # Najpierw próbuj stary sposób (var company =)
             js_data = extract_company_variable(html)
             if js_data:
                 return (parse_company_from_js_legacy(js_data, html), html)
             
-            # Nowy sposób - JSON-LD + HTML (2025+)
             parsed = parse_company_from_json_ld(html, company_url)
             if parsed:
                 return (parsed, html)
@@ -2053,14 +2142,9 @@ def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dic
 
 
 def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
-    """
-    Parsuje dane firmy z JSON-LD (LocalBusiness) + HTML.
-    Nowa struktura PanoramaFirm (2025+).
-    """
     soup = BeautifulSoup(html, "html.parser")
     data = {}
     
-    # Szukamy JSON-LD z LocalBusiness
     json_ld_scripts = soup.select('script[type="application/ld+json"]')
     ld_data = None
     
@@ -2082,27 +2166,23 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     if not ld_data:
         return None
     
-    # Podstawowe dane z JSON-LD
     data["name"] = ld_data.get("name")
     data["phone"] = ld_data.get("telephone")
     
-    # Adres z JSON-LD
     addr = ld_data.get("address", {})
     data["city"] = addr.get("addressLocality")
     data["address"] = addr.get("streetAddress")
     data["zip"] = addr.get("postalCode")
     
-    # Koordynaty z JSON-LD (jeśli są)
     geo = ld_data.get("geo", {})
     data["lat"] = geo.get("latitude")
     data["lng"] = geo.get("longitude")
     
-    # Province z URL (format: /wojewodztwo,,miasto,ulica/nazwa.html)
     try:
         url_path = source_url.split("panoramafirm.pl")[-1] if "panoramafirm.pl" in source_url else source_url
         url_parts = url_path.strip("/").split("/")
         if url_parts:
-            location_part = url_parts[0]  # np. "podlaskie,,białystok,ogrodowa,19"
+            location_part = url_parts[0]
             loc_parts = location_part.split(",")
             if loc_parts:
                 province_raw = loc_parts[0].replace("_", "-")
@@ -2110,7 +2190,6 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     except Exception:
         data["province"] = None
     
-    # Email z HTML
     email_link = soup.select_one('a[href^="mailto:"]')
     if email_link:
         email = email_link.get("href", "").replace("mailto:", "").split("?")[0]
@@ -2118,21 +2197,17 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     else:
         data["email"] = None
     
-    # WWW z HTML (szukamy linku zewnętrznego)
     www = None
     for link in soup.select('a[href^="http"]'):
         href = link.get("href", "")
-        # Pomijamy linki do PanoramaFirm, social media, itp.
         skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin", "youtube"]
         if not any(domain in href.lower() for domain in skip_domains):
             www = href
             break
     data["website"] = normalize_website(www)
     
-    # NIP z HTML
     data["nip"] = extract_nip_from_profile_html(html)
     
-    # Opis - szukamy w różnych miejscach
     raw_desc = ""
     desc_selectors = [
         '[class*="description"]', '[class*="about"]', 
@@ -2150,13 +2225,8 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
 
 
 def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None) -> dict:
-    """
-    Stary parser dla struktur z var company = {...}
-    Zachowany dla kompatybilności wstecznej.
-    """
     data = {}
 
-    # --- NIP (preferuj JS, fallback HTML) ---
     nip = js_data.get("nip")
     nip_digits = None
     if isinstance(nip, str):
@@ -2169,7 +2239,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
 
     data["nip"] = nip_digits
 
-    # --- Contact (może być null) ---
     contact = js_data.get("contact") or {}
     data["email"] = contact.get("email")
     data["website"] = normalize_website(contact.get("www"))
@@ -2180,7 +2249,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
     else:
         data["phone"] = phone
 
-    # --- Location ---
     loc = js_data.get("location") or {}
 
     city = loc.get("city")
@@ -2205,7 +2273,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
         data["lat"] = coords.get("lat")
         data["lng"] = coords.get("lon")
 
-    # --- opis surowy (jak było) ---
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
         txt = clean_html_text(js_data.get(field)).strip()
@@ -2213,19 +2280,12 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
             parts.append(txt)
     data["raw_desc"] = "\n\n".join(parts).strip()
     
-    # Dodaj nazwę z js_data
     data["name"] = js_data.get("name")
 
     return data
 
 
-# =========================
-# INSERT (DO NOTHING) + sourceUrl
-# =========================
 def insert_company_do_nothing(conn, payload: dict) -> bool:
-    """
-    True jeśli wstawiono, False jeśli konflikt (np. sourceUrl już istnieje).
-    """
     cur = conn.cursor()
     sql = """
     INSERT INTO "Company"
@@ -2266,9 +2326,6 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
     return row is not None
 
 
-# =========================
-# PIPELINE
-# =========================
 def process_company(conn, session: requests.Session, listing_item: dict, category_name: str) -> bool:
     global total_inserted
 
@@ -2280,7 +2337,6 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     if not profile_url:
         return False
 
-    # EARLY SKIP
     if company_exists_by_source_url(conn, profile_url):
         return False
 
@@ -2291,7 +2347,6 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     if not parsed:
         return False
 
-    # preferuj nazwę z parsowanych danych (zachowuje cudzysłowy/pełną nazwę)
     company_name = normalize_text(parsed.get("name") or listing_name)
     if not company_name:
         company_name = listing_name
@@ -2304,7 +2359,6 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
 
     slug = get_unique_slug(conn, tenant_id, company_name)
 
-    # opis
     description = None
     if USE_AI_REWRITE:
         if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
@@ -2330,7 +2384,6 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
                 log(f"AI strict mode: waiting and retrying. Reason: {e}")
                 continue
     else:
-        # bez AI: wrzuć surowy opis jeśli jest, inaczej NULL
         description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
 
     payload = {
@@ -2368,9 +2421,9 @@ def main():
         f"MAX_PAGES_PER_CATEGORY={MAX_PAGES_PER_CATEGORY} | AI_MODEL={OPENAI_MODEL}"
     )
     if PROXY_ENABLED:
-        log(f"PROXY ENABLED: {len(PROXY_LIST)} proxies configured")
+        log(f"FREE PROXY ENABLED: {len(proxy_manager.proxies)} proxies available")
     else:
-        log("PROXY DISABLED: No proxies configured (set PROXY_LIST env variable)")
+        log("PROXY DISABLED: Using direct connection (set USE_FREE_PROXY=true to enable)")
     
     if FORCE_IPV6:
         log("IPv6 FORCED: Using IPv6 connections only")
@@ -2384,7 +2437,6 @@ def main():
     session = requests.Session()
     session.headers.update(HEADERS)
     
-    # Dodaj IPv6 adapter jeśli wymuszony
     if FORCE_IPV6:
         adapter = IPv6HTTPAdapter()
         session.mount("http://", adapter)
