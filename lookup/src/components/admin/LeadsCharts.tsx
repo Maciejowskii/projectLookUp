@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
 	BarChart,
 	Bar,
@@ -52,7 +53,11 @@ const getSourceLabel = (source: string | null) => {
 	return labels[source] || source
 }
 
+type TimeRange = 'week' | 'month' | '3months' | 'year'
+
 export function LeadsCharts({ leads }: LeadsChartsProps) {
+	const [timeRange, setTimeRange] = useState<TimeRange>('month')
+
 	// Statystyki według źródła
 	const sourceStats = leads.reduce((acc, lead) => {
 		const source = lead.source || 'Nieznane'
@@ -81,28 +86,92 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 		.sort((a, b) => b.value - a.value)
 		.slice(0, 10)
 
-	// Statystyki według daty (ostatnie 30 dni)
+	// Statystyki według daty - dynamiczne w zależności od wybranego zakresu
 	const now = new Date()
-	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-	const recentLeads = leads.filter(lead => new Date(lead.createdAt) >= thirtyDaysAgo)
+	
+	const getDateRange = (range: TimeRange) => {
+		const ranges = {
+			week: { days: 7, step: 1, label: '7 dni' },
+			month: { days: 30, step: 1, label: '30 dni' },
+			'3months': { days: 90, step: 3, label: '90 dni' },
+			year: { days: 365, step: 7, label: '365 dni' },
+		}
+		return ranges[range]
+	}
 
-	const dateStats = recentLeads.reduce((acc, lead) => {
+	const rangeConfig = getDateRange(timeRange)
+	const startDate = new Date(now.getTime() - rangeConfig.days * 24 * 60 * 60 * 1000)
+	const filteredLeads = leads.filter(lead => new Date(lead.createdAt) >= startDate)
+
+	const dateStats = filteredLeads.reduce((acc, lead) => {
 		const date = new Date(lead.createdAt)
-		const dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		let dateKey: string
+		
+		if (timeRange === 'year') {
+			// Dla roku grupuj po tygodniach
+			const weekStart = new Date(date)
+			weekStart.setDate(date.getDate() - date.getDay())
+			dateKey = weekStart.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		} else if (timeRange === '3months') {
+			// Dla 3 miesięcy grupuj po 3 dni
+			dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		} else {
+			// Dla tygodnia i miesiąca - pojedyncze dni
+			dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		}
+		
 		acc[dateKey] = (acc[dateKey] || 0) + 1
 		return acc
 	}, {} as Record<string, number>)
 
-	// Wypełnij wszystkie dni (ostatnie 30)
-	const dateData = []
-	for (let i = 29; i >= 0; i--) {
+	// Generuj dane dla wykresu
+	const dateData: Array<{ date: string; leady: number }> = []
+	const step = rangeConfig.step
+	
+	for (let i = rangeConfig.days - 1; i >= 0; i -= step) {
 		const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-		const dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
-		dateData.push({
-			date: dateKey,
-			leady: dateStats[dateKey] || 0,
-		})
+		let dateKey: string
+		
+		if (timeRange === 'year') {
+			const weekStart = new Date(date)
+			weekStart.setDate(date.getDate() - date.getDay())
+			dateKey = weekStart.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		} else {
+			dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+		}
+		
+		// Dla 3 miesięcy i roku, sumuj leady z całego okresu
+		if (timeRange === '3months' || timeRange === 'year') {
+			let total = 0
+			for (let j = 0; j < step; j++) {
+				const checkDate = new Date(date.getTime() + j * 24 * 60 * 60 * 1000)
+				const checkKey = checkDate.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+				total += dateStats[checkKey] || 0
+			}
+			dateData.push({
+				date: dateKey,
+				leady: total,
+			})
+		} else {
+			dateData.push({
+				date: dateKey,
+				leady: dateStats[dateKey] || 0,
+			})
+		}
 	}
+
+	// Usuń duplikaty dla roku (grupowanie tygodniowe)
+	const uniqueDateData = timeRange === 'year' 
+		? dateData.reduce((acc, item) => {
+				const existing = acc.find(d => d.date === item.date)
+				if (existing) {
+					existing.leady += item.leady
+				} else {
+					acc.push({ ...item })
+				}
+				return acc
+			}, [] as typeof dateData)
+		: dateData
 
 	// Statystyki według statusu
 	const statusStats = leads.reduce((acc, lead) => {
@@ -152,8 +221,8 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							<Calendar className='text-green-600' size={20} />
 						</div>
 						<div>
-							<p className='text-sm text-gray-500'>Ostatnie 30 dni</p>
-							<p className='text-2xl font-bold text-gray-900'>{recentLeads.length}</p>
+							<p className='text-sm text-gray-500'>Ostatnie {rangeConfig.label}</p>
+							<p className='text-2xl font-bold text-gray-900'>{filteredLeads.length}</p>
 						</div>
 					</div>
 				</div>
@@ -166,7 +235,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<div>
 							<p className='text-sm text-gray-500'>Średnio dziennie</p>
 							<p className='text-2xl font-bold text-gray-900'>
-								{recentLeads.length > 0 ? Math.round((recentLeads.length / 30) * 10) / 10 : 0}
+								{filteredLeads.length > 0 ? Math.round((filteredLeads.length / rangeConfig.days) * 10) / 10 : 0}
 							</p>
 						</div>
 					</div>
@@ -175,22 +244,66 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 
 			{/* Wykresy */}
 			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-				{/* Wykres liniowy - Leady w czasie (ostatnie 30 dni) */}
+				{/* Wykres liniowy - Leady w czasie */}
 				<div className='bg-white p-6 rounded-xl border border-gray-200'>
-					<h3 className='font-bold text-gray-900 mb-4 flex items-center gap-2'>
-						<TrendingUp size={18} className='text-blue-600' />
-						Leady w czasie (ostatnie 30 dni)
-					</h3>
+					<div className='flex items-center justify-between mb-4'>
+						<h3 className='font-bold text-gray-900 flex items-center gap-2'>
+							<TrendingUp size={18} className='text-blue-600' />
+							Leady w czasie
+						</h3>
+						<div className='flex gap-2'>
+							<button
+								onClick={() => setTimeRange('week')}
+								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+									timeRange === 'week'
+										? 'bg-blue-600 text-white'
+										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+								}`}
+							>
+								Tydzień
+							</button>
+							<button
+								onClick={() => setTimeRange('month')}
+								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+									timeRange === 'month'
+										? 'bg-blue-600 text-white'
+										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+								}`}
+							>
+								Miesiąc
+							</button>
+							<button
+								onClick={() => setTimeRange('3months')}
+								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+									timeRange === '3months'
+										? 'bg-blue-600 text-white'
+										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+								}`}
+							>
+								3 miesiące
+							</button>
+							<button
+								onClick={() => setTimeRange('year')}
+								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+									timeRange === 'year'
+										? 'bg-blue-600 text-white'
+										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+								}`}
+							>
+								Rok
+							</button>
+						</div>
+					</div>
 					<div className='h-[300px]'>
 						<ResponsiveContainer width='100%' height='100%'>
-							<LineChart data={dateData}>
+							<LineChart data={uniqueDateData}>
 								<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#F1F5F9' />
 								<XAxis
 									dataKey='date'
 									axisLine={false}
 									tickLine={false}
 									tick={{ fill: '#94A3B8', fontSize: 11 }}
-									interval={2}
+									interval={timeRange === 'week' ? 0 : timeRange === 'month' ? 2 : timeRange === '3months' ? 4 : 6}
 								/>
 								<YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
 								<Tooltip
@@ -204,10 +317,10 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 								<Line
 									type='monotone'
 									dataKey='leady'
-									stroke='#6366F1'
-									strokeWidth={2.5}
-									dot={{ r: 3, fill: '#6366F1' }}
-									activeDot={{ r: 5 }}
+									stroke='#1E40AF'
+									strokeWidth={3}
+									dot={{ r: 4, fill: '#1E40AF', strokeWidth: 2, stroke: '#fff' }}
+									activeDot={{ r: 6, fill: '#1E40AF' }}
 									name='Leady'
 								/>
 							</LineChart>
