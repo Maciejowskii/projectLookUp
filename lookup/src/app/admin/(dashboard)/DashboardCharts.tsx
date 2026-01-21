@@ -33,6 +33,7 @@ interface SourceData {
 	name: string
 	value: number
 	source: string
+	[key: string]: string | number
 }
 
 interface DailyLeadData {
