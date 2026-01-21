@@ -1890,7 +1890,8 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     href = link.get("href", "")
                     if href and href.startswith("/") and len(href) > 5:
                         # Sprawdź czy to może być link do firmy
-                        if not any(exclude in href.lower() for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/"]):
+                        exclude_list = ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", "/dodaj-firme", "/dodaj-firmę"]
+                        if not any(exclude in href.lower() for exclude in exclude_list):
                             links.append(link)
         
         # 6b. Szukaj w tabelach (może być tabela z wynikami)
@@ -1902,7 +1903,8 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     href = link.get("href", "")
                     text = link.get_text(strip=True)
                     if href and text and len(text) > 3 and href.startswith("/"):
-                        if not any(exclude in href.lower() for exclude in ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:"]):
+                        exclude_list = ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/dodaj-firme", "/dodaj-firmę"]
+                        if not any(exclude in href.lower() for exclude in exclude_list):
                             links.append(link)
         
         # 7. Agresywne szukanie - wszystkie linki które mogą być firmami
@@ -1924,7 +1926,7 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", 
                     "/page/", "/kontakt", "/o-nas", "/regulamin", "/polityka", "/cookies",
                     "/szukaj", "/dodaj", "/login", "/rejestracja", "/admin", "/api/",
-                    "/biuro", "/pomoc", "/cennik", "/dla-firm"
+                    "/biuro", "/pomoc", "/cennik", "/dla-firm", "/dodaj-firme", "/dodaj-firmę"
                 ]
                 
                 if any(exclude in href_lower for exclude in exclude_patterns):
@@ -1985,7 +1987,7 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     "/page/", "/kontakt", "/o-nas", "/regulamin", "/polityka", "/cookies",
                     "/szukaj", "/dodaj", "/login", "/rejestracja", "/admin", "/api/",
                     "/biuro", "/pomoc", "/cennik", "/dla-firm", "/wojewodztwa", "/miasta",
-                    "/branze", "/branże", "/tag/", "/tagi/"
+                    "/branze", "/branże", "/tag/", "/tagi/", "/dodaj-firme", "/dodaj-firmę"
                 ]
                 
                 if any(exclude in href_lower for exclude in exclude_patterns):
@@ -2044,10 +2046,19 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             else:
                 # Sprawdź czy może być problem z JavaScript
                 scripts = soup.select("script")
-                js_loaders = [s for s in scripts if s.string and ("fetch" in s.string or "ajax" in s.string or "load" in s.string.lower() or "xhr" in s.string.lower())]
+                js_loaders = [s for s in scripts if s.string and ("fetch" in s.string or "ajax" in s.string or "load" in s.string.lower() or "xhr" in s.string.lower() or "axios" in s.string.lower() or "react" in s.string.lower() or "vue" in s.string.lower())]
                 if js_loaders:
                     log(f"    ⚠️  WARNING: Found {len(js_loaders)} scripts that might load content via JavaScript")
                     log(f"    ⚠️  WARNING: Page might need JavaScript to render company listings!")
+                
+                # Sprawdź czy strona ma puste kontenery które mogą być wypełniane przez JS
+                empty_containers = soup.select("[id*='result'], [class*='result'], [id*='listing'], [class*='listing'], [id*='company'], [class*='company']")
+                if empty_containers:
+                    log(f"    ⚠️  WARNING: Found {len(empty_containers)} containers that might be filled by JavaScript")
+                    # Sprawdź czy są puste (bez linków wewnątrz)
+                    empty_count = sum(1 for c in empty_containers if not c.select("a[href]"))
+                    if empty_count > 0:
+                        log(f"    ⚠️  WARNING: {empty_count} of these containers are empty - likely JavaScript-loaded content!")
                 
                 # Sprawdź strukturę HTML
                 possible_containers = soup.select(".result, .listing-item, .company-item, .firma, [class*='company'], [class*='firma'], [class*='business'], [class*='result']")
@@ -2102,6 +2113,11 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             href = link.get("href")
             raw_text = link.get_text(strip=True)
             name = normalize_text(raw_text)
+            
+            # Wyklucz linki do formularzy i innych nie-firm
+            if href and ("/dodaj-firme" in href.lower() or "/dodaj-firmę" in href.lower()):
+                log(f"    DEBUG: Link rejected - add company form. href={href[:60]}")
+                continue
             
             # DEBUG: Sprawdź dlaczego linki są odrzucane
             if not href:
