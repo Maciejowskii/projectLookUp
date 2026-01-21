@@ -1798,7 +1798,11 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         if MAX_PAGES_PER_CATEGORY > 0 and page > MAX_PAGES_PER_CATEGORY:
             break
 
-        url = f"{listing_url}/firmy,{page}.html" if page > 1 else listing_url
+        # Formatuj URL - upewnij się że nie ma podwójnych slashy
+        if page > 1:
+            url = f"{listing_url.rstrip('/')}/firmy,{page}.html"
+        else:
+            url = listing_url.rstrip('/')
         log(f"  Listing page {page}: {url}")
 
         try:
@@ -1826,27 +1830,41 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 log(f"  Page appears to be error/redirect page: {title_text[:50]}")
                 break
         
+        # DEBUG: Sprawdź podstawowe informacje o stronie
+        all_links_count = len(soup.select("a[href]"))
+        log(f"  DEBUG: Page loaded, total links: {all_links_count}, HTML size: {len(resp.text)} bytes")
+        
         # Próbuj różne selektory - PanoramaFirm często zmienia strukturę HTML
         links = []
         
         # 1. Nowy selektor (2025+) - class zawierający 'company'
         links = soup.select("a[class*='company'], a[class*='Company']")
+        if links:
+            log(f"  DEBUG: Found {len(links)} links via selector 1 (class*='company')")
         
         # 2. Selektor z data-attribute
         if not links:
             links = soup.select("a[data-company], a[href*='/firma/'], a[href*='/company/']")
+            if links:
+                log(f"  DEBUG: Found {len(links)} links via selector 2 (data-company, /firma/, /company/)")
         
         # 3. Selektor w sekcji z wynikami
         if not links:
             links = soup.select(".results a, .listing a, .companies a, .firmy a")
+            if links:
+                log(f"  DEBUG: Found {len(links)} links via selector 3 (.results, .listing, .companies, .firmy)")
         
         # 4. Selektor z h2/h3 (nagłówki z linkami do firm)
         if not links:
             links = soup.select("h2 a, h3 a, .company-title a, .title a")
+            if links:
+                log(f"  DEBUG: Found {len(links)} links via selector 4 (h2/h3, .company-title, .title)")
         
         # 5. Stary selektor dla kompatybilności
         if not links:
             links = soup.select("a.company-name, .company-name a")
+            if links:
+                log(f"  DEBUG: Found {len(links)} links via selector 5 (a.company-name)")
         
         # 6. Szukaj w sekcjach z wynikami - różne możliwe struktury
         if not links:
@@ -1923,7 +1941,8 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         if not links:
             # Debug: sprawdz jakie linki są na stronie
             all_links = soup.select("a[href]")
-            log(f"    ⚠️  DEBUG: No company links found. Total links on page: {len(all_links)}, HTML size: {len(resp.text)} bytes")
+            log(f"    ⚠️  DEBUG: No company links found via standard selectors!")
+            log(f"    ⚠️  DEBUG: Total links on page: {len(all_links)}, HTML size: {len(resp.text)} bytes")
             
             # Sprawdź czy strona może być pusta (brak firm w kategorii) lub używa JS do ładowania
             page_text = soup.get_text()
