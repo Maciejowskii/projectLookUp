@@ -22,6 +22,14 @@ load_dotenv()
 
 
 # =========================
+# HELPER FUNCTIONS (EARLY)
+# =========================
+def log(msg: str):
+    """Logger function - must be defined early"""
+    print(msg, flush=True)
+
+
+# =========================
 # FREE PROXY FETCHER
 # =========================
 class FreeProxyFetcher:
@@ -48,7 +56,6 @@ class FreeProxyFetcher:
             try:
                 resp = requests.get(source, timeout=10)
                 if resp.status_code == 200:
-                    # Parsuj proxy (format: IP:PORT)
                     proxies = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}', resp.text)
                     all_proxies.update(proxies)
                     log(f"  Found {len(proxies)} proxies from {source[:50]}...")
@@ -80,7 +87,6 @@ class FreeProxyFetcher:
             log("WARNING: No proxies found! Using direct connection.")
             return []
         
-        # Tasuj i testuj tylko część (żeby nie czekać godzinami)
         random.shuffle(all_proxies)
         test_proxies = all_proxies[:test_batch]
         
@@ -96,7 +102,6 @@ class FreeProxyFetcher:
                 working.append(proxy_url)
                 log(f"  ✓ Working proxy {len(working)}/{max_proxies}: {proxy}")
             
-            # Pokazuj progress co 10 prób
             if i % 10 == 0:
                 log(f"  Progress: {i}/{len(test_proxies)} tested, {len(working)} working")
         
@@ -179,12 +184,12 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 
-# FREE PROXY CONFIG - NOWE!
+# FREE PROXY CONFIG
 USE_FREE_PROXY = os.getenv("USE_FREE_PROXY", "true").lower() == "true"
-MAX_FREE_PROXIES = int(os.getenv("MAX_FREE_PROXIES", "20"))  # Ile proxy pobrać
-PROXY_TEST_BATCH = int(os.getenv("PROXY_TEST_BATCH", "50"))  # Ile proxy przetestować
+MAX_FREE_PROXIES = int(os.getenv("MAX_FREE_PROXIES", "20"))
+PROXY_TEST_BATCH = int(os.getenv("PROXY_TEST_BATCH", "50"))
 
-# Fallback na ręczne proxy (jeśli ktoś chce)
+# Fallback na ręczne proxy
 PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
 PROXY_LIST_MANUAL = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
 
@@ -231,12 +236,11 @@ proxy_fetcher = None
 
 
 # =========================
-# PROXY MANAGER - ZMODYFIKOWANY
+# PROXY MANAGER
 # =========================
 class ProxyManager:
     def __init__(self, proxy_list: list[str], auto_fetch: bool = False):
         if auto_fetch:
-            # Pobierz darmowe proxy automatycznie
             global proxy_fetcher
             if proxy_fetcher is None:
                 proxy_fetcher = FreeProxyFetcher()
@@ -250,8 +254,8 @@ class ProxyManager:
         
         self.current_index = 0
         self.failed_proxies = set()
-        self.use_count = {}  # Licznik użyć dla każdego proxy
-        self.rotation_interval = 5  # Co ile requestów rotować proxy
+        self.use_count = {}
+        self.rotation_interval = 5
     
     def get_proxy(self) -> dict | None:
         if not self.proxies:
@@ -261,7 +265,6 @@ class ProxyManager:
         while attempts < len(self.proxies):
             proxy_url = self.proxies[self.current_index]
             if proxy_url not in self.failed_proxies:
-                # Auto-rotacja co N użyć
                 self.use_count[proxy_url] = self.use_count.get(proxy_url, 0) + 1
                 if self.use_count[proxy_url] >= self.rotation_interval:
                     self.use_count[proxy_url] = 0
@@ -274,14 +277,12 @@ class ProxyManager:
             self.current_index = (self.current_index + 1) % len(self.proxies)
             attempts += 1
         
-        # Reset i refresh proxy
         log("All proxies failed, refreshing proxy list...")
         self.failed_proxies.clear()
         self.use_count.clear()
         
-        # Spróbuj pobrać nowe proxy
         if proxy_fetcher:
-            proxy_fetcher.working_proxies = []  # Reset cache
+            proxy_fetcher.working_proxies = []
             new_proxies = proxy_fetcher.get_working_proxies(max_proxies=10, test_batch=30)
             if new_proxies:
                 self.proxies = new_proxies
@@ -291,16 +292,13 @@ class ProxyManager:
         return None
     
     def rotate(self):
-        """Przejdź do następnego proxy"""
         if self.proxies:
             self.current_index = (self.current_index + 1) % len(self.proxies)
             log(f"Rotating to proxy #{self.current_index + 1}/{len(self.proxies)}")
     
     def mark_failed(self, proxy_url: str):
-        """Oznacz proxy jako niedziałające"""
         self.failed_proxies.add(proxy_url)
         log(f"Proxy marked as failed: {proxy_url[:30]}...")
-        # Natychmiast rotuj po błędzie
         self.rotate()
     
     def get_current_proxy_url(self) -> str | None:
@@ -317,10 +315,6 @@ if USE_FREE_PROXY:
 else:
     proxy_manager = ProxyManager(PROXY_LIST_MANUAL, auto_fetch=False)
     PROXY_ENABLED = len(PROXY_LIST_MANUAL) > 0
-
-
-def log(msg: str):
-    print(msg, flush=True)
 
 
 # =========================
@@ -381,7 +375,7 @@ def normalize_province(raw: str | None) -> str | None:
 
 
 # =========================
-# REQUESTS (retry + backoff) - BEZ ZMIAN W LOGICE
+# REQUESTS (retry + backoff)
 # =========================
 def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20) -> requests.Response:
     delay = HTTP_BACKOFF_INITIAL
@@ -444,7 +438,7 @@ def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20
 
 
 # =========================
-# HELPERS - BEZ ZMIAN
+# HELPERS
 # =========================
 def slugify(text: str) -> str:
     if not text:
@@ -567,7 +561,7 @@ def extract_nip_from_profile_html(html: str) -> str | None:
 
 
 # =========================
-# TENANT / CATEGORY - BEZ ZMIAN
+# TENANT / CATEGORY
 # =========================
 def get_tenant_id_by_category(conn, category_name: str):
     cat_lower = (category_name or "").lower()
@@ -644,7 +638,7 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 
 
 # =========================
-# OPENAI - BEZ ZMIAN
+# OPENAI
 # =========================
 def ensure_openai_available_forever():
     global client
@@ -741,7 +735,7 @@ Wygeneruj wyłącznie opis.
 
 
 # =========================
-# SCRAPING - BEZ ZMIAN W LOGICE
+# SCRAPING
 # =========================
 def scrape_all_categories():
     categories = []
