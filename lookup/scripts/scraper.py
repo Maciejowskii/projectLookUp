@@ -2073,14 +2073,43 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             
             break
 
+        # DEBUG: Pokaż znalezione linki przed przetwarzaniem
+        if links:
+            log(f"  DEBUG: Processing {len(links)} found links...")
+            for i, link in enumerate(links[:5], 1):  # Pokaż pierwsze 5
+                href = link.get("href", "")
+                text = link.get_text(strip=True)
+                log(f"    Link {i}: href={href[:60]}, text={text[:50]}")
+
         new_count = 0
         for link in links:
             href = link.get("href")
-            name = normalize_text(link.get_text(strip=True))
-            if href and name and href not in seen_urls:
-                seen_urls.add(href)
-                results.append({"name": name, "url": href})
-                new_count += 1
+            raw_text = link.get_text(strip=True)
+            name = normalize_text(raw_text)
+            
+            # DEBUG: Sprawdź dlaczego linki są odrzucane
+            if not href:
+                log(f"    DEBUG: Link rejected - no href")
+                continue
+            if not name or len(name) < 2:
+                log(f"    DEBUG: Link rejected - no name or too short. href={href[:60]}, raw_text={raw_text[:40]}, normalized={name[:40]}")
+                continue
+            if href in seen_urls:
+                log(f"    DEBUG: Link rejected - already seen. href={href[:60]}, name={name[:40]}")
+                continue
+            
+            # Normalizuj href (może być relatywny)
+            if href.startswith("/"):
+                full_href = f"{BASE_URL}{href}"
+            elif href.startswith("http"):
+                full_href = href
+            else:
+                full_href = f"{BASE_URL}/{href}"
+            
+            seen_urls.add(href)
+            results.append({"name": name, "url": full_href})
+            new_count += 1
+            log(f"    DEBUG: Added link - name={name[:50]}, href={full_href[:80]}")
 
         if new_count == 0:
             break
