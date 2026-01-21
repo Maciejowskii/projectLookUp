@@ -5,12 +5,9 @@ import uuid
 import time
 import random
 import warnings
-import socket
 from urllib.parse import unquote, urlparse
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.connection import create_connection
 from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
@@ -22,138 +19,19 @@ load_dotenv()
 
 
 # =========================
-# HELPER FUNCTIONS (EARLY)
-# =========================
-def log(msg: str):
-    """Logger function - must be defined early"""
-    print(msg, flush=True)
-
-
-# =========================
-# FREE PROXY FETCHER
-# =========================
-class FreeProxyFetcher:
-    """Pobiera i testuje darmowe proxy z publicznych źródeł"""
-    
-    PROXY_SOURCES = [
-        "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
-        "https://www.proxy-list.download/api/v1/get?type=http",
-        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
-        "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
-        "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
-    ]
-    
-    def __init__(self):
-        self.working_proxies = []
-        self.test_url = "http://httpbin.org/ip"
-    
-    def fetch_proxies(self) -> list[str]:
-        """Pobiera listę proxy ze wszystkich źródeł"""
-        all_proxies = set()
-        
-        log("Fetching free proxies from public sources...")
-        for source in self.PROXY_SOURCES:
-            try:
-                resp = requests.get(source, timeout=10)
-                if resp.status_code == 200:
-                    proxies = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}', resp.text)
-                    all_proxies.update(proxies)
-                    log(f"  Found {len(proxies)} proxies from {source[:50]}...")
-            except Exception as e:
-                log(f"  Failed to fetch from {source[:50]}: {e}")
-        
-        log(f"Total unique proxies collected: {len(all_proxies)}")
-        return list(all_proxies)
-    
-    def test_proxy(self, proxy: str, timeout: int = 5) -> bool:
-        """Testuje czy proxy działa"""
-        try:
-            proxy_dict = {
-                "http": f"http://{proxy}",
-                "https": f"http://{proxy}",
-            }
-            resp = requests.get(self.test_url, proxies=proxy_dict, timeout=timeout)
-            return resp.status_code == 200
-        except:
-            return False
-    
-    def get_working_proxies(self, max_proxies: int = 20, test_batch: int = 50) -> list[str]:
-        """Pobiera i testuje proxy, zwraca działające"""
-        if self.working_proxies:
-            return self.working_proxies
-        
-        all_proxies = self.fetch_proxies()
-        if not all_proxies:
-            log("WARNING: No proxies found! Using direct connection.")
-            return []
-        
-        random.shuffle(all_proxies)
-        test_proxies = all_proxies[:test_batch]
-        
-        log(f"Testing {len(test_proxies)} proxies (timeout 5s each)...")
-        working = []
-        
-        for i, proxy in enumerate(test_proxies, 1):
-            if len(working) >= max_proxies:
-                break
-            
-            if self.test_proxy(proxy):
-                proxy_url = f"http://{proxy}"
-                working.append(proxy_url)
-                log(f"  ✓ Working proxy {len(working)}/{max_proxies}: {proxy}")
-            
-            if i % 10 == 0:
-                log(f"  Progress: {i}/{len(test_proxies)} tested, {len(working)} working")
-        
-        self.working_proxies = working
-        log(f"Found {len(working)} working proxies!")
-        
-        if not working:
-            log("WARNING: No working proxies found! Scraper will use direct connection.")
-        
-        return working
-
-
-# =========================
-# IPv6 SUPPORT
-# =========================
-class IPv6HTTPAdapter(HTTPAdapter):
-    """Adapter wymuszający użycie IPv6"""
-    def init_poolmanager(self, *args, **kwargs):
-        import urllib3.util.connection as urllib3_connection
-        original_create_connection = urllib3_connection.create_connection
-        
-        def create_connection_ipv6(address, *args, **kwargs):
-            host, port = address
-            try:
-                addrinfo = socket.getaddrinfo(host, port, socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-                if addrinfo:
-                    family, socktype, proto, canonname, sockaddr = addrinfo[0]
-                    sock = socket.socket(family, socktype, proto)
-                    sock.connect(sockaddr)
-                    return sock
-            except (socket.gaierror, OSError, socket.error) as e:
-                log(f"IPv6 connection failed for {host}, falling back to IPv4: {e}")
-                return original_create_connection(address, *args, **kwargs)
-            return original_create_connection(address, *args, **kwargs)
-        
-        urllib3_connection.create_connection = create_connection_ipv6
-        return super().init_poolmanager(*args, **kwargs)
-
-
-# =========================
 # KONFIG / ENV
 # =========================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano").strip()
 
-SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()
+SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN / TEST
 REQUIRE_AI = os.getenv("REQUIRE_AI", "true").lower() == "true"
 
+# AI rewrite tylko w MAIN
 USE_AI_REWRITE = (SCRAPER_MODE == "MAIN")
 
 SCRAPE_ALL_CATEGORIES = os.getenv("SCRAPE_ALL_CATEGORIES", "false").upper() == "TRUE"
-MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "0"))
+MAX_PAGES_PER_CATEGORY = int(os.getenv("MAX_PAGES_PER_CATEGORY", "0"))  # 0 = bez limitu
 
 # AI
 MAX_AI_REQUESTS = int(os.getenv("MAX_AI_REQUESTS", "5000"))
@@ -167,12 +45,12 @@ MIN_RAW_DESC_FOR_DIRECT_USE = int(os.getenv("MIN_RAW_DESC_FOR_DIRECT_USE", "50")
 MIN_AI_DESC_LEN = int(os.getenv("MIN_AI_DESC_LEN", "400"))
 
 # HTTP pacing
-REQUEST_DELAY_MIN = float(os.getenv("REQUEST_DELAY_MIN", "2.0"))
-REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "4.0"))
-LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "3.0"))
-LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "6.0"))
+REQUEST_DELAY_MIN = float(os.getenv("REQUEST_DELAY_MIN", "0.6"))
+REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "1.2"))
+LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "1.0"))
+LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "2.0"))
 
-# API retry
+# API retry (PanoramaFirm)
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "6"))
 HTTP_BACKOFF_INITIAL = float(os.getenv("HTTP_BACKOFF_INITIAL", "1.0"))
 HTTP_BACKOFF_MAX = float(os.getenv("HTTP_BACKOFF_MAX", "30"))
@@ -184,31 +62,13 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 
-# FREE PROXY CONFIG
-USE_FREE_PROXY = os.getenv("USE_FREE_PROXY", "true").lower() == "true"
-MAX_FREE_PROXIES = int(os.getenv("MAX_FREE_PROXIES", "20"))
-PROXY_TEST_BATCH = int(os.getenv("PROXY_TEST_BATCH", "50"))
-
-# Fallback na ręczne proxy
-PROXY_LIST_RAW = os.getenv("PROXY_LIST", "").strip()
-PROXY_LIST_MANUAL = [p.strip() for p in PROXY_LIST_RAW.split(",") if p.strip()] if PROXY_LIST_RAW else []
-
-# IPv6
-FORCE_IPV6 = os.getenv("FORCE_IPV6", "false").lower() == "true"
-
 BASE_URL = "https://panoramafirm.pl"
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
-]
-
 HEADERS = {
-    "User-Agent": random.choice(USER_AGENTS),
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
 }
@@ -232,89 +92,10 @@ DEFAULT_TENANT_SUBDOMAIN = "katalog"
 ai_usage_counter = 0
 total_inserted = 0
 client = None
-proxy_fetcher = None
 
 
-# =========================
-# PROXY MANAGER
-# =========================
-class ProxyManager:
-    def __init__(self, proxy_list: list[str], auto_fetch: bool = False):
-        if auto_fetch:
-            global proxy_fetcher
-            if proxy_fetcher is None:
-                proxy_fetcher = FreeProxyFetcher()
-            free_proxies = proxy_fetcher.get_working_proxies(
-                max_proxies=MAX_FREE_PROXIES,
-                test_batch=PROXY_TEST_BATCH
-            )
-            self.proxies = free_proxies + proxy_list
-        else:
-            self.proxies = proxy_list.copy() if proxy_list else []
-        
-        self.current_index = 0
-        self.failed_proxies = set()
-        self.use_count = {}
-        self.rotation_interval = 5
-    
-    def get_proxy(self) -> dict | None:
-        if not self.proxies:
-            return None
-        
-        attempts = 0
-        while attempts < len(self.proxies):
-            proxy_url = self.proxies[self.current_index]
-            if proxy_url not in self.failed_proxies:
-                self.use_count[proxy_url] = self.use_count.get(proxy_url, 0) + 1
-                if self.use_count[proxy_url] >= self.rotation_interval:
-                    self.use_count[proxy_url] = 0
-                    self.rotate()
-                
-                return {
-                    "http": proxy_url,
-                    "https": proxy_url,
-                }
-            self.current_index = (self.current_index + 1) % len(self.proxies)
-            attempts += 1
-        
-        log("All proxies failed, refreshing proxy list...")
-        self.failed_proxies.clear()
-        self.use_count.clear()
-        
-        if proxy_fetcher:
-            proxy_fetcher.working_proxies = []
-            new_proxies = proxy_fetcher.get_working_proxies(max_proxies=10, test_batch=30)
-            if new_proxies:
-                self.proxies = new_proxies
-                self.current_index = 0
-                return self.get_proxy()
-        
-        return None
-    
-    def rotate(self):
-        if self.proxies:
-            self.current_index = (self.current_index + 1) % len(self.proxies)
-            log(f"Rotating to proxy #{self.current_index + 1}/{len(self.proxies)}")
-    
-    def mark_failed(self, proxy_url: str):
-        self.failed_proxies.add(proxy_url)
-        log(f"Proxy marked as failed: {proxy_url[:30]}...")
-        self.rotate()
-    
-    def get_current_proxy_url(self) -> str | None:
-        if not self.proxies:
-            return None
-        return self.proxies[self.current_index]
-
-
-# Inicjalizacja proxy managera
-if USE_FREE_PROXY:
-    log("Initializing FREE PROXY mode...")
-    proxy_manager = ProxyManager(PROXY_LIST_MANUAL, auto_fetch=True)
-    PROXY_ENABLED = len(proxy_manager.proxies) > 0
-else:
-    proxy_manager = ProxyManager(PROXY_LIST_MANUAL, auto_fetch=False)
-    PROXY_ENABLED = len(PROXY_LIST_MANUAL) > 0
+def log(msg: str):
+    print(msg, flush=True)
 
 
 # =========================
@@ -333,11 +114,13 @@ def connect_db():
 
 
 def normalize_text(s: str) -> str:
-    s = (s or "").strip()
+    s = (s or "").strip()  # tylko białe znaki
     if re.search(r"%[0-9A-Fa-f]{2}", s):
         s = unquote(s)
 
-    s = s.replace(""", '"').replace(""", '"').replace("„", '"').replace("'", "'")
+    # ujednolicaj, ale nie usuwaj cudzysłowów
+    s = s.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
+
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -370,7 +153,7 @@ def normalize_province(raw: str | None) -> str | None:
         return None
     s = raw.strip().lower()
     s = s.replace("–", "-").replace("—", "-")
-    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"\s+", "-", s)  # np. "kujawsko pomorskie"
     return s if s in CANONICAL_VOIVODESHIPS else None
 
 
@@ -380,54 +163,18 @@ def normalize_province(raw: str | None) -> str | None:
 def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20) -> requests.Response:
     delay = HTTP_BACKOFF_INITIAL
     last_exc = None
-    proxy_failed = False
-    current_proxy_url = None
 
     for attempt in range(1, HTTP_MAX_RETRIES + 1):
         try:
-            session.headers["User-Agent"] = random.choice(USER_AGENTS)
-            
-            proxies = None
-            if PROXY_ENABLED and not proxy_failed:
-                proxies = proxy_manager.get_proxy()
-                current_proxy_url = proxy_manager.get_current_proxy_url()
-            
-            resp = session.get(url, timeout=timeout, proxies=proxies)
+            resp = session.get(url, timeout=timeout)
 
             if resp.status_code in (429, 500, 502, 503, 504):
-                if PROXY_ENABLED and proxies:
-                    proxy_manager.rotate()
                 raise RuntimeError(f"HTTP {resp.status_code}")
 
             return resp
 
-        except requests.exceptions.ProxyError as e:
-            if PROXY_ENABLED and current_proxy_url:
-                proxy_manager.mark_failed(current_proxy_url)
-                log(f"Proxy failed, rotating... ({current_proxy_url[:30]}...)")
-                time.sleep(2)
-                continue
-            else:
-                proxy_failed = True
-                log("All proxies failed, falling back to direct connection")
-                time.sleep(2)
-                continue
-                
         except Exception as e:
             last_exc = e
-            error_str = str(e)
-            if PROXY_ENABLED and ("proxy" in error_str.lower() or "tunnel" in error_str.lower()):
-                if current_proxy_url:
-                    proxy_manager.mark_failed(current_proxy_url)
-                    log(f"Proxy error detected, rotating...")
-                    time.sleep(2)
-                    continue
-                else:
-                    proxy_failed = True
-                    log("Proxy errors, falling back to direct connection")
-                    time.sleep(2)
-                    continue
-            
             log(f"HTTP error attempt {attempt}/{HTTP_MAX_RETRIES} url={url}: {e}")
             time.sleep(min(delay, HTTP_BACKOFF_MAX) + random.uniform(0, 1.0))
             delay *= 2
@@ -538,6 +285,9 @@ def extract_company_variable(html_content: str) -> dict | None:
     return None
 
 
+# =========================
+# FALLBACK: NIP z HTML (#contact)
+# =========================
 def extract_nip_from_profile_html(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     contact = soup.select_one("#contact")
@@ -613,6 +363,9 @@ def get_or_create_category(conn, tenant_id: str, name: str):
     return cat_id
 
 
+# =========================
+# DEDUPE (sourceUrl)
+# =========================
 def company_exists_by_source_url(conn, source_url: str) -> bool:
     cur = conn.cursor()
     cur.execute('SELECT 1 FROM "Company" WHERE "sourceUrl" = %s LIMIT 1', (source_url,))
@@ -638,9 +391,13 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 
 
 # =========================
-# OPENAI
+# OPENAI (strict-ish)
 # =========================
 def ensure_openai_available_forever():
+    """
+    Jeśli REQUIRE_AI=true, to bez klucza albo przy problemach z inicjalizacją
+    nie kończymy procesu - śpimy i próbujemy ponownie co godzinę.
+    """
     global client
 
     while True:
@@ -679,8 +436,8 @@ JĘZYK I FORMA:
 - Zwróć WYŁĄCZNIE gotowy opis jako PLAIN TEXT.
 - Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (podwójny enter).
 - Bez list punktowanych i numerowanych.
-- Bez nagłówków typu „O firmie" i bez emoji.
-- Nie kończ CTA typu „zapraszamy do kontaktu".
+- Bez nagłówków typu „O firmie” i bez emoji.
+- Nie kończ CTA typu „zapraszamy do kontaktu”.
 
 DŁUGOŚĆ:
 - 900–1400 znaków (ze spacjami).
@@ -741,6 +498,176 @@ def scrape_all_categories():
     categories = []
 
     popular = [
+        "https://panoramafirm.pl/drzwi_antywłamaniowe",
+        "https://panoramafirm.pl/dywany_i_wykładziny",
+        "https://panoramafirm.pl/elektroinstalatorstwo",
+        "https://panoramafirm.pl/filtry",
+        "https://panoramafirm.pl/folie_i_foliowanie",
+        "https://panoramafirm.pl/gres,_terakota_i_płytki_ceramiczne",
+        "https://panoramafirm.pl/grzejnictwo_elektryczne",
+        "https://panoramafirm.pl/hurtownie_artykułów_higienicznych",
+        "https://panoramafirm.pl/hurtownie_dywanów_i_wykładzin",
+        "https://panoramafirm.pl/hurtownie_gresu,_terakoty_i_płytek_ceramicznych",
+        "https://panoramafirm.pl/hurtownie_parkietu_i_paneli_podłogowych",
+        "https://panoramafirm.pl/hurtownie_rtv",
+        "https://panoramafirm.pl/hurtownie_sprzętu_agd",
+        "https://panoramafirm.pl/hurtownie_szkła_ozdobnego_i_kryształów",
+        "https://panoramafirm.pl/hurtownie_urządzeń_elektrycznych",
+        "https://panoramafirm.pl/hurtownie_urządzeń_sanitarnych",
+        "https://panoramafirm.pl/hurtownie_zasłon,_firanek_i_karniszy",
+        "https://panoramafirm.pl/hurtownie_żaluzji_i_rolet",
+        "https://panoramafirm.pl/hydraulicy",
+        "https://panoramafirm.pl/hydraulika_siłowa",
+        "https://panoramafirm.pl/instalacja_i_serwis_ogrzewania",
+        "https://panoramafirm.pl/instalacja_systemów_alarmowych",
+        "https://panoramafirm.pl/kominiarze",
+        "https://panoramafirm.pl/kominki",
+        "https://panoramafirm.pl/kominy",
+        "https://panoramafirm.pl/kryształy_i_szkło_ozdobne",
+        "https://panoramafirm.pl/lampy_i_oświetlenie_wnętrz",
+        "https://panoramafirm.pl/lustra",
+        "https://panoramafirm.pl/magiel",
+        "https://panoramafirm.pl/malowanie_i_tapetowanie",
+        "https://panoramafirm.pl/maszyny_dziewiarskie",
+        "https://panoramafirm.pl/materace",
+        "https://panoramafirm.pl/materiały_do_wykańczania_wnętrz",
+        "https://panoramafirm.pl/materiały_drewnopochodne",
+        "https://panoramafirm.pl/materiały_elektryczne",
+        "https://panoramafirm.pl/materiały_tapicerskie",
+        "https://panoramafirm.pl/meble",
+        "https://panoramafirm.pl/meble_biurowe",
+        "https://panoramafirm.pl/meble_kuchenne",
+        "https://panoramafirm.pl/meble_metalowe",
+        "https://panoramafirm.pl/meble_na_zamówienie",
+        "https://panoramafirm.pl/meble_ogrodowe",
+        "https://panoramafirm.pl/meble_specjalistyczne",
+        "https://panoramafirm.pl/montaż_i_produkcja_basenów_i_fontann",
+        "https://panoramafirm.pl/montaż_i_sprzedaż_żaluzji_i_rolet",
+        "https://panoramafirm.pl/napełnianie_butli_gazowych",
+        "https://panoramafirm.pl/nośniki_danych_i_płyty_cd_i_dvd",
+        "https://panoramafirm.pl/obrusy",
+        "https://panoramafirm.pl/oczyszczanie_ścieków",
+        "https://panoramafirm.pl/odkurzacze_centralne",
+        "https://panoramafirm.pl/ogrodnictwo",
+        "https://panoramafirm.pl/ogrzewanie_elektryczne",
+        "https://panoramafirm.pl/okleiny",
+        "https://panoramafirm.pl/okna",
+        "https://panoramafirm.pl/okna_dachowe",
+        "https://panoramafirm.pl/okna_drewniane",
+        "https://panoramafirm.pl/oświetlenie",
+        "https://panoramafirm.pl/ozdoby_świąteczne",
+        "https://panoramafirm.pl/panele_i_podłogi",
+        "https://panoramafirm.pl/parapety",
+        "https://panoramafirm.pl/parkiet_i_panele_podłogowe",
+        "https://panoramafirm.pl/pomoc_domowa",
+        "https://panoramafirm.pl/porcelana_i_fajans",
+        "https://panoramafirm.pl/poręcze_i_balustrady",
+        "https://panoramafirm.pl/posadzki_przemysłowe",
+        "https://panoramafirm.pl/producenci_domów_drewnianych",
+        "https://panoramafirm.pl/produkcja_artykułów_higienicznych",
+        "https://panoramafirm.pl/produkcja_i_hurtownie_narzędzi",
+        "https://panoramafirm.pl/produkcja_i_montaż_domofonów",
+        "https://panoramafirm.pl/produkcja_kryształów_i_szkła_ozdobnego",
+        "https://panoramafirm.pl/produkcja_parkietu_i_paneli_podłogowych",
+        "https://panoramafirm.pl/produkcja_roślin_i_nasion",
+        "https://panoramafirm.pl/produkcja_sprzętu_agd",
+        "https://panoramafirm.pl/produkcja_sprzętu_rtv",
+        "https://panoramafirm.pl/produkcja_systemów_alarmowych",
+        "https://panoramafirm.pl/produkcja_urządzeń_elektronicznych",
+        "https://panoramafirm.pl/produkcja_urządzeń_elektrycznych",
+        "https://panoramafirm.pl/produkcja_urządzeń_sanitarnych",
+        "https://panoramafirm.pl/produkcja_zasłon,_firanek_i_karniszy",
+        "https://panoramafirm.pl/produkcja_żaluzji_i_rolet",
+        "https://panoramafirm.pl/ramy_i_oprawy_obrazów",
+        "https://panoramafirm.pl/renowacja_mebli",
+        "https://panoramafirm.pl/renowacje_i_remonty",
+        "https://panoramafirm.pl/ręczniki,_koce_i_pościel",
+        "https://panoramafirm.pl/rośliny_sztuczne",
+        "https://panoramafirm.pl/rośliny,_nasiona_i_cebulki",
+        "https://panoramafirm.pl/schody",
+        "https://panoramafirm.pl/serwis_rtv",
+        "https://panoramafirm.pl/serwis_sprzętu_agd",
+        "https://panoramafirm.pl/serwis_urządzeń_elektrycznych",
+        "https://panoramafirm.pl/sklepy_ze_sprzętem_agd",
+        "https://panoramafirm.pl/sklepy_ze_sprzętem_rtv",
+        "https://panoramafirm.pl/sprzątanie_wnętrz_i_mycie_okien",
+        "https://panoramafirm.pl/sprzęt_do_malowania_i_tapetowania",
+        "https://panoramafirm.pl/sprzęt_i_materiały_hydrauliczne",
+        "https://panoramafirm.pl/sprzęt_i_zabezpieczenia_przeciwpożarowe",
+        "https://panoramafirm.pl/stolarze",
+        "https://panoramafirm.pl/studnie",
+        "https://panoramafirm.pl/sufity_podwieszane",
+        "https://panoramafirm.pl/systemy_audiowizualne",
+        "https://panoramafirm.pl/systemy_dźwiękowe_i_audio",
+        "https://panoramafirm.pl/systemy_zabudowy_wnętrz",
+        "https://panoramafirm.pl/szklarze",
+        "https://panoramafirm.pl/tapety",
+        "https://panoramafirm.pl/telewizja_kablowa",
+        "https://panoramafirm.pl/telewizja_satelitarna",
+        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
+        "https://panoramafirm.pl/układanie_wykładzin_podłogowych",
+        "https://panoramafirm.pl/urządzenia_elektroniczne",
+        "https://panoramafirm.pl/urządzenia_elektryczne",
+        "https://panoramafirm.pl/urządzenia_grzewcze",
+        "https://panoramafirm.pl/urządzenia_sanitarne",
+        "https://panoramafirm.pl/usługi_gazownicze",
+        "https://panoramafirm.pl/usługi_kamieniarskie",
+        "https://panoramafirm.pl/usługi_posadzkarskie",
+        "https://panoramafirm.pl/usługi_tapicerskie",
+        "https://panoramafirm.pl/uszczelki_i_uszczelnienia",
+        "https://panoramafirm.pl/witraże",
+        "https://panoramafirm.pl/wodociągi_i_kanalizacja",
+        "https://panoramafirm.pl/wycieraczki_i_maty",
+        "https://panoramafirm.pl/wykończenia_wnętrz",
+        "https://panoramafirm.pl/wyposażenie_kuchni",
+        "https://panoramafirm.pl/wyposażenie_łazienek",
+        "https://panoramafirm.pl/wyroby_wiklinowe_i_bambusowe",
+        "https://panoramafirm.pl/wywóz_śmieci_i_odpadów",
+        "https://panoramafirm.pl/zamki_i_kłódki",
+        "https://panoramafirm.pl/zamki_i_zabezpieczenia_antywłamaniowe",
+        "https://panoramafirm.pl/zapalniczki_i_zapałki",
+        "https://panoramafirm.pl/zasłony,_firanki_i_karnisze",
+        "https://panoramafirm.pl/zawiesia_linowe,_łańcuchowe_i_pasowe",
+        "https://panoramafirm.pl/ślusarstwo_i_dorabianie_kluczy",
+        "https://panoramafirm.pl/ślusarze",
+        "https://panoramafirm.pl/środki_ochrony_roślin",
+        "https://panoramafirm.pl/świece_i_znicze",
+        "https://panoramafirm.pl/artykuły_dziecięce",
+        "https://panoramafirm.pl/artykuły_papiernicze",
+        "https://panoramafirm.pl/artykuły_szkolne",
+        "https://panoramafirm.pl/domy_dziecka",
+        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
+        "https://panoramafirm.pl/hurtownie_i_producenci_artykułów_dziecięcych",
+        "https://panoramafirm.pl/hurtownie_zabawek",
+        "https://panoramafirm.pl/logopedzi",
+        "https://panoramafirm.pl/odzież_dziecięca",
+        "https://panoramafirm.pl/opieka_nad_dziećmi",
+        "https://panoramafirm.pl/ośrodki_adopcyjno-wychowawcze",
+        "https://panoramafirm.pl/ośrodki_szkolno-wychowawcze",
+        "https://panoramafirm.pl/ośrodki_wychowawcze",
+        "https://panoramafirm.pl/parki_rozrywki",
+        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
+        "https://panoramafirm.pl/produkcja_zabawek",
+        "https://panoramafirm.pl/projektowanie_i_montaż_placów_zabaw",
+        "https://panoramafirm.pl/przedszkola_prywatne",
+        "https://panoramafirm.pl/przedszkola_publiczne",
+        "https://panoramafirm.pl/sale_zabaw",
+        "https://panoramafirm.pl/sklepy_z_zabawkami",
+        "https://panoramafirm.pl/zabawki_edukacyjne",
+        "https://panoramafirm.pl/świetlice_środowiskowe",
+        "https://panoramafirm.pl/żłobki_prywatne",
+        "https://panoramafirm.pl/żłobki_publiczne",
+        "https://panoramafirm.pl/banki",
+        "https://panoramafirm.pl/bankomaty",
+        "https://panoramafirm.pl/biura_rachunkowe",
+        "https://panoramafirm.pl/doradztwo_finansowe_i_kredytowe",
+        "https://panoramafirm.pl/doradztwo_podatkowe",
+        "https://panoramafirm.pl/fundusze_emerytalne",
+        "https://panoramafirm.pl/fundusze_inwestycyjne",
+        "https://panoramafirm.pl/giełdy",
+        "https://panoramafirm.pl/kantory",
+        "https://panoramafirm.pl/karty_kredytowe,_płatnicze_i_programy_lojalnościowe",
+        "https://panoramafirm.pl/kredyty_i_finansowanie",
         "https://panoramafirm.pl/leasing",
         "https://panoramafirm.pl/maklerzy_giełdowi",
         "https://panoramafirm.pl/oddłużanie",
@@ -1869,138 +1796,6 @@ def scrape_all_categories():
         "https://panoramafirm.pl/materiały_tapicerskie",
         "https://panoramafirm.pl/meble",
         "https://panoramafirm.pl/meble_biurowe",
-        "https://panoramafirm.pl/meble_kuchenne",
-        "https://panoramafirm.pl/meble_metalowe",
-        "https://panoramafirm.pl/meble_na_zamówienie",
-        "https://panoramafirm.pl/meble_ogrodowe",
-        "https://panoramafirm.pl/meble_specjalistyczne",
-        "https://panoramafirm.pl/montaż_i_produkcja_basenów_i_fontann",
-        "https://panoramafirm.pl/montaż_i_sprzedaż_żaluzji_i_rolet",
-        "https://panoramafirm.pl/napełnianie_butli_gazowych",
-        "https://panoramafirm.pl/nośniki_danych_i_płyty_cd_i_dvd",
-        "https://panoramafirm.pl/obrusy",
-        "https://panoramafirm.pl/oczyszczanie_ścieków",
-        "https://panoramafirm.pl/odkurzacze_centralne",
-        "https://panoramafirm.pl/ogrodnictwo",
-        "https://panoramafirm.pl/ogrzewanie_elektryczne",
-        "https://panoramafirm.pl/okleiny",
-        "https://panoramafirm.pl/okna",
-        "https://panoramafirm.pl/okna_dachowe",
-        "https://panoramafirm.pl/okna_drewniane",
-        "https://panoramafirm.pl/oświetlenie",
-        "https://panoramafirm.pl/ozdoby_świąteczne",
-        "https://panoramafirm.pl/panele_i_podłogi",
-        "https://panoramafirm.pl/parapety",
-        "https://panoramafirm.pl/parkiet_i_panele_podłogowe",
-        "https://panoramafirm.pl/pomoc_domowa",
-        "https://panoramafirm.pl/porcelana_i_fajans",
-        "https://panoramafirm.pl/poręcze_i_balustrady",
-        "https://panoramafirm.pl/posadzki_przemysłowe",
-        "https://panoramafirm.pl/producenci_domów_drewnianych",
-        "https://panoramafirm.pl/produkcja_artykułów_higienicznych",
-        "https://panoramafirm.pl/produkcja_i_hurtownie_narzędzi",
-        "https://panoramafirm.pl/produkcja_i_montaż_domofonów",
-        "https://panoramafirm.pl/produkcja_kryształów_i_szkła_ozdobnego",
-        "https://panoramafirm.pl/produkcja_parkietu_i_paneli_podłogowych",
-        "https://panoramafirm.pl/produkcja_roślin_i_nasion",
-        "https://panoramafirm.pl/produkcja_sprzętu_agd",
-        "https://panoramafirm.pl/produkcja_sprzętu_rtv",
-        "https://panoramafirm.pl/produkcja_systemów_alarmowych",
-        "https://panoramafirm.pl/produkcja_urządzeń_elektronicznych",
-        "https://panoramafirm.pl/produkcja_urządzeń_elektrycznych",
-        "https://panoramafirm.pl/produkcja_urządzeń_sanitarnych",
-        "https://panoramafirm.pl/produkcja_zasłon,_firanek_i_karniszy",
-        "https://panoramafirm.pl/produkcja_żaluzji_i_rolet",
-        "https://panoramafirm.pl/ramy_i_oprawy_obrazów",
-        "https://panoramafirm.pl/renowacja_mebli",
-        "https://panoramafirm.pl/renowacje_i_remonty",
-        "https://panoramafirm.pl/ręczniki,_koce_i_pościel",
-        "https://panoramafirm.pl/rośliny_sztuczne",
-        "https://panoramafirm.pl/rośliny,_nasiona_i_cebulki",
-        "https://panoramafirm.pl/schody",
-        "https://panoramafirm.pl/serwis_rtv",
-        "https://panoramafirm.pl/serwis_sprzętu_agd",
-        "https://panoramafirm.pl/serwis_urządzeń_elektrycznych",
-        "https://panoramafirm.pl/sklepy_ze_sprzętem_agd",
-        "https://panoramafirm.pl/sklepy_ze_sprzętem_rtv",
-        "https://panoramafirm.pl/sprzątanie_wnętrz_i_mycie_okien",
-        "https://panoramafirm.pl/sprzęt_do_malowania_i_tapetowania",
-        "https://panoramafirm.pl/sprzęt_i_materiały_hydrauliczne",
-        "https://panoramafirm.pl/sprzęt_i_zabezpieczenia_przeciwpożarowe",
-        "https://panoramafirm.pl/stolarze",
-        "https://panoramafirm.pl/studnie",
-        "https://panoramafirm.pl/sufity_podwieszane",
-        "https://panoramafirm.pl/systemy_audiowizualne",
-        "https://panoramafirm.pl/systemy_dźwiękowe_i_audio",
-        "https://panoramafirm.pl/systemy_zabudowy_wnętrz",
-        "https://panoramafirm.pl/szklarze",
-        "https://panoramafirm.pl/tapety",
-        "https://panoramafirm.pl/telewizja_kablowa",
-        "https://panoramafirm.pl/telewizja_satelitarna",
-        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
-        "https://panoramafirm.pl/układanie_wykładzin_podłogowych",
-        "https://panoramafirm.pl/urządzenia_elektroniczne",
-        "https://panoramafirm.pl/urządzenia_elektryczne",
-        "https://panoramafirm.pl/urządzenia_grzewcze",
-        "https://panoramafirm.pl/urządzenia_sanitarne",
-        "https://panoramafirm.pl/usługi_gazownicze",
-        "https://panoramafirm.pl/usługi_kamieniarskie",
-        "https://panoramafirm.pl/usługi_posadzkarskie",
-        "https://panoramafirm.pl/usługi_tapicerskie",
-        "https://panoramafirm.pl/uszczelki_i_uszczelnienia",
-        "https://panoramafirm.pl/witraże",
-        "https://panoramafirm.pl/wodociągi_i_kanalizacja",
-        "https://panoramafirm.pl/wycieraczki_i_maty",
-        "https://panoramafirm.pl/wykończenia_wnętrz",
-        "https://panoramafirm.pl/wyposażenie_kuchni",
-        "https://panoramafirm.pl/wyposażenie_łazienek",
-        "https://panoramafirm.pl/wyroby_wiklinowe_i_bambusowe",
-        "https://panoramafirm.pl/wywóz_śmieci_i_odpadów",
-        "https://panoramafirm.pl/zamki_i_kłódki",
-        "https://panoramafirm.pl/zamki_i_zabezpieczenia_antywłamaniowe",
-        "https://panoramafirm.pl/zapalniczki_i_zapałki",
-        "https://panoramafirm.pl/zasłony,_firanki_i_karnisze",
-        "https://panoramafirm.pl/zawiesia_linowe,_łańcuchowe_i_pasowe",
-        "https://panoramafirm.pl/ślusarstwo_i_dorabianie_kluczy",
-        "https://panoramafirm.pl/ślusarze",
-        "https://panoramafirm.pl/środki_ochrony_roślin",
-        "https://panoramafirm.pl/świece_i_znicze",
-        "https://panoramafirm.pl/artykuły_dziecięce",
-        "https://panoramafirm.pl/artykuły_papiernicze",
-        "https://panoramafirm.pl/artykuły_szkolne",
-        "https://panoramafirm.pl/domy_dziecka",
-        "https://panoramafirm.pl/hurtownie_artykułów_papierniczych",
-        "https://panoramafirm.pl/hurtownie_i_producenci_artykułów_dziecięcych",
-        "https://panoramafirm.pl/hurtownie_zabawek",
-        "https://panoramafirm.pl/logopedzi",
-        "https://panoramafirm.pl/odzież_dziecięca",
-        "https://panoramafirm.pl/opieka_nad_dziećmi",
-        "https://panoramafirm.pl/ośrodki_adopcyjno-wychowawcze",
-        "https://panoramafirm.pl/ośrodki_szkolno-wychowawcze",
-        "https://panoramafirm.pl/ośrodki_wychowawcze",
-        "https://panoramafirm.pl/parki_rozrywki",
-        "https://panoramafirm.pl/produkcja_artykułów_papierniczych",
-        "https://panoramafirm.pl/produkcja_zabawek",
-        "https://panoramafirm.pl/projektowanie_i_montaż_placów_zabaw",
-        "https://panoramafirm.pl/przedszkola_prywatne",
-        "https://panoramafirm.pl/przedszkola_publiczne",
-        "https://panoramafirm.pl/sale_zabaw",
-        "https://panoramafirm.pl/sklepy_z_zabawkami",
-        "https://panoramafirm.pl/zabawki_edukacyjne",
-        "https://panoramafirm.pl/świetlice_środowiskowe",
-        "https://panoramafirm.pl/żłobki_prywatne",
-        "https://panoramafirm.pl/żłobki_publiczne",
-        "https://panoramafirm.pl/banki",
-        "https://panoramafirm.pl/bankomaty",
-        "https://panoramafirm.pl/biura_rachunkowe",
-        "https://panoramafirm.pl/doradztwo_finansowe_i_kredytowe",
-        "https://panoramafirm.pl/doradztwo_podatkowe",
-        "https://panoramafirm.pl/fundusze_emerytalne",
-        "https://panoramafirm.pl/fundusze_inwestycyjne",
-        "https://panoramafirm.pl/giełdy",
-        "https://panoramafirm.pl/kantory",
-        "https://panoramafirm.pl/karty_kredytowe,_płatnicze_i_programy_lojalnościowe",
-        "https://panoramafirm.pl/kredyty_i_finansowanie",
     ]
 
     for url in popular:
@@ -2020,6 +1815,7 @@ def scrape_all_categories():
         except Exception as e:
             log(f"Błąd pobierania kategorii: {e}")
 
+    # dedupe bez zmiany kolejności
     seen = set()
     unique = []
     for cat in categories:
@@ -2034,8 +1830,6 @@ def scrape_all_categories():
 def scrape_category_listing_until_end(session: requests.Session, listing_url: str):
     results = []
     seen_urls = set()
-    block_retries = 0
-    max_block_retries = 3
 
     page = 1
     while True:
@@ -2055,39 +1849,8 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        
-        if len(resp.text) < 50000:
-            html_lower = resp.text.lower()
-            is_blocked = (
-                "captcha" in html_lower or 
-                "recaptcha" in html_lower or
-                "robot" in html_lower or
-                "blocked" in html_lower or
-                "too many requests" in html_lower
-            )
-            if is_blocked or len(resp.text) < 20000:
-                block_retries += 1
-                
-                if PROXY_ENABLED:
-                    proxy_manager.rotate()
-                    log(f"    BLOCKED! Rotated to new proxy. Retry {block_retries}/{max_block_retries}...")
-                    time.sleep(5)
-                    continue
-                
-                if block_retries > max_block_retries:
-                    log(f"    BLOCKED! Max retries exceeded. Skipping category.")
-                    break
-                wait_time = 300 * block_retries
-                log(f"    BLOCKED DETECTED! HTML size: {len(resp.text)}. Retry {block_retries}/{max_block_retries}. Sleeping {wait_time//60} minutes...")
-                time.sleep(wait_time)
-                continue
-        
-        links = soup.select("a[class*='company_name']")
+        links = soup.select("h2 a.company-name, a.company-name")
         if not links:
-            links = soup.select("h2 a.company-name, a.company-name")
-        if not links:
-            all_links = soup.select("a")
-            log(f"    No company links. Total links: {len(all_links)}, HTML size: {len(resp.text)}")
             break
 
         new_count = 0
@@ -2108,7 +1871,10 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
     return results
 
 
-def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
+def fetch_company_js(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
+    """
+    Zwraca: (js_data, html_text) - html_text jest tylko do fallbacków.
+    """
     url = safe_url(company_url)
     if not url:
         return (None, None)
@@ -2120,107 +1886,17 @@ def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dic
                 return (None, None)
 
             html = resp.text
-            
-            js_data = extract_company_variable(html)
-            if js_data:
-                return (parse_company_from_js_legacy(js_data, html), html)
-            
-            parsed = parse_company_from_json_ld(html, company_url)
-            if parsed:
-                return (parsed, html)
-            
-            return (None, html)
+            data = extract_company_variable(html)
+            return (data, html)
         except Exception as e:
             log(f"  Company fetch error: {e}. Retrying after cooldown...")
             continue
 
 
-def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
-    soup = BeautifulSoup(html, "html.parser")
-    data = {}
-    
-    json_ld_scripts = soup.select('script[type="application/ld+json"]')
-    ld_data = None
-    
-    for script in json_ld_scripts:
-        try:
-            parsed = json.loads(script.string)
-            if isinstance(parsed, list):
-                for item in parsed:
-                    if item.get("@type") == "LocalBusiness":
-                        ld_data = item
-                        break
-            elif isinstance(parsed, dict) and parsed.get("@type") == "LocalBusiness":
-                ld_data = parsed
-            if ld_data:
-                break
-        except Exception:
-            continue
-    
-    if not ld_data:
-        return None
-    
-    data["name"] = ld_data.get("name")
-    data["phone"] = ld_data.get("telephone")
-    
-    addr = ld_data.get("address", {})
-    data["city"] = addr.get("addressLocality")
-    data["address"] = addr.get("streetAddress")
-    data["zip"] = addr.get("postalCode")
-    
-    geo = ld_data.get("geo", {})
-    data["lat"] = geo.get("latitude")
-    data["lng"] = geo.get("longitude")
-    
-    try:
-        url_path = source_url.split("panoramafirm.pl")[-1] if "panoramafirm.pl" in source_url else source_url
-        url_parts = url_path.strip("/").split("/")
-        if url_parts:
-            location_part = url_parts[0]
-            loc_parts = location_part.split(",")
-            if loc_parts:
-                province_raw = loc_parts[0].replace("_", "-")
-                data["province"] = normalize_province(province_raw)
-    except Exception:
-        data["province"] = None
-    
-    email_link = soup.select_one('a[href^="mailto:"]')
-    if email_link:
-        email = email_link.get("href", "").replace("mailto:", "").split("?")[0]
-        data["email"] = email if "@" in email else None
-    else:
-        data["email"] = None
-    
-    www = None
-    for link in soup.select('a[href^="http"]'):
-        href = link.get("href", "")
-        skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin", "youtube"]
-        if not any(domain in href.lower() for domain in skip_domains):
-            www = href
-            break
-    data["website"] = normalize_website(www)
-    
-    data["nip"] = extract_nip_from_profile_html(html)
-    
-    raw_desc = ""
-    desc_selectors = [
-        '[class*="description"]', '[class*="about"]', 
-        '#description', '#about', '[class*="info-text"]'
-    ]
-    for selector in desc_selectors:
-        el = soup.select_one(selector)
-        if el:
-            text = el.get_text(separator="\n", strip=True)
-            if len(text) > len(raw_desc):
-                raw_desc = text
-    data["raw_desc"] = raw_desc
-    
-    return data
-
-
-def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None) -> dict:
+def parse_company_from_js(js_data: dict, html_fallback: str | None = None) -> dict:
     data = {}
 
+    # --- NIP (preferuj JS, fallback HTML) ---
     nip = js_data.get("nip")
     nip_digits = None
     if isinstance(nip, str):
@@ -2233,6 +1909,7 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
 
     data["nip"] = nip_digits
 
+    # --- Contact (może być null) ---
     contact = js_data.get("contact") or {}
     data["email"] = contact.get("email")
     data["website"] = normalize_website(contact.get("www"))
@@ -2243,6 +1920,7 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
     else:
         data["phone"] = phone
 
+    # --- Location ---
     loc = js_data.get("location") or {}
 
     city = loc.get("city")
@@ -2267,19 +1945,24 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
         data["lat"] = coords.get("lat")
         data["lng"] = coords.get("lon")
 
+    # --- opis surowy (jak było) ---
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
         txt = clean_html_text(js_data.get(field)).strip()
         if len(txt) >= 10:
             parts.append(txt)
     data["raw_desc"] = "\n\n".join(parts).strip()
-    
-    data["name"] = js_data.get("name")
 
     return data
 
 
+# =========================
+# INSERT (DO NOTHING) + sourceUrl
+# =========================
 def insert_company_do_nothing(conn, payload: dict) -> bool:
+    """
+    True jeśli wstawiono, False jeśli konflikt (np. sourceUrl już istnieje).
+    """
     cur = conn.cursor()
     sql = """
     INSERT INTO "Company"
@@ -2320,6 +2003,9 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
     return row is not None
 
 
+# =========================
+# PIPELINE
+# =========================
 def process_company(conn, session: requests.Session, listing_item: dict, category_name: str) -> bool:
     global total_inserted
 
@@ -2331,17 +2017,21 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     if not profile_url:
         return False
 
+    # EARLY SKIP
     if company_exists_by_source_url(conn, profile_url):
         return False
 
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     category_id = get_or_create_category(conn, tenant_id, category_name)
 
-    parsed, html = fetch_company_data(session, profile_url)
-    if not parsed:
+    js_data, html = fetch_company_js(session, profile_url)
+    if not js_data:
         return False
 
-    company_name = normalize_text(parsed.get("name") or listing_name)
+    parsed = parse_company_from_js(js_data, html_fallback=html)
+
+    # preferuj nazwę z JS (zachowuje cudzysłowy/pełną nazwę)
+    company_name = normalize_text(js_data.get("name") or listing_name)
     if not company_name:
         company_name = listing_name
 
@@ -2353,6 +2043,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
 
     slug = get_unique_slug(conn, tenant_id, company_name)
 
+    # opis
     description = None
     if USE_AI_REWRITE:
         if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
@@ -2378,6 +2069,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
                 log(f"AI strict mode: waiting and retrying. Reason: {e}")
                 continue
     else:
+        # bez AI: wrzuć surowy opis jeśli jest, inaczej NULL
         description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
 
     payload = {
@@ -2414,15 +2106,6 @@ def main():
         f"Mode={SCRAPER_MODE} | REQUIRE_AI={'YES' if REQUIRE_AI else 'NO'} | "
         f"MAX_PAGES_PER_CATEGORY={MAX_PAGES_PER_CATEGORY} | AI_MODEL={OPENAI_MODEL}"
     )
-    if PROXY_ENABLED:
-        log(f"FREE PROXY ENABLED: {len(proxy_manager.proxies)} proxies available")
-    else:
-        log("PROXY DISABLED: Using direct connection (set USE_FREE_PROXY=true to enable)")
-    
-    if FORCE_IPV6:
-        log("IPv6 FORCED: Using IPv6 connections only")
-    else:
-        log("IPv4/IPv6: Using default IP version")
 
     conn = connect_db()
     categories = scrape_all_categories()
@@ -2430,11 +2113,6 @@ def main():
 
     session = requests.Session()
     session.headers.update(HEADERS)
-    
-    if FORCE_IPV6:
-        adapter = IPv6HTTPAdapter()
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
 
     try:
         for i, cat in enumerate(categories, 1):
@@ -2457,4 +2135,3 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
