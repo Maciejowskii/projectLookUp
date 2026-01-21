@@ -25,6 +25,17 @@ export async function generateMetadata(): Promise<Metadata> {
 			template: `%s | ${siteName}`, // Np. "Hydraulik | Katalogo" wygląda czyściej
 		},
 		description: 'Największa baza firm i fachowców w Twojej okolicy.',
+		icons: {
+			icon: [
+				{ url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+				{ url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+			],
+			shortcut: '/favicon.ico',
+			apple: [
+				{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+			],
+		},
+		manifest: '/site.webmanifest',
 		openGraph: {
 			images: ['/og-image.png'],
 			siteName: siteName, // <-- WAŻNE dla social media
@@ -59,6 +70,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	return (
 		<html lang='pl'>
 			<head>
+				{/* Favicon and Icons */}
+				<link rel="manifest" href="/site.webmanifest" />
+				
 				{/* JSON-LD Schema: To jest kluczowe dla Google Site Name */}
 				<script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 

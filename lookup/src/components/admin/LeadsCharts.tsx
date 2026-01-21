@@ -302,10 +302,12 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 									dataKey='date'
 									axisLine={false}
 									tickLine={false}
-									tick={{ fill: '#94A3B8', fontSize: 11 }}
+									tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }}
+									angle={timeRange === 'year' ? -45 : 0}
+									dy={timeRange === 'year' ? 10 : 5}
 									interval={timeRange === 'week' ? 0 : timeRange === 'month' ? 2 : timeRange === '3months' ? 4 : 6}
 								/>
-								<YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+								<YAxis axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }} />
 								<Tooltip
 									contentStyle={{
 										borderRadius: '12px',
@@ -367,13 +369,13 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<ResponsiveContainer width='100%' height='100%'>
 							<BarChart data={companyData} layout='vertical'>
 								<CartesianGrid strokeDasharray='3 3' horizontal={true} vertical={false} stroke='#F1F5F9' />
-								<XAxis type='number' axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+								<XAxis type='number' axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }} />
 								<YAxis
 									dataKey='name'
 									type='category'
 									axisLine={false}
 									tickLine={false}
-									tick={{ fill: '#94A3B8', fontSize: 11 }}
+									tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }}
 									width={150}
 								/>
 								<Tooltip
