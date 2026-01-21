@@ -242,19 +242,6 @@ export const Footer = async () => {
                 </span>
               </div>
             </div>
-
-            {/* Copyright */}
-            <div className="text-xs text-gray-600 mt-6">
-              &copy; {new Date().getFullYear()} katalogo. Realizacja:{" "}
-              <a
-                href="http://digitay.pl"
-                target="_blank"
-                rel="nofollow"
-                className="text-gray-500 hover:text-white transition-colors"
-              >
-                Digitay
-              </a>
-            </div>
           </div>
         </div>
       </div>
