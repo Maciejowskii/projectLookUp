@@ -97,6 +97,29 @@ function RegisterFormContent() {
 								<p className='text-xs text-gray-500 mt-1 ml-1'>Hasło musi mieć minimum 8 znaków</p>
 							</div>
 
+							{/* Akceptacja regulaminu */}
+							<div className='flex items-start gap-3 pt-2'>
+								<input
+									type='checkbox'
+									name='acceptTerms'
+									id='acceptTerms'
+									required
+									className='mt-1 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 cursor-pointer'
+								/>
+								<label htmlFor='acceptTerms' className='text-sm text-gray-700 leading-relaxed cursor-pointer'>
+									Akceptuję{' '}
+									<Link
+										href='/regulamin'
+										target='_blank'
+										rel='noopener noreferrer'
+										className='text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 transition-colors'
+									>
+										regulamin
+									</Link>
+									{' '}serwisu
+								</label>
+							</div>
+
 							<SubmitButton />
 						</form>
 

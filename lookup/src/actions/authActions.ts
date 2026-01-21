@@ -9,10 +9,15 @@ import { cookies } from 'next/headers'
 export async function registerAction(formData: FormData) {
 	const email = formData.get('email') as string
 	const password = formData.get('password') as string
+	const acceptTerms = formData.get('acceptTerms')
 	const returnTo = formData.get('returnTo') as string | null
 
 	if (!email || !password) {
 		redirect('/rejestracja?error=' + encodeURIComponent('Wypełnij wszystkie pola') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
+	}
+
+	if (!acceptTerms) {
+		redirect('/rejestracja?error=' + encodeURIComponent('Musisz zaakceptować regulamin') + (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : ''))
 	}
 
 	if (password.length < 8) {
