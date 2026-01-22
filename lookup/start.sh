@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+# Don't exit on error - we want the app to start even if some SQL commands fail
+set +e
 
 # Change to script directory if not already there
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,7 +24,7 @@ npx prisma migrate deploy || true
 # 3. Dodaj brakujące kolumny bezpośrednio przez SQL (jeśli nie istnieją)
 echo "Ensuring all required columns exist..."
 TEMP_SQL="./prisma/migrations/ensure_columns_temp.sql"
-echo "Creating SQL file..."
+echo "Creating SQL file at: $TEMP_SQL"
 mkdir -p "$(dirname "$TEMP_SQL")"
 cat > "$TEMP_SQL" <<'SQL_EOF'
 -- Dodaj kolumny dla OAuth jeśli nie istnieją
@@ -140,12 +141,51 @@ END $$;
 SQL_EOF
 
 echo "Executing SQL commands..."
-npx prisma db execute --file "$TEMP_SQL" --schema=./prisma/schema.prisma || true
+echo "SQL file size: $(wc -l < "$TEMP_SQL" 2>/dev/null || echo 0) lines"
+
+# Try using psql directly if available, otherwise fall back to prisma db execute
+if command -v psql >/dev/null 2>&1 && [ -n "$DATABASE_URL" ]; then
+    echo "Using psql directly..."
+    if psql "$DATABASE_URL" -f "$TEMP_SQL" 2>&1; then
+        echo "SQL executed successfully via psql"
+    else
+        echo "Warning: psql execution had errors (continuing anyway - this is usually safe)"
+    fi
+else
+    echo "Using prisma db execute (psql not available or DATABASE_URL not set)..."
+    # Use timeout to prevent hanging (30 seconds)
+    if timeout 30 npx prisma db execute --file "$TEMP_SQL" --schema=./prisma/schema.prisma 2>&1; then
+        echo "SQL executed successfully via prisma"
+    else
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 124 ]; then
+            echo "Warning: prisma db execute timed out after 30s (continuing anyway)"
+        else
+            echo "Warning: prisma db execute had errors (exit code: $EXIT_CODE) - continuing anyway"
+            echo "This is usually safe - columns may already exist"
+        fi
+    fi
+fi
+
 echo "Cleaning up temporary file..."
 rm -f "$TEMP_SQL" 2>/dev/null || true
 
 echo "Database schema synchronized!"
 
-# 4. Uruchom aplikację
+# 4. Generate Prisma Client (important - in case schema changed)
+echo "Generating Prisma Client..."
+if npx prisma generate 2>&1; then
+    echo "Prisma Client generated successfully"
+else
+    echo "Warning: prisma generate had errors (continuing anyway - client may already be generated)"
+fi
+
+# 5. Uruchom aplikację
 echo "Starting Next.js application..."
+echo "Node version: $(node --version)"
+echo "NPM version: $(npm --version)"
+echo "Current directory: $(pwd)"
+echo "Files in current directory: $(ls -la | head -10)"
+
+# Start the application
 exec npm run start
