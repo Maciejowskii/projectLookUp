@@ -211,11 +211,9 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
                         <span className="text-gray-500 text-xs">
                           ({company.reviewCount})
                         </span>
-                        <Info
-                          size={12}
-                          className="text-gray-400"
-                          title="Średnia ocena z opinii"
-                        />
+                        <span title="Średnia ocena z opinii">
+                          <Info size={12} className="text-gray-400" />
+                        </span>
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">Brak opinii</span>

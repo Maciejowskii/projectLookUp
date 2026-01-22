@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getResend } from '@/lib/resend'
+import { getNotificationEmails } from '@/lib/notificationEmails'
 
 export async function claimCompanyAction(formData: FormData) {
 	const cookieStore = await cookies()
@@ -164,10 +165,55 @@ export async function claimCompanyAction(formData: FormData) {
 				console.log(`✅ Mail powitalny wysłany do: ${user.email}`)
 			} catch (error) {
 				console.error(`❌ Błąd wysyłania maila powitalnego do ${user.email}:`, error)
-				// Nie przerywamy procesu, jeśli mail się nie wyśle
 			}
 			} else {
 				console.warn('⚠️ Brak RESEND_API_KEY - mail powitalny nie został wysłany')
+			}
+		}
+
+		// Powiadom adminów (notification_emails) o bezpośrednim przejęciu – dane użytkownika
+		const notifEmails = await getNotificationEmails()
+		const resendNotif = getResend()
+		if (resendNotif && notifEmails.length > 0) {
+			const baseUrl = process.env.NEXT_PUBLIC_URL ?? 'https://www.katalogo.pl'
+			const fullName = user?.name || user?.email || 'Użytkownik'
+			const email = user?.email || 'brak@email.pl'
+			const adminHtml = `
+				<!DOCTYPE html><html><head>
+				<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;}
+				.container{max-width:600px;margin:0 auto;padding:20px;}
+				.header{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;}
+				.content{background:#f8fafc;padding:24px;border:1px solid #e2e8f0;}
+				.info-box{background:white;padding:16px;border-radius:8px;margin:12px 0;border-left:4px solid #3b82f6;}
+				.label{font-size:11px;color:#64748b;text-transform:uppercase;}
+				.value{font-size:15px;font-weight:600;color:#1e293b;margin-top:4px;}
+				.footer{text-align:center;padding:16px;color:#64748b;font-size:12px;}
+				</style></head><body>
+				<div class="container">
+					<div class="header"><h1 style="margin:0;font-size:20px;">🔄 Przejęcie bez weryfikacji</h1>
+					<p style="margin:8px 0 0;opacity:0.9;">${company.name}</p></div>
+					<div class="content">
+						<div class="info-box"><div class="label">Przejął</div><div class="value">${fullName}</div></div>
+						<div class="info-box"><div class="label">Email</div><div class="value"><a href="mailto:${email}">${email}</a></div></div>
+						<div style="text-align:center;margin-top:16px;">
+							<a href="${baseUrl}/admin/zgloszenia" style="display:inline-block;background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Panel admina →</a>
+						</div>
+					</div>
+					<div class="footer"><p>Katalogo – powiadomienie automatyczne</p></div>
+				</div></body></html>
+			`
+			for (const to of notifEmails) {
+				try {
+					await resendNotif.emails.send({
+						from: 'Katalogo <onboarding@resend.dev>',
+						to,
+						subject: `🔄 Przejęcie (bez weryfikacji): ${company.name}`,
+						html: adminHtml,
+					})
+					console.log(`✅ Powiadomienie do admina wysłane: ${to}`)
+				} catch (e) {
+					console.error(`❌ Błąd wysyłania do ${to}:`, e)
+				}
 			}
 		}
 

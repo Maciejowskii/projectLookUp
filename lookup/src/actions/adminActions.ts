@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { checkAdminAuth, logAdminAction } from '@/lib/adminAuth'
 import { getResend } from '@/lib/resend'
+import { getNotificationEmails } from '@/lib/notificationEmails'
 
 export async function approveClaim(claimId: string) {
 	const admin = await checkAdminAuth()
@@ -130,14 +131,57 @@ export async function approveClaim(claimId: string) {
 				subject: `✅ Wizytówka ${claim.company?.name || 'firmy'} została przejęta!`,
 				html: emailHtml,
 			})
-
-				console.log(`✅ Mail powitalny wysłany do: ${claim.email}`)
+			console.log(`✅ Mail powitalny wysłany do: ${claim.email}`)
 			} catch (error) {
 				console.error(`❌ Błąd wysyłania maila powitalnego do ${claim.email}:`, error)
-				// Nie przerywamy procesu, jeśli mail się nie wyśle
 			}
 		} else {
 			console.warn('⚠️ Brak RESEND_API_KEY - mail powitalny nie został wysłany')
+		}
+	}
+
+	// Powiadom adminów (notification_emails) o zatwierdzonym przejęciu – wszystkie dane zgłaszającego
+	const notifEmails = await getNotificationEmails()
+	const resendNotif = getResend()
+	if (resendNotif && notifEmails.length > 0) {
+		const baseUrl = process.env.NEXT_PUBLIC_URL ?? 'https://www.katalogo.pl'
+		const adminHtml = `
+			<!DOCTYPE html><html><head>
+			<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;}
+			.container{max-width:600px;margin:0 auto;padding:20px;}
+			.header{background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;}
+			.content{background:#f8fafc;padding:24px;border:1px solid #e2e8f0;}
+			.info-box{background:white;padding:16px;border-radius:8px;margin:12px 0;border-left:4px solid #10b981;}
+			.label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;}
+			.value{font-size:15px;font-weight:600;color:#1e293b;margin-top:4px;}
+			.footer{text-align:center;padding:16px;color:#64748b;font-size:12px;}
+			</style></head><body>
+			<div class="container">
+				<div class="header"><h1 style="margin:0;font-size:20px;">✅ Wizytówka przejęta (zatwierdzona)</h1>
+				<p style="margin:8px 0 0;opacity:0.9;">${claim.company?.name ?? 'Firma'}</p></div>
+				<div class="content">
+					<div class="info-box"><div class="label">Zgłaszający</div><div class="value">${claim.fullName}</div></div>
+					<div class="info-box"><div class="label">Email</div><div class="value"><a href="mailto:${claim.email}">${claim.email}</a></div></div>
+					<div class="info-box"><div class="label">Telefon</div><div class="value">${claim.phone}</div></div>
+					<div style="text-align:center;margin-top:16px;">
+						<a href="${baseUrl}/admin/zgloszenia" style="display:inline-block;background:#10b981;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Panel admina →</a>
+					</div>
+				</div>
+				<div class="footer"><p>Katalogo – powiadomienie automatyczne</p></div>
+			</div></body></html>
+		`
+		for (const to of notifEmails) {
+			try {
+				await resendNotif.emails.send({
+					from: 'Katalogo <onboarding@resend.dev>',
+					to,
+					subject: `✅ Przejęcie zatwierdzone: ${claim.company?.name ?? 'firma'}`,
+					html: adminHtml,
+				})
+				console.log(`✅ Powiadomienie do admina wysłane: ${to}`)
+			} catch (e) {
+				console.error(`❌ Błąd wysyłania do ${to}:`, e)
+			}
 		}
 	}
 

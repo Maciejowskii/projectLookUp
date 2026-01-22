@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
+import { getNotificationEmails } from "@/lib/notificationEmails";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
@@ -14,36 +15,6 @@ function getResend() {
     return null;
   }
   return new Resend(key);
-}
-
-// Pobierz emaile do powiadomień z ustawień lub z .env jako fallback
-async function getNotificationEmails(): Promise<string[]> {
-  // Najpierw sprawdź ustawienia w bazie
-  const setting = await prisma.setting.findUnique({
-    where: { key: "notification_emails" },
-  });
-
-  if (setting?.value) {
-    // Parsuj emaile z ustawień (każdy email w nowej linii)
-    const emails = setting.value
-      .split("\n")
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0 && e.includes("@"));
-    
-    if (emails.length > 0) {
-      return emails;
-    }
-  }
-
-  // Fallback do .env ADMIN_EMAIL (może zawierać wiele emaili po przecinku)
-  if (process.env.ADMIN_EMAIL) {
-    return process.env.ADMIN_EMAIL
-      .split(",")
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0);
-  }
-
-  return [];
 }
 
 export async function submitClaimRequest(formData: FormData) {

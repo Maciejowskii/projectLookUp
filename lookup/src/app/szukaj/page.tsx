@@ -127,11 +127,9 @@ export default async function SearchPage({
                       ))}
                     </div>
                     <span className="text-gray-500">({company.reviewCount})</span>
-                    <Info
-                      size={14}
-                      className="text-gray-400"
-                      title="Średnia ocena z opinii klientów"
-                    />
+                    <span title="Średnia ocena z opinii klientów">
+                      <Info size={14} className="text-gray-400" />
+                    </span>
                   </div>
                 )}
               </div>

@@ -13,6 +13,8 @@ import { Footer } from "@/components/Footer";
 import Link from "next/link";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { getResend } from "@/lib/resend";
+import { getNotificationEmails } from "@/lib/notificationEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -89,8 +91,58 @@ export default async function AddCompanyPage() {
       });
     });
 
-    // Przekierowujemy do strony z potwierdzeniem i wyświetlamy hasło w URL (opcjonalnie)
-    // Zmień to:
+    // Powiadom adminów (notification_emails) o nowej wizytówce – wszystkie dane z formularza
+    const category = await prisma.category.findUnique({
+      where: { id: rawData.categoryId },
+      select: { name: true },
+    });
+    const notifEmails = await getNotificationEmails();
+    const resendNotif = getResend();
+    if (resendNotif && notifEmails.length > 0) {
+      const baseUrl = process.env.NEXT_PUBLIC_URL ?? "https://www.katalogo.pl";
+      const adminHtml = `
+        <!DOCTYPE html><html><head>
+        <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;}
+        .container{max-width:600px;margin:0 auto;padding:20px;}
+        .header{background:linear-gradient(135deg,#8b5cf6 0%,#7c3aed 100%);color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;}
+        .content{background:#f8fafc;padding:24px;border:1px solid #e2e8f0;}
+        .info-box{background:white;padding:16px;border-radius:8px;margin:12px 0;border-left:4px solid #8b5cf6;}
+        .label{font-size:11px;color:#64748b;text-transform:uppercase;}
+        .value{font-size:15px;font-weight:600;color:#1e293b;margin-top:4px;}
+        .footer{text-align:center;padding:16px;color:#64748b;font-size:12px;}
+        </style></head><body>
+        <div class="container">
+          <div class="header"><h1 style="margin:0;font-size:20px;">📋 Nowa wizytówka</h1>
+          <p style="margin:8px 0 0;opacity:0.9;">${rawData.name}</p></div>
+          <div class="content">
+            <div class="info-box"><div class="label">Nazwa firmy</div><div class="value">${rawData.name}</div></div>
+            <div class="info-box"><div class="label">NIP</div><div class="value">${rawData.nip || "—"}</div></div>
+            <div class="info-box"><div class="label">Email</div><div class="value"><a href="mailto:${rawData.email}">${rawData.email}</a></div></div>
+            <div class="info-box"><div class="label">Telefon</div><div class="value">${rawData.phone}</div></div>
+            <div class="info-box"><div class="label">Miasto</div><div class="value">${rawData.city}</div></div>
+            <div class="info-box"><div class="label">Branża</div><div class="value">${category?.name ?? "—"}</div></div>
+            <div style="text-align:center;margin-top:16px;">
+              <a href="${baseUrl}/admin/companies" style="display:inline-block;background:#8b5cf6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Panel admina →</a>
+            </div>
+          </div>
+          <div class="footer"><p>Katalogo – powiadomienie automatyczne</p></div>
+        </div></body></html>
+      `;
+      for (const to of notifEmails) {
+        try {
+          await resendNotif.emails.send({
+            from: "Katalogo <onboarding@resend.dev>",
+            to,
+            subject: `📋 Nowa wizytówka: ${rawData.name}`,
+            html: adminHtml,
+          });
+          console.log(`✅ Powiadomienie do admina (nowa firma) wysłane: ${to}`);
+        } catch (e) {
+          console.error(`❌ Błąd wysyłania do ${to}:`, e);
+        }
+      }
+    }
+
     redirect(`/sukces-rejestracji?email=${rawData.email}&p=${tempPassword}`);
   }
 
