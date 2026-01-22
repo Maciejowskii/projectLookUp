@@ -40,7 +40,7 @@ export default async function SearchPage({
       category: true,
       reviews: { select: { rating: true } },
     },
-    take: 50,
+    take: 200, // Zwiększono limit z 50 do 200
   });
 
   type CompanyWithRating = (typeof companiesRaw)[number] & {

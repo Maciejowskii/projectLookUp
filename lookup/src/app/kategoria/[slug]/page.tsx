@@ -49,11 +49,13 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 
 	if (isUuid(slug)) permanentRedirect(`/kategoria/${category.slug}`)
 
-	// 2. Pobierz firmy z tego samego tenanta co kategoria
+	// 2. Pobierz firmy z kategorii (bez filtrowania po tenantId - pokazujemy wszystkie)
+	// Jeśli chcesz filtrować po tenantId, użyj: tenantId: category.tenantId
 	const companies = await prisma.company.findMany({
 		where: {
 			categoryId: category.id,
-			tenantId: category.tenantId, // Tylko firmy z tego samego tenanta
+			// Wykluczamy firmy bez nazwy (mogą być błędne dane)
+			name: { not: null },
 		},
 		orderBy: [
 			{ isVerified: 'desc' }, // Zweryfikowane pierwsze

@@ -50,7 +50,7 @@ export default async function RegionPage({
         { city: { in: region.cities } }, // Fallback dla starych wpisów (główne miasta)
       ],
     },
-    take: 50,
+    take: 200, // Zwiększono limit z 50 do 200
     orderBy: [
       { isVerified: "desc" }, // Zweryfikowane na górze
       { createdAt: "desc" }, // Najnowsze zaraz po nich

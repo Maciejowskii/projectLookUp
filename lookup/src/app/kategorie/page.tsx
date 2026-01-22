@@ -37,7 +37,8 @@ export default async function CategoriesIndexPage() {
 		)
 	}
 
-	// Pobieramy kategorie z domyślnego tenanta i liczymy firmy tylko z tego samego tenanta
+	// Pobieramy kategorie z domyślnego tenanta i liczymy WSZYSTKIE firmy z kategorii
+	// (bez filtrowania po tenantId - pokazujemy wszystkie firmy)
 	const categories = await prisma.category.findMany({
 		where: {
 			tenantId: tenant.id,
@@ -45,11 +46,7 @@ export default async function CategoriesIndexPage() {
 		include: {
 			_count: {
 				select: {
-					companies: {
-						where: {
-							tenantId: tenant.id, // Tylko firmy z tego samego tenanta
-						},
-					},
+					companies: true, // Liczymy wszystkie firmy z kategorii, niezależnie od tenantId
 				},
 			},
 		},

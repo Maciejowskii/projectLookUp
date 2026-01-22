@@ -67,7 +67,7 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
   // 3. Pobranie danych (Server Side)
   const companiesRaw = await prisma.company.findMany({
     where: whereClause,
-    take: 100,
+    take: 500, // Zwiększono limit z 100 do 500
     orderBy: [
       { isVerified: "desc" },
       { logo: "desc" },
