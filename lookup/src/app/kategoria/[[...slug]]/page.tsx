@@ -75,8 +75,24 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 				  }
 				: {}),
 		},
+		include: {
+			category: true, // Dodajemy kategorię do debugowania
+		},
 		orderBy: [{ isVerified: 'desc' }, { logo: 'desc' }, { name: 'asc' }],
+		take: 1000, // Zwiększony limit
 	})
+
+	// Debug: loguj informacje (tylko w development)
+	if (process.env.NODE_ENV === 'development') {
+		console.log(`[DEBUG] Category: ${category.name} (ID: ${category.id})`)
+		console.log(`[DEBUG] Found ${companies.length} companies`)
+		if (companies.length === 0) {
+			const count = await prisma.company.count({
+				where: { categoryId: category.id },
+			})
+			console.log(`[DEBUG] Total companies with categoryId=${category.id}: ${count}`)
+		}
+	}
 
 	type CompanyType = (typeof companies)[number]
 

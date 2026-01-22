@@ -37,23 +37,32 @@ export default async function CategoriesIndexPage() {
 		)
 	}
 
-	// Pobieramy kategorie z domyślnego tenanta i liczymy WSZYSTKIE firmy z kategorii
-	// (bez filtrowania po tenantId - pokazujemy wszystkie firmy)
-	const categories = await prisma.category.findMany({
+	// Pobieramy kategorie z domyślnego tenanta
+	const categoriesRaw = await prisma.category.findMany({
 		where: {
 			tenantId: tenant.id,
-		},
-		include: {
-			_count: {
-				select: {
-					companies: true, // Liczymy wszystkie firmy z kategorii, niezależnie od tenantId
-				},
-			},
 		},
 		orderBy: {
 			name: 'asc', // Sortowanie alfabetyczne
 		},
 	})
+
+	// Liczymy firmy dla każdej kategorii osobno (bardziej niezawodne)
+	const categories = await Promise.all(
+		categoriesRaw.map(async (cat) => {
+			const companyCount = await prisma.company.count({
+				where: {
+					categoryId: cat.id,
+				},
+			})
+			return {
+				...cat,
+				_count: {
+					companies: companyCount,
+				},
+			}
+		})
+	)
 
 	return (
 		<div className='min-h-screen bg-gray-50 flex flex-col font-sans'>

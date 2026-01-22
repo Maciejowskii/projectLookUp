@@ -49,18 +49,45 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 
 	if (isUuid(slug)) permanentRedirect(`/kategoria/${category.slug}`)
 
-	// 2. Pobierz firmy z kategorii (bez filtrowania po tenantId - pokazujemy wszystkie)
-	// Jeśli chcesz filtrować po tenantId, użyj: tenantId: category.tenantId
+	// 2. Pobierz firmy z kategorii
 	const companies = await prisma.company.findMany({
 		where: {
 			categoryId: category.id,
 		},
+		include: {
+			category: true,
+		},
 		orderBy: [
-			{ isVerified: 'desc' }, // Zweryfikowane pierwsze
-			{ logo: 'desc' }, // Te z logo wyżej (null jest na końcu)
+			{ isVerified: 'desc' },
+			{ logo: 'desc' },
 			{ name: 'asc' },
 		],
+		take: 1000,
 	})
+
+	// Debug: loguj informacje (tylko w development)
+	if (process.env.NODE_ENV === 'development') {
+		console.log(`[DEBUG] Category: ${category.name} (ID: ${category.id}, tenantId: ${category.tenantId})`)
+		console.log(`[DEBUG] Found ${companies.length} companies`)
+		if (companies.length === 0) {
+			const count = await prisma.company.count({
+				where: { categoryId: category.id },
+			})
+			console.log(`[DEBUG] Total companies with categoryId=${category.id}: ${count}`)
+			
+			// Sprawdź czy są firmy z innym tenantId
+			const companiesWithDifferentTenant = await prisma.company.findMany({
+				where: {
+					categoryId: category.id,
+					tenantId: { not: category.tenantId },
+				},
+				take: 5,
+			})
+			if (companiesWithDifferentTenant.length > 0) {
+				console.log(`[DEBUG] Found ${companiesWithDifferentTenant.length} companies with different tenantId`)
+			}
+		}
+	}
 
 	return (
 		// Używamy <div> jako głównego kontenera, to bezpieczne.
