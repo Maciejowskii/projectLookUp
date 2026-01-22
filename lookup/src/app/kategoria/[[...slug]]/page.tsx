@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
 
 	const category = await prisma.category.findFirst({
 		where: { slug: categorySlug },
-		select: { name: true, slug: true },
+		select: { name: true, slug: true, tenantId: true },
 	})
 
 	if (!category) return { title: 'Kategoria nie znaleziona | Katalogo' }
@@ -55,16 +55,17 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 
 	const category = await prisma.category.findFirst({
 		where: isUuid(categorySlug) ? { id: categorySlug } : { slug: categorySlug },
-		select: { id: true, slug: true, name: true },
+		select: { id: true, slug: true, name: true, tenantId: true },
 	})
 
 	if (!category) return notFound()
 	if (isUuid(categorySlug)) permanentRedirect(`/kategoria/${category.slug}`)
 
-	// POBIERANIE FIRM Z FILTROWANIEM PO KATEGORII I (OPCJONALNIE) MIEŚCIE
+	// POBIERANIE FIRM Z FILTROWANIEM PO KATEGORII, TENANT ID I (OPCJONALNIE) MIEŚCIE
 	const companies = await prisma.company.findMany({
 		where: {
 			categoryId: category.id,
+			tenantId: category.tenantId, // Tylko firmy z tego samego tenanta
 			...(citySlug
 				? {
 						city: {

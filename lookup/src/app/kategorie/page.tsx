@@ -7,11 +7,50 @@ import { Footer } from '@/components/Footer'
 import { safeDecode } from '@/lib/text'
 
 export default async function CategoriesIndexPage() {
-	// Pobieramy wszystkie kategorie z bazy
+	// Pobierz domyślny tenant (lub pierwszy dostępny)
+	const defaultTenant = await prisma.tenant.findFirst({
+		where: {
+			OR: [
+				{ subdomain: 'katalog' },
+				{ subdomain: 'default' },
+			],
+		},
+		orderBy: { createdAt: 'asc' },
+	})
+
+	// Jeśli nie ma domyślnego tenanta, użyj pierwszego dostępnego
+	const tenant = defaultTenant || await prisma.tenant.findFirst({
+		orderBy: { createdAt: 'asc' },
+	})
+
+	if (!tenant) {
+		return (
+			<div className='min-h-screen bg-gray-50 flex flex-col font-sans'>
+				<Navbar />
+				<div className='flex-grow pt-32 pb-20 flex items-center justify-center'>
+					<div className='text-center'>
+						<p className='text-gray-500'>Brak tenantów w bazie. Uruchom skrypt create-default-tenant.ts</p>
+					</div>
+				</div>
+				<Footer />
+			</div>
+		)
+	}
+
+	// Pobieramy kategorie z domyślnego tenanta i liczymy firmy tylko z tego samego tenanta
 	const categories = await prisma.category.findMany({
+		where: {
+			tenantId: tenant.id,
+		},
 		include: {
 			_count: {
-				select: { companies: true },
+				select: {
+					companies: {
+						where: {
+							tenantId: tenant.id, // Tylko firmy z tego samego tenanta
+						},
+					},
+				},
 			},
 		},
 		orderBy: {

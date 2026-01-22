@@ -39,18 +39,22 @@ const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 export default async function CategoryDetailPage({ params }: { params: Promise<{ slug: string }> }) {
 	const { slug } = await params
 
+	// Pobierz kategorię wraz z tenantId
 	const category = await prisma.category.findFirst({
 		where: isUuid(slug) ? { id: slug } : { slug },
-		select: { id: true, slug: true, name: true },
+		select: { id: true, slug: true, name: true, tenantId: true },
 	})
 
 	if (!category) return notFound()
 
 	if (isUuid(slug)) permanentRedirect(`/kategoria/${category.slug}`)
 
-	// 2. Pobierz firmy (jeśli wolisz osobne zapytanie dla lepszej kontroli)
+	// 2. Pobierz firmy z tego samego tenanta co kategoria
 	const companies = await prisma.company.findMany({
-		where: { categoryId: category.id },
+		where: {
+			categoryId: category.id,
+			tenantId: category.tenantId, // Tylko firmy z tego samego tenanta
+		},
 		orderBy: [
 			{ isVerified: 'desc' }, // Zweryfikowane pierwsze
 			{ logo: 'desc' }, // Te z logo wyżej (null jest na końcu)
