@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 
 function getResend() {
@@ -151,5 +152,6 @@ export async function submitClaimRequest(formData: FormData) {
     console.warn("⚠️ Brak skonfigurowanych emaili powiadomień lub brak klucza Resend API");
   }
 
+  revalidatePath("/admin/zgloszenia");
   redirect(`/przejmij/sukces?id=${companyId}`);
 }

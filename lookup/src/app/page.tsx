@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { TrendingUp, ArrowRight, MapPin, Sparkles } from 'lucide-react'
+import { TrendingUp, ArrowRight, MapPin } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { HomeSearchBar } from '@/components/HomeSearchBar'
 import { Footer } from '@/components/Footer'
 import { Navbar } from '@/components/Navbar'
+import { FeaturedCompanyCard } from '@/components/FeaturedCompanyCard'
 
 export default async function LandingPage() {
 	// Pobieramy dane z bazy równolegle
@@ -76,47 +77,14 @@ export default async function LandingPage() {
 
 			{/* --- WYRÓŻNIONA FIRMA (PROMOCJA) --- */}
 			{featuredCompany && (
-				<section className='py-16 px-6 bg-gray-50'>
-					<div className='max-w-7xl mx-auto'>
-						<Link
-							href={`/firma/${featuredCompany.slug}`}
-							className='group block bg-white border-2 border-blue-200 rounded-2xl p-6 md:p-8 hover:border-blue-400 hover:shadow-xl transition-all duration-300'
-						>
-							<div className='flex flex-col md:flex-row items-center justify-between gap-6'>
-								<div className='flex items-center gap-4 flex-1'>
-									<div className='w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors'>
-										<Sparkles className='text-blue-600' size={28} />
-									</div>
-									<div>
-										<div className='inline-flex items-center gap-2 px-3 py-1 bg-yellow-100 rounded-full mb-2'>
-											<span className='text-yellow-700 text-xs font-bold uppercase tracking-wider'>
-												Polecamy
-											</span>
-										</div>
-										<h3 className='text-xl md:text-2xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors'>
-											Najlepsza Agencja SEO/SEM w 2025 roku
-										</h3>
-										{featuredCompany.city && (
-											<p className='text-gray-600 text-sm flex items-center gap-1'>
-												<MapPin size={14} />
-												{featuredCompany.city}
-											</p>
-										)}
-									</div>
-								</div>
-								<div className='flex items-center gap-3'>
-									<span className='text-gray-700 font-semibold hidden md:block group-hover:text-blue-600 transition-colors'>
-										Sprawdź ofertę
-									</span>
-									<ArrowRight
-										size={20}
-										className='text-gray-600 group-hover:text-blue-600 group-hover:translate-x-1 transition-all'
-									/>
-								</div>
-							</div>
-						</Link>
-					</div>
-				</section>
+				<FeaturedCompanyCard
+					featured={{
+						id: featuredCompany.id,
+						name: featuredCompany.name,
+						slug: featuredCompany.slug,
+						city: featuredCompany.city,
+					}}
+				/>
 			)}
 
 			{/* --- POPULARNE KATEGORIE (DYNAMICZNE) --- */}

@@ -2,8 +2,10 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { FeaturedCompanyCard } from "@/components/FeaturedCompanyCard";
 import { MapPin, Globe, Mail, Calendar, FileText } from "lucide-react";
 import { ReviewSection } from "@/components/ReviewSection";
 import { PhoneRevealButton } from "@/components/PhoneRevealButton";
@@ -15,17 +17,30 @@ export default async function CompanyProfilePage({
 }) {
   const { slug } = await params;
 
-  const company = await prisma.company.findFirst({
-    where: { slug: slug },
-    include: {
-      category: true,
-      reviews: {
-        orderBy: { createdAt: "desc" },
+  const [company, featuredSetting] = await Promise.all([
+    prisma.company.findFirst({
+      where: { slug },
+      include: {
+        category: true,
+        reviews: { orderBy: { createdAt: "desc" } },
       },
-    },
-  });
+    }),
+    prisma.setting.findUnique({ where: { key: "featured_company_id" } }),
+  ]);
 
   if (!company) return notFound();
+
+  let featuredCompany: { id: string; name: string; slug: string; city: string | null } | null = null;
+  if (featuredSetting?.value) {
+    const fc = await prisma.company.findUnique({
+      where: { id: featuredSetting.value },
+      select: { id: true, name: true, slug: true, city: true },
+    });
+    if (fc) featuredCompany = fc;
+  }
+  const showFeatured = featuredCompany && featuredCompany.slug !== company.slug;
+  const showClaimBar = !company.isVerified;
+  const hasTopBanners = showClaimBar || showFeatured;
 
   const mapQuery = encodeURIComponent(
     `${company.name} ${company.city} ${company.address}`
@@ -35,8 +50,30 @@ export default async function CompanyProfilePage({
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
 
+      {showClaimBar && (
+        <div className="pt-24 pb-4 px-4 bg-yellow-50 border-b border-yellow-100">
+          <div className="container mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-yellow-800 text-sm">
+              <strong>To Twoja firma?</strong> Przejmij ten profil, aby edytować dane i odpowiadać na opinie.
+            </p>
+            <Link
+              href={`/przejmij/${company.id}`}
+              className="bg-white text-yellow-700 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-200 hover:bg-yellow-100"
+            >
+              Zarządzaj profilem →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {showFeatured && featuredCompany && (
+        <div className={!showClaimBar ? "pt-24" : ""}>
+          <FeaturedCompanyCard featured={featuredCompany} compact />
+        </div>
+      )}
+
       {/* HEADER FIRMY */}
-      <div className="bg-white border-b border-gray-200 pt-32 pb-12">
+      <div className={`bg-white border-b border-gray-200 pb-12 ${hasTopBanners ? "pt-8" : "pt-24"}`}>
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="flex flex-col md:flex-row gap-8 items-start">

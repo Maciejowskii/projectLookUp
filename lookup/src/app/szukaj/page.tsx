@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { Search, MapPin } from "lucide-react";
+import { Search, MapPin, Star, Info } from "lucide-react";
 import Link from "next/link";
 
 export default async function SearchPage({
@@ -17,10 +17,9 @@ export default async function SearchPage({
   const city = resolvedParams.city || "";
 
   // Logika wyszukiwania
-  const companies = await prisma.company.findMany({
+  const companiesRaw = await prisma.company.findMany({
     where: {
       AND: [
-        // Szukanie po nazwie lub opisie lub kategorii
         query
           ? {
               OR: [
@@ -32,16 +31,29 @@ export default async function SearchPage({
               ],
             }
           : {},
-        // Szukanie po mieście (jeśli podane)
         city
-          ? {
-              city: { contains: city, mode: "insensitive" },
-            }
+          ? { city: { contains: city, mode: "insensitive" } }
           : {},
       ],
     },
-    include: { category: true },
+    include: {
+      category: true,
+      reviews: { select: { rating: true } },
+    },
     take: 50,
+  });
+
+  type CompanyWithRating = (typeof companiesRaw)[number] & {
+    reviewCount: number;
+    averageRating: number;
+  };
+  const companies: CompanyWithRating[] = companiesRaw.map((c) => {
+    const reviewCount = c.reviews.length;
+    const averageRating =
+      reviewCount > 0
+        ? c.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount
+        : 0;
+    return { ...c, reviewCount, averageRating };
   });
 
   return (
@@ -89,11 +101,37 @@ export default async function SearchPage({
                 {company.description || "Brak opisu."}
               </p>
 
-              <div className="space-y-1 text-sm text-gray-600">
+              <div className="space-y-2 text-sm text-gray-600">
                 {company.city && (
                   <div className="flex items-center gap-2">
-                    <MapPin size={14} className="text-gray-400" />{" "}
+                    <MapPin size={14} className="text-gray-400" />
                     {company.city}
+                  </div>
+                )}
+                {company.reviewCount > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900">
+                      {company.averageRating.toFixed(1).replace(".", ",")}
+                    </span>
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star
+                          key={i}
+                          size={16}
+                          className={
+                            i <= Math.round(company.averageRating)
+                              ? "text-amber-400 fill-amber-400"
+                              : "text-gray-200"
+                          }
+                        />
+                      ))}
+                    </div>
+                    <span className="text-gray-500">({company.reviewCount})</span>
+                    <Info
+                      size={14}
+                      className="text-gray-400"
+                      title="Średnia ocena z opinii klientów"
+                    />
                   </div>
                 )}
               </div>

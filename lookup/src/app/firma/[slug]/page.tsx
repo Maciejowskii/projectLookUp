@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CityCrossLinks } from '@/components/CityCrossLinks'
+import { FeaturedCompanyCard } from '@/components/FeaturedCompanyCard'
 import { MapPin, Globe, Mail, FileText, CheckCircle, ChevronRight } from 'lucide-react'
 import { OpeningHoursDisplay } from '@/components/OpeningHoursDisplay'
 import type { OpeningHours } from '@/components/OpeningHoursEditor'
@@ -60,17 +61,30 @@ const getInitial = (name?: string) => {
 export default async function CompanyProfilePage({ params }: { params: Promise<{ slug: string }> }) {
 	const { slug } = await params
 
-	const company = await prisma.company.findFirst({
-		where: { slug },
-		include: {
-			category: true,
-			reviews: {
-				orderBy: { createdAt: 'desc' },
+	const [company, featuredSetting] = await Promise.all([
+		prisma.company.findFirst({
+			where: { slug },
+			include: {
+				category: true,
+				reviews: { orderBy: { createdAt: 'desc' } },
 			},
-		},
-	})
+		}),
+		prisma.setting.findUnique({ where: { key: 'featured_company_id' } }),
+	])
 
 	if (!company) return notFound()
+
+	let featuredCompany: { id: string; name: string; slug: string; city: string | null } | null = null
+	if (featuredSetting?.value) {
+		const fc = await prisma.company.findUnique({
+			where: { id: featuredSetting.value },
+			select: { id: true, name: true, slug: true, city: true },
+		})
+		if (fc) featuredCompany = fc
+	}
+	const showFeatured = featuredCompany && featuredCompany.slug !== company.slug
+	const showClaimBar = !company.isVerified
+	const hasTopBanners = showClaimBar || showFeatured
 
 	const mapQuery = encodeURIComponent(`${company.name} ${company.city} ${company.address}`)
 
@@ -132,7 +146,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			<Navbar />
 
 			{/* PASEK "CZY TO TWOJA FIRMA?" */}
-			{!company.isVerified && (
+			{showClaimBar && (
 				<div className='pt-24 pb-4 px-4 bg-yellow-50 border-b border-yellow-100'>
 					<div className='container mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4'>
 						<p className='text-yellow-800 text-sm'>
@@ -148,8 +162,15 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 				</div>
 			)}
 
+			{/* POLECAMY – wyróżniona firma (na każdej stronie firmy, oprócz własnej) */}
+			{showFeatured && featuredCompany && (
+				<div className={!showClaimBar ? 'pt-24' : ''}>
+					<FeaturedCompanyCard featured={featuredCompany} compact />
+				</div>
+			)}
+
 			{/* HEADER PROFILU */}
-			<div className={`bg-white border-b ${!company.isVerified ? 'pt-8' : 'pt-32'} pb-12`}>
+			<div className={`bg-white border-b pb-12 ${hasTopBanners ? 'pt-8' : 'pt-24'}`}>
 				<div className='container mx-auto px-4 max-w-5xl'>
 					{/* --- 1. BREADCRUMBS (SEO) --- */}
 					<nav className='flex flex-wrap items-center text-sm text-gray-500 mb-6 gap-2'>

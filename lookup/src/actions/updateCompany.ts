@@ -63,23 +63,41 @@ export async function updateCompanyAction(formData: FormData) {
     }
   }
 
-  // 5. Pobieramy slug firmy dla revalidatePath
+  // 5. Pobieramy firmę (slug, plan) dla revalidatePath i reguł Premium
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { slug: true },
+    select: { slug: true, plan: true, premiumUntil: true },
   });
+
+  const isPremiumActive =
+    company?.plan === "PREMIUM" &&
+    company?.premiumUntil &&
+    new Date(company.premiumUntil) > new Date();
+
+  const updateData: {
+    description: string;
+    website?: string;
+    phone: string;
+    email: string;
+    address: string;
+    openingHours?: object;
+  } = {
+    description,
+    phone,
+    email,
+    address,
+  };
+  if (openingHours !== undefined) {
+    updateData.openingHours = openingHours;
+  }
+  if (isPremiumActive) {
+    updateData.website = website ?? "";
+  }
 
   // 6. Aktualizacja w bazie
   await prisma.company.update({
     where: { id: companyId },
-    data: {
-      description,
-      website,
-      phone,
-      email,
-      address,
-      openingHours,
-    },
+    data: updateData,
   });
 
   // 7. Odświeżamy cache, żeby użytkownik od razu widział zmiany

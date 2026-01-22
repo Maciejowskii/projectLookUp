@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SearchBar } from "@/components/SearchBar";
 import MapWrapper from "@/components/MapWrapper";
-import { MapPin, Star, ShieldCheck, Phone } from "lucide-react";
+import { MapPin, Star, ShieldCheck, Phone, Info } from "lucide-react";
 
 // --- TYPY ---
 type Props = {
@@ -65,17 +65,27 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
   }
 
   // 3. Pobranie danych (Server Side)
-  const companies = await prisma.company.findMany({
+  const companiesRaw = await prisma.company.findMany({
     where: whereClause,
-    take: 100, // Optymalna liczba dla mapy
+    take: 100,
     orderBy: [
-      { isVerified: "desc" }, // Zweryfikowane na górze
-      { logo: "desc" }, // Te z logo wyżej
+      { isVerified: "desc" },
+      { logo: "desc" },
       { name: "asc" },
     ],
     include: {
       category: true,
+      reviews: { select: { rating: true } },
     },
+  });
+
+  const companies = companiesRaw.map((c) => {
+    const reviewCount = c.reviews.length;
+    const averageRating =
+      reviewCount > 0
+        ? c.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount
+        : 0;
+    return { ...c, reviewCount, averageRating };
   });
 
   // 4. Przygotowanie danych dla mapy
@@ -178,13 +188,38 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
                     </div>
                   </div>
 
-                  {/* Akcje / Footer karty */}
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star key={i} size={14} className="text-gray-200" />
-                      ))}
-                    </div>
+                  {/* Ocena + Akcje */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                    {company.reviewCount > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {company.averageRating.toFixed(1).replace(".", ",")}
+                        </span>
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <Star
+                              key={i}
+                              size={14}
+                              className={
+                                i <= Math.round(company.averageRating)
+                                  ? "text-amber-400 fill-amber-400"
+                                  : "text-gray-200"
+                              }
+                            />
+                          ))}
+                        </div>
+                        <span className="text-gray-500 text-xs">
+                          ({company.reviewCount})
+                        </span>
+                        <Info
+                          size={12}
+                          className="text-gray-400"
+                          title="Średnia ocena z opinii"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">Brak opinii</span>
+                    )}
                     <span className="text-xs font-medium text-blue-600 group-hover:underline">
                       Zobacz szczegóły
                     </span>

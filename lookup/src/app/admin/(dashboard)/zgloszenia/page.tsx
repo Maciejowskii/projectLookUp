@@ -47,10 +47,10 @@ export default async function AdminClaimsPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-lg text-gray-900 leading-tight">
-                        {claim.company.name}
+                        {claim.company?.name ?? "—"}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        NIP: {claim.company.nip || "Brak"}
+                        NIP: {claim.company?.nip || "Brak"}
                       </p>
                     </div>
                   </div>
@@ -59,10 +59,10 @@ export default async function AdminClaimsPage() {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-2">
                     <div className="flex items-center gap-2 text-sm text-gray-700 font-medium">
                       <User size={16} className="text-gray-400" />{" "}
-                      {claim.fullName}
+                      {claim.fullName || "—"}
                     </div>
                     <div className="text-xs text-gray-500 pl-6">
-                      {claim.email} • {claim.phone}
+                      {claim.email || "—"} • {claim.phone || "—"}
                     </div>
                   </div>
                 </div>
@@ -111,9 +111,9 @@ export default async function AdminClaimsPage() {
               {historyClaims.map((claim) => (
                 <tr key={claim.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">
-                    {claim.company.name}
+                    {claim.company?.name ?? "—"}
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{claim.email}</td>
+                  <td className="px-6 py-4 text-gray-500">{claim.email || "—"}</td>
                   <td className="px-6 py-4 text-right">
                     {claim.status === "APPROVED" ? (
                       <span className="inline-flex items-center gap-1 text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded-md">

@@ -11,6 +11,7 @@ import {
 	AlignLeft,
 	Image as ImageIcon,
 	Crown,
+	Lock,
 	X,
 	TrendingUp,
 	ShieldCheck,
@@ -269,21 +270,47 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 								/>
 							</div>
 						</div>
-						<div className='space-y-2'>
-							<label className='text-sm font-semibold text-gray-700'>WWW</label>
-							<div className='relative group'>
-								<Globe
-									className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors'
-									size={20}
-								/>
-								<input
-									name='website'
-									type='text'
-									defaultValue={company.website || ''}
-									className='w-full pl-12 pr-4 py-3.5 rounded-xl border-2 border-gray-100 bg-white text-gray-900 font-medium placeholder-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm'
-								/>
+						{isPremiumActive ? (
+							<div className='space-y-2'>
+								<label className='text-sm font-semibold text-gray-700'>WWW</label>
+								<div className='relative group'>
+									<Globe
+										className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors'
+										size={20}
+									/>
+									<input
+										name='website'
+										type='text'
+										defaultValue={company.website || ''}
+										placeholder='https://twojastrona.pl'
+										className='w-full pl-12 pr-4 py-3.5 rounded-xl border-2 border-gray-100 bg-white text-gray-900 font-medium placeholder-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm'
+									/>
+								</div>
 							</div>
-						</div>
+						) : (
+							<div className='space-y-2'>
+								<label className='text-sm font-semibold text-gray-700'>Strona www</label>
+								<div className='flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50'>
+									<Lock className='text-gray-400 shrink-0' size={20} />
+									<div className='flex-1 min-w-0'>
+										<p className='text-sm font-medium text-gray-600'>
+											Dodaj link do strony — tylko w pakiecie Premium
+										</p>
+										<p className='text-xs text-gray-500 mt-0.5'>
+											Wyróżnij firmę i pokaż klientom swoją witryną.
+										</p>
+									</div>
+									<button
+										type='button'
+										onClick={handlePremiumUpgrade}
+										disabled={isProcessing}
+										className='shrink-0 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60'
+									>
+										<Crown size={16} /> Przejdź na Premium
+									</button>
+								</div>
+							</div>
+						)}
 						<div className='space-y-2'>
 							<label className='text-sm font-semibold text-gray-700'>Adres</label>
 							<div className='relative group'>

@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { getResend } from '@/lib/resend'
 
 export async function claimCompanyAction(formData: FormData) {
@@ -56,18 +57,19 @@ export async function claimCompanyAction(formData: FormData) {
 	})
 
 	if (existingOwners.length > 0) {
-		// Firma ma właściciela - utwórz zgłoszenie
+		// Firma ma właściciela - utwórz zgłoszenie (z danymi usera, żeby w Przejęcia było widać)
 		await prisma.claimRequest.create({
 			data: {
 				companyId: company.id,
-				fullName: 'Użytkownik z dashboardu',
-				email: '', // Będzie pobrane z user
-				phone: '',
+				fullName: user?.name || user?.email || 'Użytkownik z dashboardu',
+				email: user?.email || 'brak@email.pl',
+				phone: '-',
 				status: 'PENDING',
 				message: `Użytkownik ${userId} próbuje przejąć firmę z dashboardu.`,
 			},
 		})
 
+		revalidatePath('/admin/zgloszenia')
 		redirect('/dashboard?status=claim_pending')
 	} else {
 		// Firma nie ma właściciela - automatycznie przypisz
@@ -84,6 +86,20 @@ export async function claimCompanyAction(formData: FormData) {
 			where: { id: company.id },
 			data: { isVerified: true },
 		})
+
+		// Zapisz przejęcie w ClaimRequest (status APPROVED), żeby widoczne w Przejęcia → Historia
+		await prisma.claimRequest.create({
+			data: {
+				companyId: company.id,
+				fullName: user?.name || user?.email || 'Użytkownik',
+				email: user?.email || 'brak@email.pl',
+				phone: '-',
+				status: 'APPROVED',
+				message: 'Przejęcie automatyczne (firma bez właściciela).',
+			},
+		})
+
+		revalidatePath('/admin/zgloszenia')
 
 		// Wyślij mail powitalny do użytkownika
 		if (user?.email) {
@@ -145,12 +161,11 @@ export async function claimCompanyAction(formData: FormData) {
 					subject: `✅ Wizytówka ${company.name} została przejęta!`,
 					html: emailHtml,
 				})
-
-					console.log(`✅ Mail powitalny wysłany do: ${user.email}`)
-				} catch (error) {
-					console.error(`❌ Błąd wysyłania maila powitalnego do ${user.email}:`, error)
-					// Nie przerywamy procesu, jeśli mail się nie wyśle
-				}
+				console.log(`✅ Mail powitalny wysłany do: ${user.email}`)
+			} catch (error) {
+				console.error(`❌ Błąd wysyłania maila powitalnego do ${user.email}:`, error)
+				// Nie przerywamy procesu, jeśli mail się nie wyśle
+			}
 			} else {
 				console.warn('⚠️ Brak RESEND_API_KEY - mail powitalny nie został wysłany')
 			}
