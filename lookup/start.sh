@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
 
+# Change to script directory if not already there
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
 echo "=== Starting deployment process ==="
+echo "Working directory: $(pwd)"
 
 # 1. Oznacz wszystkie migracje jako zastosowane (rozwiązuje konflikt z istniejącymi obiektami)
 echo "Marking all migrations as applied..."
@@ -17,13 +22,21 @@ npx prisma migrate deploy || true
 
 # 3. Dodaj brakujące kolumny bezpośrednio przez SQL (jeśli nie istnieją)
 echo "Ensuring all required columns exist..."
-npx prisma db execute --stdin <<EOF
+TEMP_SQL="./prisma/migrations/ensure_columns_temp.sql"
+echo "Creating SQL file..."
+mkdir -p "$(dirname "$TEMP_SQL")"
+cat > "$TEMP_SQL" <<'SQL_EOF'
 -- Dodaj kolumny dla OAuth jeśli nie istnieją
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "name" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "image" TEXT;
 
--- Upewnij się że password jest nullable
-ALTER TABLE "User" ALTER COLUMN "password" DROP NOT NULL;
+-- Upewnij się że password jest nullable (tylko jeśli kolumna istnieje)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='password' AND is_nullable='NO') THEN
+        ALTER TABLE "User" ALTER COLUMN "password" DROP NOT NULL;
+    END IF;
+END $$;
 
 -- Dodaj userId do ClaimRequest jeśli nie istnieje
 ALTER TABLE "ClaimRequest" ADD COLUMN IF NOT EXISTS "userId" TEXT;
@@ -31,8 +44,13 @@ ALTER TABLE "ClaimRequest" ADD COLUMN IF NOT EXISTS "userId" TEXT;
 -- Dodaj fullName do User jeśli nie istnieje
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fullName" TEXT;
 
--- Upewnij się że companyId jest nullable
-ALTER TABLE "User" ALTER COLUMN "companyId" DROP NOT NULL;
+-- Upewnij się że companyId jest nullable (tylko jeśli kolumna istnieje)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='companyId' AND is_nullable='NO') THEN
+        ALTER TABLE "User" ALTER COLUMN "companyId" DROP NOT NULL;
+    END IF;
+END $$;
 
 -- Dodaj kolumnę openingHours do Company jeśli nie istnieje
 ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "openingHours" JSONB;
@@ -51,6 +69,17 @@ CREATE TABLE IF NOT EXISTS "CompanyUser" (
 CREATE INDEX IF NOT EXISTS "CompanyUser_userId_idx" ON "CompanyUser"("userId");
 CREATE INDEX IF NOT EXISTS "CompanyUser_companyId_idx" ON "CompanyUser"("companyId");
 CREATE UNIQUE INDEX IF NOT EXISTS "CompanyUser_userId_companyId_key" ON "CompanyUser"("userId", "companyId");
+
+-- Dodaj foreign keys dla CompanyUser jeśli nie istnieją
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='CompanyUser_userId_fkey' AND table_name='CompanyUser') THEN
+        ALTER TABLE "CompanyUser" ADD CONSTRAINT "CompanyUser_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='CompanyUser_companyId_fkey' AND table_name='CompanyUser') THEN
+        ALTER TABLE "CompanyUser" ADD CONSTRAINT "CompanyUser_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Utwórz tabelę Account jeśli nie istnieje (dla OAuth)
 CREATE TABLE IF NOT EXISTS "Account" (
@@ -84,8 +113,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "A
 CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
 CREATE INDEX IF NOT EXISTS "Session_userId_idx" ON "Session"("userId");
 
+-- Dodaj foreign keys dla Account i Session jeśli nie istnieją
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='Account_userId_fkey' AND table_name='Account') THEN
+        ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='Session_userId_fkey' AND table_name='Session') THEN
+        ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='ClaimRequest_userId_fkey' AND table_name='ClaimRequest') THEN
+        ALTER TABLE "ClaimRequest" ADD CONSTRAINT "ClaimRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+END $$;
+
 -- Dodaj kolumny description i source do Lead (bezpieczne - tylko jeśli nie istnieją)
-DO \$\$
+DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Lead' AND column_name='description') THEN
         ALTER TABLE "Lead" ADD COLUMN "description" TEXT;
@@ -93,8 +136,13 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Lead' AND column_name='source') THEN
         ALTER TABLE "Lead" ADD COLUMN "source" TEXT;
     END IF;
-END \$\$;
-EOF
+END $$;
+SQL_EOF
+
+echo "Executing SQL commands..."
+npx prisma db execute --file "$TEMP_SQL" --schema=./prisma/schema.prisma || true
+echo "Cleaning up temporary file..."
+rm -f "$TEMP_SQL" 2>/dev/null || true
 
 echo "Database schema synchronized!"
 
