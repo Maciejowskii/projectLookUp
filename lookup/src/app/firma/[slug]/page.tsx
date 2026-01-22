@@ -83,8 +83,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		if (fc) featuredCompany = fc
 	}
 	const showFeatured = featuredCompany && featuredCompany.slug !== company.slug
-	const showClaimBar = !company.isVerified
-	const hasTopBanners = showClaimBar || showFeatured
+	const hasTopBanners = showFeatured
 
 	const mapQuery = encodeURIComponent(`${company.name} ${company.city} ${company.address}`)
 
@@ -145,26 +144,9 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
 			<Navbar />
 
-			{/* PASEK "CZY TO TWOJA FIRMA?" */}
-			{showClaimBar && (
-				<div className='pt-24 pb-4 px-4 bg-yellow-50 border-b border-yellow-100'>
-					<div className='container mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4'>
-						<p className='text-yellow-800 text-sm'>
-							<strong>To Twoja firma?</strong> Przejmij ten profil, aby edytować dane i odpowiadać na opinie.
-						</p>
-						<Link
-							href={`/przejmij/${company.id}`}
-							className='bg-white text-yellow-700 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-200 hover:bg-yellow-100'
-						>
-							Zarządzaj profilem →
-						</Link>
-					</div>
-				</div>
-			)}
-
 			{/* POLECAMY – wyróżniona firma (na każdej stronie firmy, oprócz własnej) */}
 			{showFeatured && featuredCompany && (
-				<div className={!showClaimBar ? 'pt-24' : ''}>
+				<div className='pt-24'>
 					<FeaturedCompanyCard featured={featuredCompany} compact />
 				</div>
 			)}
@@ -263,16 +245,28 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</div>
 
 						{/* AKCJE */}
-						<div className='bg-gray-50 p-6 rounded-2xl min-w-[280px] border border-gray-100 h-fit'>
+						<div className='bg-gray-50 p-6 rounded-2xl w-full md:w-[300px] md:min-w-[300px] md:max-w-[300px] shrink-0 border border-gray-100 h-fit space-y-3 text-center'>
 							{company.phone && <PhoneRevealButton phone={company.phone} companyId={company.id} />}
 
-							{company.email && (
-								<a
-									href={`mailto:${company.email}`}
-									className='mt-3 flex items-center justify-center gap-2 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors'
-								>
-									<Mail size={18} /> Wyślij wiadomość
-								</a>
+							<a
+								href={company.email ? `mailto:${company.email}` : '/kontakt'}
+								className='flex items-center justify-center gap-2 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors'
+							>
+								<Mail size={18} /> Wyślij wiadomość
+							</a>
+
+							{!company.isVerified && (
+								<div className='pt-3 border-t border-gray-200 text-center'>
+									<p className='text-amber-800/90 text-xs mb-3'>
+										<strong>To Twoja firma?</strong> Przejmij profil, aby edytować dane i odpowiadać na opinie.
+									</p>
+									<Link
+										href={`/przejmij/${company.id}`}
+										className='inline-flex items-center justify-center gap-2 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-sm hover:shadow transition-all text-sm'
+									>
+										Zarządzaj profilem →
+									</Link>
+								</div>
 							)}
 						</div>
 					</div>
