@@ -66,8 +66,6 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 	const companies = await prisma.company.findMany({
 		where: {
 			categoryId: category.id,
-			// Wykluczamy firmy bez nazwy (mogą być błędne dane)
-			name: { not: null },
 			...(citySlug
 				? {
 						city: {
