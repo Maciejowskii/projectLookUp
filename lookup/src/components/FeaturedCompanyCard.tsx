@@ -28,7 +28,8 @@ export function FeaturedCompanyCard({ featured, compact }: Props) {
 								<Sparkles className="text-blue-600" size={14} />
 							</div>
 							<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
-								<span className="text-yellow-700 text-[10px] font-bold uppercase tracking-wider bg-yellow-100 px-1.5 py-0.5 rounded">
+								<span className="inline-flex items-center gap-1 text-white text-xs font-black uppercase tracking-wider bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 px-2.5 py-1 rounded-md shadow-lg border border-red-400/50 animate-pulse">
+									<Sparkles size={10} className="text-white" />
 									Polecamy
 								</span>
 								<span className="text-gray-900 font-semibold text-sm truncate group-hover:text-blue-600 transition-colors">
@@ -63,8 +64,9 @@ export function FeaturedCompanyCard({ featured, compact }: Props) {
 								<Sparkles className="text-blue-600" size={28} />
 							</div>
 							<div className="min-w-0">
-								<div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-100 rounded-full mb-2">
-									<span className="text-yellow-700 text-xs font-bold uppercase tracking-wider">Polecamy</span>
+								<div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full mb-2 shadow-lg border border-red-400/50">
+									<Sparkles size={12} className="text-white" />
+									<span className="text-white text-xs font-black uppercase tracking-wider">Polecamy</span>
 								</div>
 								<h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
 									Najlepsza Agencja SEO/SEM w 2025 roku
