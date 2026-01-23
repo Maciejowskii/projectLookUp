@@ -8,20 +8,39 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Systemowe zależności potrzebne m.in. dla psycopg2
+# Systemowe zależności:
+# - build-essential, libpq-dev dla psycopg2
+# - Zależności dla Playwright/Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    # Zależności dla Playwright/Chromium
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
+    libxshmfence1 \
+    fonts-liberation \
+    libappindicator3-1 \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir \
-    "openai==1.55.3" \
-    "httpx==0.27.2" \
-    psycopg2-binary \
-    requests \
-    beautifulsoup4 \
-    python-dotenv
+# Zainstaluj zależności Pythona (z requirements.txt)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Zainstaluj przeglądarki Playwright (tylko Chromium dla mniejszego rozmiaru)
+RUN playwright install chromium
+RUN playwright install-deps chromium
 
 # Skopiuj tylko to, co potrzebne
 COPY scraper.py /app/scraper.py
