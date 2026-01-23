@@ -13,6 +13,7 @@ import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
 import httpx  # Potrzebne dla OpenAI >= 1.0 jeśli używasz proxy
+import openai  # Do sprawdzenia wersji
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 
@@ -402,6 +403,15 @@ def ensure_openai_available_forever():
     """
     global client
 
+    # Sprawdź wersję OpenAI przy pierwszym wywołaniu
+    if not hasattr(ensure_openai_available_forever, '_version_logged'):
+        try:
+            openai_version = getattr(openai, '__version__', 'unknown')
+            log(f"📦 OpenAI version: {openai_version}")
+            ensure_openai_available_forever._version_logged = True
+        except:
+            pass
+
     while True:
         if not OPENAI_API_KEY:
             if REQUIRE_AI:
@@ -423,9 +433,27 @@ def ensure_openai_available_forever():
                 # )
                 # client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
                 
-                # Bez proxy (domyślne):
+                # Bez proxy (domyślne) - POPRAWNA składnia dla OpenAI >= 1.0
+                log(f"Inicjalizacja klienta OpenAI...")
                 client = OpenAI(api_key=OPENAI_API_KEY)
+                log(f"✅ Klient OpenAI zainicjalizowany pomyślnie")
                 return True
+            except TypeError as e:
+                # Specjalna obsługa błędu z proxies
+                if "proxies" in str(e):
+                    log(f"❌ BŁĄD: Wykryto użycie 'proxies' w inicjalizacji OpenAI. To nie jest obsługiwane w OpenAI >= 1.0.")
+                    log(f"❌ Sprawdź czy nie używasz starej wersji kodu lub zmiennych środowiskowych z proxies.")
+                    log(f"❌ Błąd: {e}")
+                    # Nie próbuj ponownie - to jest błąd w kodzie, nie problem z API
+                    if REQUIRE_AI:
+                        log(f"⚠️ REQUIRE_AI=true, ale nie można zainicjalizować klienta. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                        time.sleep(AI_RETRY_CHECK_SECONDS)
+                        continue
+                    return False
+                else:
+                    log(f"OpenAI init error (TypeError): {e}. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                    time.sleep(AI_RETRY_CHECK_SECONDS)
+                    continue
             except Exception as e:
                 log(f"OpenAI init error: {e}. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
                 time.sleep(AI_RETRY_CHECK_SECONDS)
