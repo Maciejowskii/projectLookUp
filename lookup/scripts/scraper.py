@@ -2262,13 +2262,18 @@ def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dic
             # Najpierw próbuj stary sposób (var company =)
             js_data = extract_company_variable(html)
             if js_data:
-                return (parse_company_from_js_legacy(js_data, html), html)
+                parsed = parse_company_from_js_legacy(js_data, html)
+                if parsed:
+                    log(f"  ✅ Parsowanie: użyto legacy JS (var company)")
+                    return (parsed, html)
 
             # Nowy sposób - JSON-LD + HTML (2025+)
             parsed = parse_company_from_json_ld(html, company_url)
             if parsed:
+                log(f"  ✅ Parsowanie: użyto JSON-LD")
                 return (parsed, html)
 
+            log(f"  ⚠️ Parsowanie: nie udało się sparsować danych (ani JS, ani JSON-LD)")
             return (None, html)
         except Exception as e:
             log(f"  Company fetch error: {e}")
@@ -2453,6 +2458,12 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
     """
     True jeśli wstawiono, False jeśli konflikt (np. sourceUrl już istnieje).
     """
+    # Sprawdź czy sourceUrl jest ustawione (wymagane dla ON CONFLICT)
+    source_url = payload.get("sourceUrl")
+    if not source_url:
+        log(f"  ❌ ERROR: sourceUrl jest NULL dla firmy {payload.get('name', 'N/A')[:50]} - nie można wstawić")
+        return False
+    
     cur = conn.cursor()
     sql = """
     INSERT INTO "Company"
@@ -2465,32 +2476,44 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
     RETURNING id;
     """
 
-    cur.execute(
-        sql,
-        (
-            payload.get("id") or str(uuid.uuid4()),
-            payload["tenantId"],
-            payload["name"],
-            payload["slug"],
-            payload.get("address"),
-            payload.get("city"),
-            payload.get("province"),
-            payload.get("zip"),
-            payload.get("phone"),
-            payload.get("email"),
-            payload.get("website"),
-            payload.get("description"),
-            payload["categoryId"],
-            payload.get("nip"),
-            payload.get("lat"),
-            payload.get("lng"),
-            payload.get("sourceUrl"),
-        ),
-    )
-    row = cur.fetchone()
-    conn.commit()
-    cur.close()
-    return row is not None
+    try:
+        cur.execute(
+            sql,
+            (
+                payload.get("id") or str(uuid.uuid4()),
+                payload["tenantId"],
+                payload["name"],
+                payload["slug"],
+                payload.get("address"),
+                payload.get("city"),
+                payload.get("province"),
+                payload.get("zip"),
+                payload.get("phone"),
+                payload.get("email"),
+                payload.get("website"),
+                payload.get("description"),
+                payload["categoryId"],
+                payload.get("nip"),
+                payload.get("lat"),
+                payload.get("lng"),
+                source_url,
+            ),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        
+        if row:
+            log(f"  ✅ INSERT SUCCESS: ID={row[0]}, sourceUrl={source_url[:60]}")
+            return True
+        else:
+            log(f"  ⚠️ INSERT CONFLICT: sourceUrl już istnieje w bazie: {source_url[:60]}")
+            return False
+    except Exception as e:
+        log(f"  ❌ INSERT ERROR: {e}")
+        conn.rollback()
+        cur.close()
+        return False
 
 
 # =========================
@@ -2501,22 +2524,36 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
 
     listing_name = normalize_text(listing_item.get("name"))
     if not listing_name:
+        log(f"  ⚠️ SKIP: Brak nazwy firmy w listing_item")
         return False
 
     profile_url = safe_url(listing_item.get("url"))
     if not profile_url:
+        log(f"  ⚠️ SKIP: Brak lub nieprawidłowy URL dla {listing_name}")
         return False
 
     # EARLY SKIP
     if company_exists_by_source_url(conn, profile_url):
+        log(f"  ⚠️ SKIP: Firma już istnieje w bazie (sourceUrl={profile_url[:60]})")
         return False
 
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
+    if not tenant_id:
+        log(f"  ❌ ERROR: Nie udało się uzyskać tenant_id dla kategorii: {category_name}")
+        return False
+    
     category_id = get_or_create_category(conn, tenant_id, category_name)
+    if not category_id:
+        log(f"  ❌ ERROR: Nie udało się uzyskać category_id dla: {category_name}")
+        return False
 
+    log(f"  📥 Pobieranie danych firmy: {profile_url[:80]}")
     parsed, html = fetch_company_data(session, profile_url)
     if not parsed:
+        log(f"  ⚠️ SKIP: Nie udało się sparsować danych firmy z {profile_url[:60]}")
         return False
+    
+    log(f"  ✅ Sparsowano dane firmy: {parsed.get('name', 'N/A')[:50]}")
 
     # preferuj nazwę z parsowanych danych (zachowuje cudzysłowy/pełną nazwę)
     company_name = normalize_text(parsed.get("name") or listing_name)
@@ -2539,11 +2576,15 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         else:
             source_text = raw_desc
 
-        while True:
+        log(f"  🤖 Generowanie opisu przez AI...")
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
             try:
                 if REQUIRE_AI and not OPENAI_API_KEY:
-                    log(f"REQUIRE_AI=true, ale brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                    log(f"  ⚠️ REQUIRE_AI=true, ale brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
                     time.sleep(AI_RETRY_CHECK_SECONDS)
+                    retry_count += 1
                     continue
 
                 description = rewrite_description_with_ai_strict(
@@ -2552,13 +2593,21 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
                     category_name=category_name,
                     city=city,
                 )
+                log(f"  ✅ Opis wygenerowany przez AI ({len(description or '')} znaków)")
                 break
             except Exception as e:
-                log(f"AI strict mode: waiting and retrying. Reason: {e}")
+                retry_count += 1
+                log(f"  ⚠️ AI error (próba {retry_count}/{max_retries}): {e}")
+                if retry_count >= max_retries:
+                    log(f"  ⚠️ Przekroczono limit prób AI, używam surowego opisu")
+                    description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
+                    break
+                time.sleep(2)
                 continue
     else:
         # bez AI: wrzuć surowy opis jeśli jest, inaczej NULL
         description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
+        log(f"  ℹ️ Tryb bez AI: opis={'dostępny' if description else 'brak'}")
 
     payload = {
         "id": str(uuid.uuid4()),
@@ -2580,13 +2629,15 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         "sourceUrl": profile_url,
     }
 
+    log(f"  💾 Próba wstawienia firmy do bazy: {company_name[:50]}")
     inserted = insert_company_do_nothing(conn, payload)
     if inserted:
         total_inserted += 1
-        log(f"  INSERT OK [{tenant_subdomain}] {company_name[:60]} | slug={slug} | desc={len(description or '')}")
+        log(f"  ✅ INSERT OK [{tenant_subdomain}] {company_name[:60]} | slug={slug} | desc={len(description or '')} znaków")
         return True
-
-    return False
+    else:
+        log(f"  ⚠️ INSERT SKIP: Firma nie została dodana (prawdopodobnie duplikat sourceUrl: {profile_url[:60]})")
+        return False
 
 
 def main():
@@ -2613,7 +2664,16 @@ def main():
 
             for j, item in enumerate(companies, 1):
                 log(f"  ({j}/{len(companies)}) {item.get('name','')[:60]}")
-                process_company(conn, session, item, category_name=cat_name)
+                try:
+                    result = process_company(conn, session, item, category_name=cat_name)
+                    if result:
+                        log(f"  ✅ Firma {j}/{len(companies)} dodana pomyślnie")
+                    else:
+                        log(f"  ⚠️ Firma {j}/{len(companies)} pominięta")
+                except Exception as e:
+                    log(f"  ❌ ERROR podczas przetwarzania firmy {j}/{len(companies)}: {e}")
+                    import traceback
+                    log(f"  Traceback: {traceback.format_exc()}")
                 time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     finally:
