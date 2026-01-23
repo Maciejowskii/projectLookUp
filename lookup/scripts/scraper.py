@@ -512,9 +512,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/elektroinstalatorstwo",
-        "https://panoramafirm.pl/hydraulicy",
-        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
         "https://panoramafirm.pl/wykończenia_wnętrz",
         "https://panoramafirm.pl/malowanie_i_tapetowanie",
         "https://panoramafirm.pl/renowacje_i_remonty",
@@ -533,6 +530,9 @@ def scrape_all_categories():
         "https://panoramafirm.pl/oddłużanie",
         "https://panoramafirm.pl/stomatolodzy_i_protetycy",
         "https://panoramafirm.pl/masaż",
+        "https://panoramafirm.pl/elektroinstalatorstwo",
+        "https://panoramafirm.pl/hydraulicy",
+        "https://panoramafirm.pl/układanie_gresu_i_płytek_ceramicznych",
         "https://panoramafirm.pl/rehabilitacja",
         "https://panoramafirm.pl/rehabilitacja_medyczna",   
         "https://panoramafirm.pl/łańcuchy",
