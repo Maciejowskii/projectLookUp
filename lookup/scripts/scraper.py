@@ -512,6 +512,7 @@ def scrape_all_categories():
     categories = []
 
     popular = [
+        "https://panoramafirm.pl/administracja_obiektów_użyteczności_publicznej",
         "https://panoramafirm.pl/wykończenia_wnętrz",
         "https://panoramafirm.pl/malowanie_i_tapetowanie",
         "https://panoramafirm.pl/renowacje_i_remonty",
@@ -608,7 +609,6 @@ def scrape_all_categories():
         "https://panoramafirm.pl/ubezpieczenia",
         "https://panoramafirm.pl/ubezpieczenia_społeczne",
         "https://panoramafirm.pl/windykacja_długów_i_należności",
-        "https://panoramafirm.pl/administracja_obiektów_użyteczności_publicznej",
         "https://panoramafirm.pl/agencje_i_składy_celne",
         "https://panoramafirm.pl/ambasady",
         "https://panoramafirm.pl/archiwa_i_archiwizacja_danych",
