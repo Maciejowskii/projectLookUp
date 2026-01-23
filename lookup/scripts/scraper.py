@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
+import httpx  # Potrzebne dla OpenAI >= 1.0 jeśli używasz proxy
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 
@@ -411,6 +412,18 @@ def ensure_openai_available_forever():
 
         if client is None:
             try:
+                # OpenAI >= 1.0: NIE używaj argumentu 'proxies' bezpośrednio
+                # Jeśli potrzebujesz proxy, użyj http_client z httpx.Client
+                # Przykład z proxy:
+                # http_client = httpx.Client(
+                #     proxies={
+                #         "http://": "http://proxy.example.com:8080",
+                #         "https://": "http://proxy.example.com:8080"
+                #     }
+                # )
+                # client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
+                
+                # Bez proxy (domyślne):
                 client = OpenAI(api_key=OPENAI_API_KEY)
                 return True
             except Exception as e:
