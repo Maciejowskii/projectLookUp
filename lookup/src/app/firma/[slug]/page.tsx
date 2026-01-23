@@ -116,7 +116,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		'@context': 'https://schema.org',
 		'@type': 'LocalBusiness',
 		name: company.name,
-		image: company.logo ? [company.logo] : ['https://placehold.co/600x600?text=Logo'],
+		image: company.logo ? [company.logo] : undefined,
 		address: {
 			'@type': 'PostalAddress',
 			streetAddress: company.address,
@@ -125,15 +125,19 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			addressCountry: 'PL',
 		},
 		url: `https://www.katalogo.pl/firma/${company.slug}`,
-		telephone: company.phone,
+		telephone: company.phone || undefined,
+		email: company.email || undefined,
 		description: company.description || `Profil firmy ${company.name} w miejscowości ${company.city}.`,
+		category: company.category.name,
 		priceRange: 'PLN',
 		openingHours: formatOpeningHoursForSchema(company.openingHours as OpeningHours | null),
-		...(reviewCount > 0 && {
+		...(reviewCount > 0 && parseFloat(averageRating || '0') >= 3.5 && {
 			aggregateRating: {
 				'@type': 'AggregateRating',
 				ratingValue: averageRating,
-				reviewCount,
+				bestRating: '5',
+				worstRating: '1',
+				reviewCount: reviewCount.toString(),
 			},
 		}),
 	}
