@@ -40,7 +40,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Zainstaluj przeglądarki Playwright (tylko Chromium dla mniejszego rozmiaru)
 RUN playwright install chromium
-RUN playwright install-deps chromium
+
+# Zainstaluj dodatkowe pakiety fontów potrzebne dla Playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-unifont \
+    && rm -rf /var/lib/apt/lists/*
+
+# Uwaga: pomijamy 'playwright install-deps' ponieważ:
+# 1. Większość zależności jest już zainstalowana ręcznie powyżej
+# 2. 'playwright install-deps' próbuje zainstalować stare pakiety (ttf-unifont, ttf-ubuntu-font-family)
+#    które nie są dostępne w Debian Trixie (python:3.13-slim)
+# 3. Zainstalowaliśmy już fonts-unifont jako zamiennik dla ttf-unifont
+# 4. fonts-liberation jest już zainstalowane w pierwszym RUN
 
 # Skopiuj tylko to, co potrzebne
 COPY scraper.py /app/scraper.py
