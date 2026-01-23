@@ -367,9 +367,40 @@ def get_or_create_category(conn, tenant_id: str, name: str):
 
 
 # =========================
-# DEDUPE (sourceUrl)
+# DEDUPE (NIP lub nazwa firmy)
 # =========================
+def company_exists_by_nip_or_name(conn, nip: str | None, company_name: str, tenant_id: str) -> bool:
+    """
+    Sprawdza czy firma już istnieje w bazie:
+    1. Po NIP (jeśli NIP jest dostępny i nie jest NULL)
+    2. Jeśli nie ma NIP, po nazwie firmy (w tym samym tenantId)
+    """
+    cur = conn.cursor()
+    
+    # 1. Sprawdź po NIP (jeśli jest dostępny)
+    if nip and nip.strip():
+        cur.execute('SELECT 1 FROM "Company" WHERE nip = %s AND nip IS NOT NULL LIMIT 1', (nip.strip(),))
+        if cur.fetchone():
+            cur.close()
+            return True
+    
+    # 2. Sprawdź po nazwie firmy (w tym samym tenantId)
+    normalized_name = normalize_text(company_name)
+    if normalized_name:
+        cur.execute(
+            'SELECT 1 FROM "Company" WHERE "tenantId" = %s AND LOWER(TRIM(name)) = LOWER(TRIM(%s)) LIMIT 1',
+            (tenant_id, normalized_name)
+        )
+        if cur.fetchone():
+            cur.close()
+            return True
+    
+    cur.close()
+    return False
+
+
 def company_exists_by_source_url(conn, source_url: str) -> bool:
+    """Sprawdza czy firma istnieje po sourceUrl (backup check)"""
     cur = conn.cursor()
     cur.execute('SELECT 1 FROM "Company" WHERE "sourceUrl" = %s LIMIT 1', (source_url,))
     ok = cur.fetchone() is not None
@@ -2211,21 +2242,24 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     raw_text = link.get_text(strip=True)
                     name = normalize_text(raw_text)
             
-                    # Wyklucz linki do formularzy i innych nie-firm
-                    if href and ("/dodaj-firme" in href.lower() or "/dodaj-firmę" in href.lower()):
-                        log(f"    DEBUG: Link rejected - add company form. href={href[:60]}")
-                        continue
-                    
                     # DEBUG: Sprawdź dlaczego linki są odrzucane
                     if not href:
-                        log(f"    DEBUG: Link rejected - no href")
-                        continue
+                        continue  # Pomijamy linki bez href (ciche pominięcie)
+                    
+                    # Wyklucz linki z href="#" (mapa, anchor links) - nie są to linki do firm
+                    if href == "#" or href.startswith("#"):
+                        continue  # Pomijamy anchor links (ciche pominięcie)
+                    
+                    # Wyklucz linki do formularzy i innych nie-firm
+                    if "/dodaj-firme" in href.lower() or "/dodaj-firmę" in href.lower():
+                        continue  # Pomijamy formularze (ciche pominięcie)
+                    
                     if not name or len(name) < 2:
-                        log(f"    DEBUG: Link rejected - no name or too short. href={href[:60]}, raw_text={raw_text[:40]}, normalized={name[:40]}")
-                        continue
+                        continue  # Pomijamy linki bez nazwy (ciche pominięcie)
+                    
+                    # Sprawdź duplikaty używając pełnego URL
                     if href in seen_urls:
-                        log(f"    DEBUG: Link rejected - already seen. href={href[:60]}, name={name[:40]}")
-                        continue
+                        continue  # Pomijamy duplikaty (ciche pominięcie)
                     
                     # Normalizuj href (może być relatywny)
                     if href.startswith("/"):
@@ -2235,7 +2269,11 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     else:
                         full_href = f"{BASE_URL}/{href}"
                     
-                    seen_urls.add(href)
+                    # Używamy full_href do sprawdzania duplikatów (bardziej niezawodne)
+                    if full_href in seen_urls:
+                        continue  # Pomijamy duplikaty pełnych URL (ciche pominięcie)
+                    
+                    seen_urls.add(full_href)  # Dodajemy full_href zamiast href
                     results.append({"name": name, "url": full_href})
                     new_count += 1
                     log(f"    DEBUG: Added link - name={name[:50]}, href={full_href[:80]}")
@@ -2484,7 +2522,11 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
 # =========================
 def insert_company_do_nothing(conn, payload: dict) -> bool:
     """
-    True jeśli wstawiono, False jeśli konflikt (np. sourceUrl już istnieje).
+    Wstawia firmę do bazy danych.
+    True jeśli wstawiono, False jeśli konflikt.
+    
+    Uwaga: Deduplikacja jest już sprawdzona wcześniej przez company_exists_by_nip_or_name(),
+    ale ON CONFLICT na sourceUrl jest backupem na wypadek równoczesnych requestów.
     """
     # Sprawdź czy sourceUrl jest ustawione (wymagane dla ON CONFLICT)
     source_url = payload.get("sourceUrl")
@@ -2532,10 +2574,11 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
         cur.close()
         
         if row:
-            log(f"  ✅ INSERT SUCCESS: ID={row[0]}, sourceUrl={source_url[:60]}")
+            log(f"  ✅ INSERT SUCCESS: ID={row[0]}, name={payload.get('name', 'N/A')[:50]}, NIP={payload.get('nip', 'brak')[:20]}")
             return True
         else:
-            log(f"  ⚠️ INSERT CONFLICT: sourceUrl już istnieje w bazie: {source_url[:60]}")
+            # To nie powinno się zdarzyć (sprawdzamy wcześniej), ale jest backup
+            log(f"  ⚠️ INSERT CONFLICT: sourceUrl już istnieje w bazie (backup check): {source_url[:60]}")
             return False
     except Exception as e:
         log(f"  ❌ INSERT ERROR: {e}")
@@ -2560,7 +2603,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         log(f"  ⚠️ SKIP: Brak lub nieprawidłowy URL dla {listing_name}")
         return False
 
-    # EARLY SKIP
+    # Quick check po sourceUrl (szybkie sprawdzenie przed scrapowaniem)
     if company_exists_by_source_url(conn, profile_url):
         log(f"  ⚠️ SKIP: Firma już istnieje w bazie (sourceUrl={profile_url[:60]})")
         return False
@@ -2593,6 +2636,14 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     website = parsed.get("website")
     nip = parsed.get("nip")
     province = parsed.get("province")
+    
+    # GŁÓWNE SPRAWDZENIE: po NIP (jeśli jest) lub po nazwie firmy
+    if company_exists_by_nip_or_name(conn, nip, company_name, tenant_id):
+        if nip and nip.strip():
+            log(f"  ⚠️ SKIP: Firma już istnieje w bazie (NIP={nip[:20]})")
+        else:
+            log(f"  ⚠️ SKIP: Firma już istnieje w bazie (nazwa={company_name[:50]})")
+        return False
 
     slug = get_unique_slug(conn, tenant_id, company_name)
 
