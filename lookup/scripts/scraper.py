@@ -12,8 +12,8 @@ from bs4 import BeautifulSoup
 import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
-import httpx  # Potrzebne dla OpenAI >= 1.0 jeśli używasz proxy
-import openai  # Do sprawdzenia wersji
+import httpx
+import openai
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 
@@ -25,7 +25,7 @@ load_dotenv()
 # KONFIG / ENV
 # =========================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "MAIN").upper()  # MAIN / TEST
 REQUIRE_AI = os.getenv("REQUIRE_AI", "true").lower() == "true"
@@ -117,13 +117,11 @@ def connect_db():
 
 
 def normalize_text(s: str) -> str:
-    s = (s or "").strip()  # tylko białe znaki
+    s = (s or "").strip()
     if re.search(r"%[0-9A-Fa-f]{2}", s):
         s = unquote(s)
 
-    # ujednolicaj, ale nie usuwaj cudzysłowów
-    s = s.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
-
+    s = s.replace(""", '"').replace(""", '"').replace("„", '"').replace("'", "'")
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -156,7 +154,7 @@ def normalize_province(raw: str | None) -> str | None:
         return None
     s = raw.strip().lower()
     s = s.replace("–", "-").replace("—", "-")
-    s = re.sub(r"\s+", "-", s)  # np. "kujawsko pomorskie"
+    s = re.sub(r"\s+", "-", s)
     return s if s in CANONICAL_VOIVODESHIPS else None
 
 
@@ -288,9 +286,6 @@ def extract_company_variable(html_content: str) -> dict | None:
     return None
 
 
-# =========================
-# FALLBACK: NIP z HTML (#contact)
-# =========================
 def extract_nip_from_profile_html(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     contact = soup.select_one("#contact")
@@ -377,14 +372,14 @@ def company_exists_by_nip_or_name(conn, nip: str | None, company_name: str, tena
     """
     cur = conn.cursor()
     
-    # 1. Sprawdź po NIP (jeśli jest dostępny)
+    # 1. Sprawdź po NIP
     if nip and nip.strip():
         cur.execute('SELECT 1 FROM "Company" WHERE nip = %s AND nip IS NOT NULL LIMIT 1', (nip.strip(),))
         if cur.fetchone():
             cur.close()
             return True
     
-    # 2. Sprawdź po nazwie firmy (w tym samym tenantId)
+    # 2. Sprawdź po nazwie firmy
     normalized_name = normalize_text(company_name)
     if normalized_name:
         cur.execute(
@@ -425,7 +420,7 @@ def get_unique_slug(conn, tenant_id: str, base_name: str) -> str:
 
 
 # =========================
-# OPENAI (strict-ish)
+# OPENAI - POPRAWIONE!
 # =========================
 def ensure_openai_available_forever():
     """
@@ -434,7 +429,6 @@ def ensure_openai_available_forever():
     """
     global client
 
-    # Sprawdź wersję OpenAI przy pierwszym wywołaniu
     if not hasattr(ensure_openai_available_forever, '_version_logged'):
         try:
             openai_version = getattr(openai, '__version__', 'unknown')
@@ -446,60 +440,43 @@ def ensure_openai_available_forever():
     while True:
         if not OPENAI_API_KEY:
             if REQUIRE_AI:
-                log(f"Brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                log(f"❌ Brak OPENAI_API_KEY. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
                 time.sleep(AI_RETRY_CHECK_SECONDS)
                 continue
             return False
 
         if client is None:
             try:
-                # OpenAI >= 1.0: NIE używaj argumentu 'proxies' bezpośrednio
-                # Jeśli potrzebujesz proxy, użyj http_client z httpx.Client
-                # Przykład z proxy:
-                # http_client = httpx.Client(
-                #     proxies={
-                #         "http://": "http://proxy.example.com:8080",
-                #         "https://": "http://proxy.example.com:8080"
-                #     }
-                # )
-                # client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
-                
-                # Sprawdź czy są zmienne środowiskowe z proxy (mogą powodować problemy)
-                proxy_vars = [k for k in os.environ.keys() if 'proxy' in k.lower() or 'PROXY' in k]
+                # Sprawdź czy są zmienne środowiskowe z proxy
+                proxy_vars = [k for k in os.environ.keys() if 'proxy' in k.lower()]
                 if proxy_vars:
                     log(f"⚠️ Wykryto zmienne środowiskowe z proxy: {proxy_vars}")
-                    log(f"⚠️ OpenAI >= 1.0 może próbować użyć ich automatycznie")
+                    log(f"⚠️ Będziemy je ignorować używając trust_env=False")
                 
-                # ZAWSZE używamy httpx.Client bez proxy, żeby uniknąć automatycznego wykrywania
-                # To zapobiega problemom z OpenAI >= 1.0, które nie obsługuje argumentu 'proxies'
                 log(f"Inicjalizacja klienta OpenAI...")
+                
+                # POPRAWKA: Używamy trust_env=False zamiast proxies=None
                 http_client = httpx.Client(
-                    proxies=None,  # Wymusza brak proxy (ignoruje zmienne środowiskowe)
-                    timeout=60.0
+                    timeout=60.0,
+                    trust_env=False  # Ignoruje zmienne środowiskowe HTTP_PROXY, HTTPS_PROXY, etc.
                 )
-                client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
-                log(f"✅ Klient OpenAI zainicjalizowany pomyślnie (z httpx.Client bez proxy)")
+                
+                client = OpenAI(
+                    api_key=OPENAI_API_KEY,
+                    http_client=http_client
+                )
+                
+                log(f"✅ Klient OpenAI zainicjalizowany pomyślnie")
                 return True
-            except TypeError as e:
-                # Specjalna obsługa błędu z proxies
-                if "proxies" in str(e):
-                    log(f"❌ BŁĄD: Wykryto użycie 'proxies' w inicjalizacji OpenAI. To nie jest obsługiwane w OpenAI >= 1.0.")
-                    log(f"❌ Sprawdź czy nie używasz starej wersji kodu lub zmiennych środowiskowych z proxies.")
-                    log(f"❌ Błąd: {e}")
-                    # Nie próbuj ponownie - to jest błąd w kodzie, nie problem z API
-                    if REQUIRE_AI:
-                        log(f"⚠️ REQUIRE_AI=true, ale nie można zainicjalizować klienta. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
-                        time.sleep(AI_RETRY_CHECK_SECONDS)
-                        continue
-                    return False
-                else:
-                    log(f"OpenAI init error (TypeError): {e}. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
+                
+            except Exception as e:
+                log(f"❌ OpenAI init error: {e}")
+                
+                if REQUIRE_AI:
+                    log(f"⚠️ REQUIRE_AI=true, ale nie można zainicjalizować klienta. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
                     time.sleep(AI_RETRY_CHECK_SECONDS)
                     continue
-            except Exception as e:
-                log(f"OpenAI init error: {e}. Sleeping {AI_RETRY_CHECK_SECONDS}s...")
-                time.sleep(AI_RETRY_CHECK_SECONDS)
-                continue
+                return False
 
         return True
 
@@ -520,8 +497,8 @@ JĘZYK I FORMA:
 - Zwróć WYŁĄCZNIE gotowy opis jako PLAIN TEXT.
 - Format: 5–7 krótkich akapitów; między akapitami ZAWSZE jedna pusta linia (podwójny enter).
 - Bez list punktowanych i numerowanych.
-- Bez nagłówków typu „O firmie” i bez emoji.
-- Nie kończ CTA typu „zapraszamy do kontaktu”.
+- Bez nagłówków typu „O firmie" i bez emoji.
+- Nie kończ CTA typu „zapraszamy do kontaktu".
 
 DŁUGOŚĆ:
 - 900–1400 znaków (ze spacjami).
@@ -1884,7 +1861,7 @@ def scrape_all_categories():
         except Exception as e:
             log(f"Błąd pobierania kategorii: {e}")
 
-    # dedupe bez zmiany kolejności
+    # dedupe
     seen = set()
     unique = []
     for cat in categories:
@@ -1899,444 +1876,159 @@ def scrape_all_categories():
 def scrape_category_listing_until_end(session: requests.Session, listing_url: str):
     """
     Scrapuje listę firm z kategorii używając Playwright (obsługuje JavaScript).
-    Zachowuje kompatybilność z resztą kodu - zwraca te same dane co wcześniej.
     """
     results = []
     seen_urls = set()
+    browser = None
 
-    with sync_playwright() as p:
-        # Uruchom przeglądarkę (headless=True dla produkcji)
-        browser = p.chromium.launch(headless=True)
-        
-        # Opcje kontekstu - user agent, viewport
-        context = browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080}
-        )
-        
-        page = context.new_page()
-        
-        page_num = 1
-        while True:
-            if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
-                break
-
-            # Formatuj URL
-            if page_num > 1:
-                url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
-            else:
-                url = listing_url.rstrip('/')
-            log(f"  Listing page {page_num}: {url}")
-
-            try:
-                # Wejdź na stronę z Playwright
-                page.goto(url, wait_until='networkidle', timeout=30000)
-                
-                # Czekaj na załadowanie firm (dostosuj selektor!)
-                try:
-                    page.wait_for_selector(
-                        'a[href*="/firma/"], a.company-link, .company-item a, article a, a[class*="company"]',
-                        timeout=10000
-                    )
-                except PlaywrightTimeout:
-                    log(f"  ⚠️ Timeout waiting for company links on page {page_num}")
-                    # Zapisz screenshot do debugowania
-                    try:
-                        page.screenshot(path=f"debug_page_{page_num}_{int(time.time())}.png")
-                    except:
-                        pass
-                    break
-                
-                # Przewiń stronę w dół, żeby załadować lazy-loaded content
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(random.uniform(1, 2))
-                
-                # Pobierz HTML po wykonaniu JavaScript
-                html = page.content()
-                
-                # Sprawdź czy strona nie jest zbyt krótka
-                if len(html) < 1000:
-                    log(f"  Page seems too short ({len(html)} bytes), might be empty or redirect")
-                    break
-
-                soup = BeautifulSoup(html, "html.parser")
-        
-                # Sprawdź czy strona nie jest przekierowaniem lub błędem
-                page_title = soup.find("title")
-                if page_title:
-                    title_text = page_title.get_text().lower()
-                    if any(keyword in title_text for keyword in ["404", "not found", "błąd", "error", "przekierowanie"]):
-                        log(f"  Page appears to be error/redirect page: {title_text[:50]}")
-                        break
-                
-                # DEBUG: Sprawdź podstawowe informacje o stronie
-                all_links_count = len(soup.select("a[href]"))
-                log(f"  DEBUG: Page loaded, total links: {all_links_count}, HTML size: {len(html)} bytes")
-                
-                # Próbuj różne selektory - PanoramaFirm często zmienia strukturę HTML
-                links = []
-        
-                # 1. Nowy selektor (2025+) - class zawierający 'company'
-                links = soup.select("a[class*='company'], a[class*='Company']")
-                if links:
-                    log(f"  DEBUG: Found {len(links)} links via selector 1 (class*='company')")
-                
-                # 2. Selektor z data-attribute
-                if not links:
-                    raw_links = soup.select("a[data-company], a[href*='/firma/'], a[href*='/company/']")
-                    # Filtruj - wyklucz LinkedIn i inne zewnętrzne domeny
-                    links = []
-                    for link in raw_links:
-                        href = link.get("href", "")
-                        # Wyklucz LinkedIn i inne zewnętrzne domeny
-                        if "linkedin.com" in href.lower() or "facebook.com" in href.lower() or "twitter.com" in href.lower():
-                            continue
-                        # Akceptuj tylko linki do panoramafirm.pl lub relatywne linki
-                        if href.startswith("/") or "panoramafirm.pl" in href.lower():
-                            # Sprawdź czy to faktycznie link do firmy (zawiera /firma/ lub podobne)
-                            if "/firma/" in href.lower() or (href.startswith("/") and len(href.split("/")) >= 3):
-                                links.append(link)
-                    if raw_links and not links:
-                        log(f"  DEBUG: Found {len(raw_links)} links via selector 2, but all were filtered out (external links)")
-                    elif links:
-                        log(f"  DEBUG: Found {len(links)} links via selector 2 (after filtering external links)")
-                
-                # 3. Selektor w sekcji z wynikami
-                if not links:
-                    links = soup.select(".results a, .listing a, .companies a, .firmy a")
-                    if links:
-                        log(f"  DEBUG: Found {len(links)} links via selector 3 (.results, .listing, .companies, .firmy)")
-                
-                # 4. Selektor z h2/h3 (nagłówki z linkami do firm)
-                if not links:
-                    links = soup.select("h2 a, h3 a, .company-title a, .title a")
-                    if links:
-                        log(f"  DEBUG: Found {len(links)} links via selector 4 (h2/h3, .company-title, .title)")
-                
-                # 5. Stary selektor dla kompatybilności
-                if not links:
-                    links = soup.select("a.company-name, .company-name a")
-                    if links:
-                        log(f"  DEBUG: Found {len(links)} links via selector 5 (a.company-name)")
-                
-                # 6. Szukaj w sekcjach z wynikami - różne możliwe struktury
-                if not links:
-                    # Spróbuj znaleźć kontenery z wynikami
-                    result_containers = soup.select("article, .card, .item, .entry, [class*='result'], [class*='item'], [class*='entry'], [class*='listing'], [class*='company'], [class*='firma'], [class*='business']")
-                    for container in result_containers:
-                        container_links = container.select("a[href]")
-                        for link in container_links:
-                            href = link.get("href", "")
-                            if href and href.startswith("/") and len(href) > 5:
-                                # Sprawdź czy to może być link do firmy
-                                exclude_list = ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", "/dodaj-firme", "/dodaj-firmę"]
-                                if not any(exclude in href.lower() for exclude in exclude_list):
-                                    links.append(link)
-                
-                # 6b. Szukaj w tabelach (może być tabela z wynikami)
-                if not links:
-                    tables = soup.select("table")
-                    for table in tables:
-                        table_links = table.select("a[href]")
-                        for link in table_links:
-                            href = link.get("href", "")
-                            text = link.get_text(strip=True)
-                            if href and text and len(text) > 3 and href.startswith("/"):
-                                exclude_list = ["/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,", ".html#", "javascript:", "mailto:", "tel:", "/dodaj-firme", "/dodaj-firmę"]
-                                if not any(exclude in href.lower() for exclude in exclude_list):
-                                    links.append(link)
-                
-                # 7. Agresywne szukanie - wszystkie linki które mogą być firmami
-                if not links:
-                    all_links = soup.select("a[href]")
-                    filtered_links = []
-                    
-                    for a in all_links:
-                        href = a.get("href", "")
-                        if not href:
-                            continue
-                            
-                        href_lower = href.lower()
-                        text = a.get_text(strip=True)
-                        
-                        # Wyklucz znane nie-firmy
-                        exclude_patterns = [
-                            "/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,",
-                            ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", 
-                            "/page/", "/kontakt", "/o-nas", "/regulamin", "/polityka", "/cookies",
-                            "/szukaj", "/dodaj", "/login", "/rejestracja", "/admin", "/api/",
-                            "/biuro", "/pomoc", "/cennik", "/dla-firm", "/dodaj-firme", "/dodaj-firmę"
-                        ]
-                        
-                        if any(exclude in href_lower for exclude in exclude_patterns):
-                            continue
-                        
-                        # Akceptuj linki które:
-                        # 1. Zawierają /firma/ lub /company/
-                        # 2. LUB są relatywne (/...), mają tekst i wyglądają jak profile (3+ segmenty w URL)
-                        # 3. LUB są linkami zewnętrznymi do panoramafirm.pl z nazwą firmy
-                        is_company_link = False
-                        
-                        if "/firma/" in href_lower:
-                            # Upewnij się że to nie jest LinkedIn lub inna zewnętrzna domena
-                            if "linkedin.com" not in href_lower and "facebook.com" not in href_lower and "twitter.com" not in href_lower:
-                                is_company_link = True
-                        elif href.startswith("/") and len(href.split("/")) >= 3:
-                            # Link relatywny z 3+ segmentami (np. /miasto/firma/nazwa)
-                            if text and len(text) > 2:
-                                is_company_link = True
-                        elif "panoramafirm.pl" in href_lower and text and len(text) > 3:
-                            # Link zewnętrzny do PanoramaFirm z tekstem
-                            if "/firma/" in href_lower or "/company/" in href_lower:
-                                is_company_link = True
-                        
-                        if is_company_link:
-                            filtered_links.append(a)
-                    
-                    links = filtered_links
-                
-                if not links:
-                    # Debug: sprawdz jakie linki są na stronie
-                    all_links = soup.select("a[href]")
-                    log(f"    ⚠️  DEBUG: No company links found via standard selectors!")
-                    log(f"    ⚠️  DEBUG: Total links on page: {len(all_links)}, HTML size: {len(html)} bytes")
-                    
-                    # Sprawdź czy strona może być pusta (brak firm w kategorii) lub używa JS do ładowania
-                    page_text = soup.get_text()
-                    if "brak wyników" in page_text.lower() or "no results" in page_text.lower() or "nie znaleziono" in page_text.lower():
-                        log(f"    ℹ️  INFO: Page appears to have no results message")
-                        break
-                    
-                    # AGRESYWNE podejście: sprawdź WSZYSTKIE linki i znajdź te które mogą być firmami
-                    log(f"    🔍 DEBUG: Analyzing all {len(all_links)} links on page...")
-                    potential_company_links = []
-                    
-                    for link in all_links:
-                        href = link.get("href", "")
-                        if not href:
-                            continue
-                            
-                        href_lower = href.lower()
-                        text = link.get_text(strip=True)
-                        
-                        # Wyklucz znane nie-firmy
-                        exclude_patterns = [
-                            "/kategoria/", "/category/", "/wojewodztwo/", "/miasto/", "/firmy,",
-                            ".html#", "javascript:", "mailto:", "tel:", "/blog/", "/strona/", 
-                            "/page/", "/kontakt", "/o-nas", "/regulamin", "/polityka", "/cookies",
-                            "/szukaj", "/dodaj", "/login", "/rejestracja", "/admin", "/api/",
-                            "/biuro", "/pomoc", "/cennik", "/dla-firm", "/wojewodztwa", "/miasta",
-                            "/branze", "/branże", "/tag/", "/tagi/", "/dodaj-firme", "/dodaj-firmę"
-                        ]
-                        
-                        if any(exclude in href_lower for exclude in exclude_patterns):
-                            continue
-                        
-                        # Akceptuj linki które:
-                        # 1. Mają tekst (nazwę firmy)
-                        # 2. Są relatywne (/...) lub prowadzą do panoramafirm.pl
-                        # 3. Nie są do znanych nie-firm
-                        if not text or len(text) < 3:
-                            continue
-                        
-                        # Sprawdź różne formaty URL firm
-                        is_potential_company = False
-                        
-                        # Format 1: /miasto/firma/nazwa-firmy
-                        if href.startswith("/") and len(href.split("/")) >= 3:
-                            # Sprawdź czy nie jest to kategoria lub inna znana struktura
-                            parts = href.split("/")
-                            if len(parts) >= 3 and parts[1] not in ["kategoria", "category", "wojewodztwo", "miasto", "firmy"]:
-                                is_potential_company = True
-                        
-                        # Format 2: /firma/nazwa-firmy lub /company/nazwa-firmy
-                        elif "/firma/" in href_lower or "/company/" in href_lower:
-                            is_potential_company = True
-                        
-                        # Format 3: Link zewnętrzny do panoramafirm.pl z /firma/
-                        elif "panoramafirm.pl" in href_lower and ("/firma/" in href_lower or "/company/" in href_lower):
-                            is_potential_company = True
-                        
-                        # Format 4: Link który wygląda jak nazwa firmy (ma tekst i nie jest do znanych stron)
-                        elif href.startswith("/") and len(href) > 5 and text and len(text) > 5:
-                            # Może być to link do firmy w nowym formacie
-                            # Sprawdź czy tekst nie jest nazwą kategorii lub menu
-                            menu_keywords = ["strona główna", "home", "o nas", "kontakt", "regulamin", "polityka"]
-                            if not any(kw in text.lower() for kw in menu_keywords):
-                                is_potential_company = True
-                        
-                        if is_potential_company:
-                            potential_company_links.append({
-                                "text": text[:50],
-                                "href": href[:80]
-                            })
-                    
-                    if potential_company_links:
-                        log(f"    ✅ DEBUG: Found {len(potential_company_links)} potential company links!")
-                        for i, pl in enumerate(potential_company_links[:10], 1):
-                            log(f"      {i}. {pl['text']} -> {pl['href']}")
-                        # Użyj znalezionych linków
-                        links = [a for a in all_links if any(
-                            a.get("href", "") == pl["href"] or 
-                            (a.get("href", "").startswith(pl["href"]) and len(pl["href"]) > 10)
-                            for pl in potential_company_links
-                        )]
-                        log(f"    ✅ Using {len(links)} links from potential matches")
-                    else:
-                        # Sprawdź czy może być problem z JavaScript
-                        scripts = soup.select("script")
-                        js_loaders = [s for s in scripts if s.string and ("fetch" in s.string or "ajax" in s.string or "load" in s.string.lower() or "xhr" in s.string.lower() or "axios" in s.string.lower() or "react" in s.string.lower() or "vue" in s.string.lower())]
-                        if js_loaders:
-                            log(f"    ⚠️  WARNING: Found {len(js_loaders)} scripts that might load content via JavaScript")
-                            log(f"    ⚠️  WARNING: Page might need JavaScript to render company listings!")
-                        
-                        # Sprawdź czy strona ma puste kontenery które mogą być wypełniane przez JS
-                        empty_containers = soup.select("[id*='result'], [class*='result'], [id*='listing'], [class*='listing'], [id*='company'], [class*='company']")
-                        if empty_containers:
-                            log(f"    ⚠️  WARNING: Found {len(empty_containers)} containers that might be filled by JavaScript")
-                            # Sprawdź czy są puste (bez linków wewnątrz)
-                            empty_count = sum(1 for c in empty_containers if not c.select("a[href]"))
-                            if empty_count > 0:
-                                log(f"    ⚠️  WARNING: {empty_count} of these containers are empty - likely JavaScript-loaded content!")
-                        
-                        # Sprawdź strukturę HTML
-                        possible_containers = soup.select(".result, .listing-item, .company-item, .firma, [class*='company'], [class*='firma'], [class*='business'], [class*='result']")
-                        log(f"    DEBUG: Found {len(possible_containers)} possible company containers")
-                        
-                        # Pokaż przykładowe linki
-                        sample_links = [f"{a.get('href', '')[:60]} ({a.get_text(strip=True)[:30]})" for a in all_links[:10]]
-                        log(f"    DEBUG: Sample links (first 10):")
-                        for sl in sample_links:
-                            log(f"      - {sl}")
-                    
-                    # Zapisz HTML do pliku debugowego (tylko pierwsza strona z problemem)
-                    if page_num == 1:
-                        debug_file = f"debug_listing_{int(time.time())}.html"
-                        try:
-                            with open(debug_file, "w", encoding="utf-8") as f:
-                                f.write(html)
-                            log(f"    DEBUG: Saved HTML to {debug_file} for inspection")
-                            
-                            # Dodatkowe debugowanie - sprawdź strukturę HTML
-                            main_content = soup.select("main, .content, .main, #content, #main")
-                            log(f"    DEBUG: Found {len(main_content)} main/content containers")
-                            
-                            # Sprawdź czy są jakieś listy lub tabele
-                            lists = soup.select("ul, ol, .list, [class*='list']")
-                            log(f"    DEBUG: Found {len(lists)} list elements")
-                            
-                            # Sprawdź czy są jakieś divy z klasami które mogą zawierać wyniki
-                            divs_with_classes = soup.select("div[class]")
-                            unique_classes = set()
-                            for div in divs_with_classes[:100]:  # Sprawdź pierwsze 100
-                                classes = div.get("class", [])
-                                if classes:
-                                    unique_classes.update(classes)
-                            log(f"    DEBUG: Found {len(unique_classes)} unique CSS classes (sample): {list(unique_classes)[:20]}")
-                            
-                        except Exception as e:
-                            log(f"    DEBUG: Could not save HTML: {e}")
-                    
-                    break
-
-                # DEBUG: Pokaż znalezione linki przed przetwarzaniem
-                if links:
-                    log(f"  DEBUG: Processing {len(links)} found links...")
-                    for i, link in enumerate(links[:5], 1):  # Pokaż pierwsze 5
-                        href = link.get("href", "")
-                        text = link.get_text(strip=True)
-                        log(f"    Link {i}: href={href[:60]}, text={text[:50]}")
-
-                new_count = 0
-                for link in links:
-                    href = link.get("href")
-                    raw_text = link.get_text(strip=True)
-                    name = normalize_text(raw_text)
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
             
-                    # DEBUG: Sprawdź dlaczego linki są odrzucane
-                    if not href:
-                        continue  # Pomijamy linki bez href (ciche pominięcie)
-                    
-                    # Wyklucz linki z href="#" (mapa, anchor links) - nie są to linki do firm
-                    if href == "#" or href.startswith("#"):
-                        continue  # Pomijamy anchor links (ciche pominięcie)
-                    
-                    # Wyklucz linki do formularzy i innych nie-firm
-                    if "/dodaj-firme" in href.lower() or "/dodaj-firmę" in href.lower():
-                        continue  # Pomijamy formularze (ciche pominięcie)
-                    
-                    if not name or len(name) < 2:
-                        continue  # Pomijamy linki bez nazwy (ciche pominięcie)
-                    
-                    # Sprawdź duplikaty używając pełnego URL
-                    if href in seen_urls:
-                        continue  # Pomijamy duplikaty (ciche pominięcie)
-                    
-                    # Normalizuj href (może być relatywny)
-                    if href.startswith("/"):
-                        full_href = f"{BASE_URL}{href}"
-                    elif href.startswith("http"):
-                        full_href = href
-                    else:
-                        full_href = f"{BASE_URL}/{href}"
-                    
-                    # Używamy full_href do sprawdzania duplikatów (bardziej niezawodne)
-                    if full_href in seen_urls:
-                        continue  # Pomijamy duplikaty pełnych URL (ciche pominięcie)
-                    
-                    seen_urls.add(full_href)  # Dodajemy full_href zamiast href
-                    results.append({"name": name, "url": full_href})
-                    new_count += 1
-                    log(f"    DEBUG: Added link - name={name[:50]}, href={full_href[:80]}")
-
-                if new_count == 0:
+            context = browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080}
+            )
+            
+            page = context.new_page()
+            
+            page_num = 1
+            while True:
+                if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
                     break
 
-                # Opóźnienie między stronami
-                time.sleep(random.uniform(LISTING_DELAY_MIN, LISTING_DELAY_MAX))
-                page_num += 1
-                
-            except Exception as e:
-                log(f"  ❌ Error on page {page_num}: {e}")
-                break
-        
-        browser.close()
+                if page_num > 1:
+                    url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
+                else:
+                    url = listing_url.rstrip('/')
+                log(f"  Listing page {page_num}: {url}")
+
+                try:
+                    page.goto(url, wait_until='networkidle', timeout=30000)
+                    
+                    try:
+                        page.wait_for_selector(
+                            'a[href*="/firma/"], a.company-link, .company-item a, article a, a[class*="company"]',
+                            timeout=10000
+                        )
+                    except PlaywrightTimeout:
+                        log(f"  ⚠️ Timeout waiting for company links on page {page_num}")
+                        break
+                    
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    time.sleep(random.uniform(1, 2))
+                    
+                    html = page.content()
+                    
+                    if len(html) < 1000:
+                        log(f"  Page seems too short ({len(html)} bytes), might be empty or redirect")
+                        break
+
+                    soup = BeautifulSoup(html, "html.parser")
+            
+                    page_title = soup.find("title")
+                    if page_title:
+                        title_text = page_title.get_text().lower()
+                        if any(keyword in title_text for keyword in ["404", "not found", "błąd", "error"]):
+                            log(f"  Page appears to be error page: {title_text[:50]}")
+                            break
+                    
+                    log(f"  Listing items: {len(soup.select('a[href]'))}")
+                    
+                    # Zbierz linki
+                    links = []
+                    
+                    # Próbuj różne selektory
+                    selectors = [
+                        "a[class*='company']",
+                        "a[href*='/firma/']",
+                        ".results a",
+                        "h2 a",
+                        "article a"
+                    ]
+                    
+                    for selector in selectors:
+                        links = soup.select(selector)
+                        if links:
+                            log(f"  Found {len(links)} links via selector: {selector}")
+                            break
+                    
+                    if not links:
+                        log(f"  ⚠️ No company links found on page {page_num}")
+                        break
+
+                    new_count = 0
+                    for link in links:
+                        href = link.get("href")
+                        name = normalize_text(link.get_text(strip=True))
+                        
+                        if not href or href == "#" or not name or len(name) < 2:
+                            continue
+                        
+                        if href.startswith("/"):
+                            full_href = f"{BASE_URL}{href}"
+                        elif href.startswith("http"):
+                            full_href = href
+                        else:
+                            continue
+                        
+                        if full_href in seen_urls:
+                            continue
+                        
+                        seen_urls.add(full_href)
+                        results.append({"name": name, "url": full_href})
+                        new_count += 1
+
+                    if new_count == 0:
+                        break
+
+                    time.sleep(random.uniform(LISTING_DELAY_MIN, LISTING_DELAY_MAX))
+                    page_num += 1
+                    
+                except Exception as e:
+                    log(f"  ❌ Error on page {page_num}: {e}")
+                    break
+            
+            if browser:
+                browser.close()
+    
+    except Exception as e:
+        log(f"❌ Critical error in scraping: {e}")
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
     
     return results
 
 
 def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dict | None, str | None]:
     """
-    Pobiera stronę firmy używając Playwright (obsługuje JavaScript).
-    Zwraca: (parsed_data, html_text) lub (None, None) przy błędzie.
+    Pobiera stronę firmy używając Playwright.
     """
     url = safe_url(company_url)
     if not url:
         return (None, None)
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
-        page = context.new_page()
-        
-        try:
+    browser = None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            page = context.new_page()
+            
             page.goto(url, wait_until='networkidle', timeout=30000)
-            
-            # Czekaj na załadowanie treści
             page.wait_for_selector('body', timeout=10000)
-            
-            # Przewiń stronę, żeby załadować lazy-loaded content
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(random.uniform(1, 2))
             
-            # Pobierz HTML po wykonaniu JavaScript
             html = page.content()
-            
             browser.close()
             
-            # Najpierw próbuj stary sposób (var company =)
+            # Próbuj stary sposób
             js_data = extract_company_variable(html)
             if js_data:
                 parsed = parse_company_from_js_legacy(js_data, html)
@@ -2344,32 +2036,30 @@ def fetch_company_data(session: requests.Session, company_url: str) -> tuple[dic
                     log(f"  ✅ Parsowanie: użyto legacy JS (var company)")
                     return (parsed, html)
 
-            # Nowy sposób - JSON-LD + HTML (2025+)
+            # Nowy sposób - JSON-LD
             parsed = parse_company_from_json_ld(html, company_url)
             if parsed:
                 log(f"  ✅ Parsowanie: użyto JSON-LD")
                 return (parsed, html)
 
-            log(f"  ⚠️ Parsowanie: nie udało się sparsować danych (ani JS, ani JSON-LD)")
+            log(f"  ⚠️ Parsowanie: nie udało się sparsować danych")
             return (None, html)
-        except Exception as e:
-            log(f"  Company fetch error: {e}")
+            
+    except Exception as e:
+        log(f"  Company fetch error: {e}")
+        if browser:
             try:
                 browser.close()
             except:
                 pass
-            return (None, None)
+        return (None, None)
 
 
 def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
-    """
-    Parsuje dane firmy z JSON-LD (LocalBusiness) + HTML.
-    Nowa struktura PanoramaFirm (2025+).
-    """
+    """Parsuje dane firmy z JSON-LD (LocalBusiness) + HTML."""
     soup = BeautifulSoup(html, "html.parser")
     data = {}
 
-    # Szukamy JSON-LD z LocalBusiness
     json_ld_scripts = soup.select('script[type="application/ld+json"]')
     ld_data = None
 
@@ -2391,27 +2081,24 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     if not ld_data:
         return None
 
-    # Podstawowe dane z JSON-LD
     data["name"] = ld_data.get("name")
     data["phone"] = ld_data.get("telephone")
 
-    # Adres z JSON-LD
     addr = ld_data.get("address", {})
     data["city"] = addr.get("addressLocality")
     data["address"] = addr.get("streetAddress")
     data["zip"] = addr.get("postalCode")
 
-    # Koordynaty z JSON-LD (jeśli są)
     geo = ld_data.get("geo", {})
     data["lat"] = geo.get("latitude")
     data["lng"] = geo.get("longitude")
 
-    # Province z URL (format: /wojewodztwo,,miasto,ulica/nazwa.html)
+    # Province z URL
     try:
-        url_path = source_url.split("panoramafirm.pl")[-1] if "panoramafirm.pl" in source_url else source_url
+        url_path = source_url.split("panoramafirm.pl")[-1]
         url_parts = url_path.strip("/").split("/")
         if url_parts:
-            location_part = url_parts[0]  # np. "podlaskie,,białystok,ogrodowa,19"
+            location_part = url_parts[0]
             loc_parts = location_part.split(",")
             if loc_parts:
                 province_raw = loc_parts[0].replace("_", "-")
@@ -2419,7 +2106,7 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     except Exception:
         data["province"] = None
 
-    # Email z HTML
+    # Email
     email_link = soup.select_one('a[href^="mailto:"]')
     if email_link:
         email = email_link.get("href", "").replace("mailto:", "").split("?")[0]
@@ -2427,26 +2114,22 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
     else:
         data["email"] = None
 
-    # WWW z HTML (szukamy linku zewnętrznego)
+    # WWW
     www = None
     for link in soup.select('a[href^="http"]'):
         href = link.get("href", "")
-        # Pomijamy linki do PanoramaFirm, social media, itp.
-        skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin", "youtube"]
+        skip_domains = ["panoramafirm", "facebook", "google", "twitter", "instagram", "linkedin"]
         if not any(domain in href.lower() for domain in skip_domains):
             www = href
             break
     data["website"] = normalize_website(www)
 
-    # NIP z HTML
+    # NIP
     data["nip"] = extract_nip_from_profile_html(html)
 
-    # Opis - szukamy w różnych miejscach
+    # Opis
     raw_desc = ""
-    desc_selectors = [
-        '[class*="description"]', '[class*="about"]', 
-        '#description', '#about', '[class*="info-text"]'
-    ]
+    desc_selectors = ['[class*="description"]', '[class*="about"]', '#description', '#about']
     for selector in desc_selectors:
         el = soup.select_one(selector)
         if el:
@@ -2459,13 +2142,9 @@ def parse_company_from_json_ld(html: str, source_url: str) -> dict | None:
 
 
 def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None) -> dict:
-    """
-    Stary parser dla struktur z var company = {...}
-    Zachowany dla kompatybilności wstecznej.
-    """
+    """Stary parser dla struktur z var company = {...}"""
     data = {}
 
-    # --- NIP (preferuj JS, fallback HTML) ---
     nip = js_data.get("nip")
     nip_digits = None
     if isinstance(nip, str):
@@ -2478,7 +2157,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
 
     data["nip"] = nip_digits
 
-    # --- Contact (może być null) ---
     contact = js_data.get("contact") or {}
     data["email"] = contact.get("email")
     data["website"] = normalize_website(contact.get("www"))
@@ -2489,7 +2167,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
     else:
         data["phone"] = phone
 
-    # --- Location ---
     loc = js_data.get("location") or {}
 
     city = loc.get("city")
@@ -2514,7 +2191,6 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
         data["lat"] = coords.get("lat")
         data["lng"] = coords.get("lon")
 
-    # --- opis surowy (jak było) ---
     parts = []
     for field in ["announcementBrief", "products", "summary"]:
         txt = clean_html_text(js_data.get(field)).strip()
@@ -2522,27 +2198,19 @@ def parse_company_from_js_legacy(js_data: dict, html_fallback: str | None = None
             parts.append(txt)
     data["raw_desc"] = "\n\n".join(parts).strip()
 
-    # Dodaj nazwę z js_data
     data["name"] = js_data.get("name")
 
     return data
 
 
 # =========================
-# INSERT (DO NOTHING) + sourceUrl
+# INSERT
 # =========================
 def insert_company_do_nothing(conn, payload: dict) -> bool:
-    """
-    Wstawia firmę do bazy danych.
-    True jeśli wstawiono, False jeśli konflikt.
-    
-    Uwaga: Deduplikacja jest już sprawdzona wcześniej przez company_exists_by_nip_or_name(),
-    ale ON CONFLICT na sourceUrl jest backupem na wypadek równoczesnych requestów.
-    """
-    # Sprawdź czy sourceUrl jest ustawione (wymagane dla ON CONFLICT)
+    """Wstawia firmę do bazy danych."""
     source_url = payload.get("sourceUrl")
     if not source_url:
-        log(f"  ❌ ERROR: sourceUrl jest NULL dla firmy {payload.get('name', 'N/A')[:50]} - nie można wstawić")
+        log(f"  ❌ ERROR: sourceUrl jest NULL dla firmy {payload.get('name', 'N/A')[:50]}")
         return False
     
     cur = conn.cursor()
@@ -2585,11 +2253,10 @@ def insert_company_do_nothing(conn, payload: dict) -> bool:
         cur.close()
         
         if row:
-            log(f"  ✅ INSERT SUCCESS: ID={row[0]}, name={payload.get('name', 'N/A')[:50]}, NIP={payload.get('nip', 'brak')[:20]}")
+            log(f"  ✅ INSERT SUCCESS: ID={row[0]}, name={payload.get('name', 'N/A')[:50]}")
             return True
         else:
-            # To nie powinno się zdarzyć (sprawdzamy wcześniej), ale jest backup
-            log(f"  ⚠️ INSERT CONFLICT: sourceUrl już istnieje w bazie (backup check): {source_url[:60]}")
+            log(f"  ⚠️ INSERT CONFLICT: sourceUrl już istnieje: {source_url[:60]}")
             return False
     except Exception as e:
         log(f"  ❌ INSERT ERROR: {e}")
@@ -2606,38 +2273,36 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
 
     listing_name = normalize_text(listing_item.get("name"))
     if not listing_name:
-        log(f"  ⚠️ SKIP: Brak nazwy firmy w listing_item")
+        log(f"  ⚠️ SKIP: Brak nazwy firmy")
         return False
 
     profile_url = safe_url(listing_item.get("url"))
     if not profile_url:
-        log(f"  ⚠️ SKIP: Brak lub nieprawidłowy URL dla {listing_name}")
+        log(f"  ⚠️ SKIP: Brak URL dla {listing_name}")
         return False
 
-    # Quick check po sourceUrl (szybkie sprawdzenie przed scrapowaniem)
     if company_exists_by_source_url(conn, profile_url):
-        log(f"  ⚠️ SKIP: Firma już istnieje w bazie (sourceUrl={profile_url[:60]})")
+        log(f"  ⚠️ SKIP: Firma już istnieje (sourceUrl={profile_url[:60]})")
         return False
 
     tenant_id, tenant_subdomain = get_tenant_id_by_category(conn, category_name)
     if not tenant_id:
-        log(f"  ❌ ERROR: Nie udało się uzyskać tenant_id dla kategorii: {category_name}")
+        log(f"  ❌ ERROR: Nie udało się uzyskać tenant_id")
         return False
     
     category_id = get_or_create_category(conn, tenant_id, category_name)
     if not category_id:
-        log(f"  ❌ ERROR: Nie udało się uzyskać category_id dla: {category_name}")
+        log(f"  ❌ ERROR: Nie udało się uzyskać category_id")
         return False
 
     log(f"  📥 Pobieranie danych firmy: {profile_url[:80]}")
     parsed, html = fetch_company_data(session, profile_url)
     if not parsed:
-        log(f"  ⚠️ SKIP: Nie udało się sparsować danych firmy z {profile_url[:60]}")
+        log(f"  ⚠️ SKIP: Nie udało się sparsować danych")
         return False
     
     log(f"  ✅ Sparsowano dane firmy: {parsed.get('name', 'N/A')[:50]}")
 
-    # preferuj nazwę z parsowanych danych (zachowuje cudzysłowy/pełną nazwę)
     company_name = normalize_text(parsed.get("name") or listing_name)
     if not company_name:
         company_name = listing_name
@@ -2648,17 +2313,16 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
     nip = parsed.get("nip")
     province = parsed.get("province")
     
-    # GŁÓWNE SPRAWDZENIE: po NIP (jeśli jest) lub po nazwie firmy
     if company_exists_by_nip_or_name(conn, nip, company_name, tenant_id):
         if nip and nip.strip():
-            log(f"  ⚠️ SKIP: Firma już istnieje w bazie (NIP={nip[:20]})")
+            log(f"  ⚠️ SKIP: Firma już istnieje (NIP={nip[:20]})")
         else:
-            log(f"  ⚠️ SKIP: Firma już istnieje w bazie (nazwa={company_name[:50]})")
+            log(f"  ⚠️ SKIP: Firma już istnieje (nazwa={company_name[:50]})")
         return False
 
     slug = get_unique_slug(conn, tenant_id, company_name)
 
-    # opis
+    # Opis
     description = None
     if USE_AI_REWRITE:
         if len(raw_desc.strip()) < MIN_RAW_DESC_FOR_DIRECT_USE:
@@ -2693,9 +2357,7 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
                     description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
                     break
                 time.sleep(2)
-                continue
     else:
-        # bez AI: wrzuć surowy opis jeśli jest, inaczej NULL
         description = raw_desc if len(raw_desc.strip()) >= MIN_RAW_DESC_FOR_DIRECT_USE else None
         log(f"  ℹ️ Tryb bez AI: opis={'dostępny' if description else 'brak'}")
 
@@ -2719,14 +2381,14 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
         "sourceUrl": profile_url,
     }
 
-    log(f"  💾 Próba wstawienia firmy do bazy: {company_name[:50]}")
+    log(f"  💾 Próba wstawienia firmy: {company_name[:50]}")
     inserted = insert_company_do_nothing(conn, payload)
     if inserted:
         total_inserted += 1
-        log(f"  ✅ INSERT OK [{tenant_subdomain}] {company_name[:60]} | slug={slug} | desc={len(description or '')} znaków")
+        log(f"  ✅ INSERT OK [{tenant_subdomain}] {company_name[:60]}")
         return True
     else:
-        log(f"  ⚠️ INSERT SKIP: Firma nie została dodana (prawdopodobnie duplikat sourceUrl: {profile_url[:60]})")
+        log(f"  ⚠️ INSERT SKIP: Firma nie została dodana")
         return False
 
 
@@ -2738,7 +2400,7 @@ def main():
 
     conn = connect_db()
     categories = scrape_all_categories()
-    log(f"Kategorie (from list): {len(categories)}")
+    log(f"Kategorie: {len(categories)}")
 
     session = requests.Session()
     session.headers.update(HEADERS)
