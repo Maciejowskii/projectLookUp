@@ -464,10 +464,21 @@ def ensure_openai_available_forever():
                 # )
                 # client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
                 
-                # Bez proxy (domyślne) - POPRAWNA składnia dla OpenAI >= 1.0
+                # Sprawdź czy są zmienne środowiskowe z proxy (mogą powodować problemy)
+                proxy_vars = [k for k in os.environ.keys() if 'proxy' in k.lower() or 'PROXY' in k]
+                if proxy_vars:
+                    log(f"⚠️ Wykryto zmienne środowiskowe z proxy: {proxy_vars}")
+                    log(f"⚠️ OpenAI >= 1.0 może próbować użyć ich automatycznie")
+                
+                # ZAWSZE używamy httpx.Client bez proxy, żeby uniknąć automatycznego wykrywania
+                # To zapobiega problemom z OpenAI >= 1.0, które nie obsługuje argumentu 'proxies'
                 log(f"Inicjalizacja klienta OpenAI...")
-                client = OpenAI(api_key=OPENAI_API_KEY)
-                log(f"✅ Klient OpenAI zainicjalizowany pomyślnie")
+                http_client = httpx.Client(
+                    proxies=None,  # Wymusza brak proxy (ignoruje zmienne środowiskowe)
+                    timeout=60.0
+                )
+                client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
+                log(f"✅ Klient OpenAI zainicjalizowany pomyślnie (z httpx.Client bez proxy)")
                 return True
             except TypeError as e:
                 # Specjalna obsługa błędu z proxies
