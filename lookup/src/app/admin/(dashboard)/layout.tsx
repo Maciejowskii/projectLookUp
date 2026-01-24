@@ -14,6 +14,7 @@ import {
 	Shield,
 	Menu,
 	ClipboardList,
+	FileDown,
 } from 'lucide-react'
 import { getAdminSession, AdminSessionData } from '@/lib/adminAuth'
 import { logoutAction } from '../login/actions'
@@ -38,6 +39,7 @@ const navItems = [
 		section: 'Monetyzacja',
 		items: [
 			{ href: '/admin/zgloszenia', icon: ShieldCheck, label: 'Przejęcia (Claims)', badge: true },
+			{ href: '/admin/raporty', icon: FileDown, label: 'Raporty i Eksporty' },
 			{ href: '/admin/blog', icon: PenTool, label: 'Blog & AI' },
 		],
 	},
