@@ -290,21 +290,23 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 						) : (
 							<div className='space-y-2'>
 								<label className='text-sm font-semibold text-gray-700'>Strona www</label>
-								<div className='flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50'>
-									<Lock className='text-gray-400 shrink-0' size={20} />
-									<div className='flex-1 min-w-0'>
-										<p className='text-sm font-medium text-gray-600'>
-											Dodaj link do strony — tylko w pakiecie Premium
-										</p>
-										<p className='text-xs text-gray-500 mt-0.5'>
-											Wyróżnij firmę i pokaż klientom swoją witryną.
-										</p>
+								<div className='flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50'>
+									<div className='flex items-start gap-3 flex-1 min-w-0'>
+										<Lock className='text-gray-400 shrink-0 mt-0.5' size={20} />
+										<div className='flex-1 min-w-0'>
+											<p className='text-sm font-medium text-gray-600 leading-relaxed'>
+												Dodaj link do strony — tylko w pakiecie Premium
+											</p>
+											<p className='text-xs text-gray-500 mt-1.5 leading-relaxed'>
+												Wyróżnij firmę i pokaż klientom swoją witryną.
+											</p>
+										</div>
 									</div>
 									<button
 										type='button'
 										onClick={handlePremiumUpgrade}
 										disabled={isProcessing}
-										className='shrink-0 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60'
+										className='shrink-0 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60 whitespace-nowrap w-full sm:w-auto'
 									>
 										<Crown size={16} /> Przejdź na Premium
 									</button>
