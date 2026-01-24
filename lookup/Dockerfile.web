@@ -18,7 +18,7 @@ RUN npx next build
 
 EXPOSE 3000
 
-# Nadajemy uprawnienia do wykonania skryptu startowego (start.sh jest kopiowany przez COPY . .)
-RUN chmod +x /app/start.sh
+# Nadajemy uprawnienia do wykonania skryptów (start.sh i coolify-post-deploy.sh są kopiowane przez COPY . .)
+RUN chmod +x /app/start.sh /app/coolify-post-deploy.sh
 
 CMD ["/app/start.sh"]

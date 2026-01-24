@@ -62,6 +62,7 @@ export async function claimCompanyAction(formData: FormData) {
 		await prisma.claimRequest.create({
 			data: {
 				companyId: company.id,
+				userId: userId,
 				fullName: user?.name || user?.email || 'Użytkownik z dashboardu',
 				email: user?.email || 'brak@email.pl',
 				phone: '-',

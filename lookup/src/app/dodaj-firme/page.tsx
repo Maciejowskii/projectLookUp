@@ -58,6 +58,9 @@ export default async function AddCompanyPage() {
       "-" +
       Math.floor(Math.random() * 1000);
 
+    let newCompanyId: string;
+    let userId: string | null = null;
+
     await prisma.$transaction(async (tx) => {
       // 1. Tworzymy firmę
       const newCompany = await tx.company.create({
@@ -73,9 +76,10 @@ export default async function AddCompanyPage() {
           isVerified: false,
         },
       });
+      newCompanyId = newCompany.id;
 
       // 2. Tworzymy użytkownika (od razu zweryfikowany email)
-      await tx.user.upsert({
+      const user = await tx.user.upsert({
         where: { email: rawData.email },
         update: {
           password: hashedPassword,
@@ -87,6 +91,20 @@ export default async function AddCompanyPage() {
           password: hashedPassword,
           companyId: newCompany.id,
           emailVerified: new Date(), // Konto od razu aktywne
+        },
+      });
+      userId = user.id;
+
+      // 3. Tworzymy ClaimRequest dla nowej firmy (do akceptacji przez admina)
+      await tx.claimRequest.create({
+        data: {
+          companyId: newCompany.id,
+          userId: user.id,
+          fullName: rawData.name,
+          email: rawData.email,
+          phone: rawData.phone || '-',
+          status: 'PENDING',
+          message: `Nowa wizytówka utworzona przez formularz rejestracji.`,
         },
       });
     });
@@ -122,7 +140,7 @@ export default async function AddCompanyPage() {
             <div class="info-box"><div class="label">Miasto</div><div class="value">${rawData.city}</div></div>
             <div class="info-box"><div class="label">Branża</div><div class="value">${category?.name ?? "—"}</div></div>
             <div style="text-align:center;margin-top:16px;">
-              <a href="${baseUrl}/admin/companies" style="display:inline-block;background:#8b5cf6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Panel admina →</a>
+              <a href="${baseUrl}/admin/zgloszenia" style="display:inline-block;background:#8b5cf6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Panel admina →</a>
             </div>
           </div>
           <div class="footer"><p>Katalogo – powiadomienie automatyczne</p></div>

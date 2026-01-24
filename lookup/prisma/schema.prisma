@@ -54,25 +54,25 @@ model Company {
   email   String?
   website String?
   logo    String?
-  
+
   openingHours Json? // { mon: {open, close}, tue: {open, close}, ... }
 
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId           String
+  category             Category @relation(fields: [categoryId], references: [id])
   stripeCustomerId     String?  @unique
   stripeSubscriptionId String?  @unique
 
-  plan       Plan    @default(FREE)
+  plan         Plan      @default(FREE)
   premiumUntil DateTime?
-  isVerified Boolean @default(false)
+  isVerified   Boolean   @default(false)
 
   leads Lead[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime? @updatedAt
-  sourceUrl String? @unique
+  sourceUrl String?   @unique
 
-  users       User[]        @relation("UserCompany") // Legacy relation
+  users        User[]        @relation("UserCompany") // Legacy relation
   companyUsers CompanyUser[] // New many-to-many relation
 
   @@unique([tenantId, slug])
@@ -102,7 +102,7 @@ model Lead {
   email       String
   description String? @db.Text // Opis/zapytanie od użytkownika
   source      String? // Źródło: "PHONE_REVEAL", "REGISTRATION", "LOGIN", "CONTACT_FORM"
-  status      String @default("NEW")
+  status      String  @default("NEW")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -124,6 +124,9 @@ model ClaimRequest {
   id        String  @id @default(cuid())
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   fullName String
   email    String
@@ -173,6 +176,9 @@ model User {
   // New many-to-many relationship
   companies CompanyUser[]
 
+  // Claim requests
+  claimRequests ClaimRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -197,9 +203,9 @@ model AdminAuditLog {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action    String   // np. "APPROVE_CLAIM", "REJECT_CLAIM", "DELETE_REVIEW", "UPDATE_SETTINGS"
-  target    String?  // ID obiektu, na którym wykonano akcję
-  details   Json?    // Dodatkowe szczegóły operacji
+  action    String // np. "APPROVE_CLAIM", "REJECT_CLAIM", "DELETE_REVIEW", "UPDATE_SETTINGS"
+  target    String? // ID obiektu, na którym wykonano akcję
+  details   Json? // Dodatkowe szczegóły operacji
   ipAddress String?
   createdAt DateTime @default(now())
 
@@ -311,4 +317,3 @@ model RawCompany {
   createdAt    DateTime @default(now())
   processed    Boolean  @default(false)
 }
-

@@ -23,16 +23,44 @@ export async function approveClaim(claimId: string) {
 		data: { status: 'APPROVED' },
 	})
 
-	// 3. Znajdź użytkownika po emailu (jeśli istnieje konto)
-	const user = await prisma.user.findUnique({
-		where: { email: claim.email },
-		select: { id: true, companyId: true },
-	})
+	// 3. Znajdź użytkownika po emailu lub userId z claim (jeśli istnieje konto)
+	let user = null
+	if (claim.userId) {
+		user = await prisma.user.findUnique({
+			where: { id: claim.userId },
+			select: { id: true, companyId: true },
+		})
+	}
+	if (!user) {
+		user = await prisma.user.findUnique({
+			where: { email: claim.email },
+			select: { id: true, companyId: true },
+		})
+	}
 
-	// 4. Jeśli użytkownik istnieje i nie ma jeszcze przypisanej firmy, przypisz firmę
+	// 4. Jeśli użytkownik istnieje, utwórz relację CompanyUser (nowy system)
 	if (user) {
+		// Sprawdź czy już istnieje relacja CompanyUser
+		const existingCompanyUser = await prisma.companyUser.findFirst({
+			where: {
+				userId: user.id,
+				companyId: claim.companyId,
+			},
+		})
+
+		if (!existingCompanyUser) {
+			// Utwórz nową relację CompanyUser
+			await prisma.companyUser.create({
+				data: {
+					userId: user.id,
+					companyId: claim.companyId,
+					role: 'OWNER',
+				},
+			})
+		}
+
+		// Legacy: zaktualizuj też user.companyId dla kompatybilności wstecznej
 		if (!user.companyId) {
-			// Użytkownik istnieje i nie ma firmy - bezpiecznie przypisz
 			await prisma.user.update({
 				where: { id: user.id },
 				data: { companyId: claim.companyId },
@@ -41,7 +69,6 @@ export async function approveClaim(claimId: string) {
 			// Użytkownik ma już inną firmę - nie nadpisujemy (bezpieczeństwo danych)
 			console.log(`⚠️ User ${user.id} already has company ${user.companyId}, cannot assign ${claim.companyId}`)
 		}
-		// Jeśli user.companyId === claim.companyId, wszystko jest już OK
 	}
 
 	// 5. Pobierz firmę, żeby sprawdzić czy ma już email

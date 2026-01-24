@@ -27,9 +27,16 @@ export async function submitClaimRequest(formData: FormData) {
     throw new Error("Wypełnij wymagane pola");
   }
 
+  // Spróbuj znaleźć użytkownika po emailu (jeśli istnieje konto)
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+
   const claim = await prisma.claimRequest.create({
     data: {
       companyId,
+      userId: user?.id || null,
       fullName,
       email,
       phone,
