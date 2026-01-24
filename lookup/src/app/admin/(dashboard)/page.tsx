@@ -11,6 +11,9 @@ import {
 	Clock,
 	Star,
 	MessageSquare,
+	CheckCircle2,
+	XCircle,
+	FileDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import { AdminDashboardCharts } from './DashboardCharts'
@@ -29,6 +32,13 @@ async function getStats() {
 		totalLeads,
 		totalReviews,
 		pendingClaims,
+		// Statystyki przejęć
+		totalClaims,
+		approvedClaims,
+		rejectedClaims,
+		claimsLast30Days,
+		// Statystyki nowych firm (utworzonych przez formularz)
+		newCompaniesLast30Days,
 		// Dane z ostatnich 30 dni
 		companiesLast30Days,
 		leadsLast30Days,
@@ -52,6 +62,18 @@ async function getStats() {
 		prisma.lead.count(),
 		prisma.review.count(),
 		prisma.claimRequest.count({ where: { status: 'PENDING' } }),
+		// Statystyki przejęć
+		prisma.claimRequest.count(),
+		prisma.claimRequest.count({ where: { status: 'APPROVED' } }),
+		prisma.claimRequest.count({ where: { status: 'REJECTED' } }),
+		prisma.claimRequest.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+		// Nowe firmy utworzone przez formularz (mają ClaimRequest z message zawierającym "Nowa wizytówka")
+		prisma.claimRequest.count({
+			where: {
+				createdAt: { gte: thirtyDaysAgo },
+				message: { contains: 'Nowa wizytówka' },
+			},
+		}),
 		// Ostatnie 30 dni
 		prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
 		prisma.lead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
@@ -78,7 +100,6 @@ async function getStats() {
 		prisma.claimRequest.findMany({
 			take: 5,
 			orderBy: { createdAt: 'desc' },
-			where: { status: 'PENDING' },
 			include: { company: { select: { name: true } } },
 		}),
 		prisma.review.findMany({
@@ -100,6 +121,11 @@ async function getStats() {
 		totalLeads,
 		totalReviews,
 		pendingClaims,
+		totalClaims,
+		approvedClaims,
+		rejectedClaims,
+		claimsLast30Days,
+		newCompaniesLast30Days,
 		companiesLast30Days,
 		leadsLast30Days,
 		reviewsLast30Days,
@@ -224,6 +250,13 @@ export default async function AdminDashboard() {
 					<span className="text-xs text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
 						Ostatnia aktualizacja: {new Date().toLocaleString('pl-PL')}
 					</span>
+					<Link
+						href="/admin/export"
+						className="text-xs text-indigo-600 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 transition-colors"
+					>
+						<FileDown className="w-3.5 h-3.5" />
+						Eksport danych
+					</Link>
 				</div>
 			</div>
 
@@ -260,6 +293,42 @@ export default async function AdminDashboard() {
 					subtext="Ze wszystkich firm"
 					icon={<ShieldCheck className="w-5 h-5" />}
 					color="amber"
+				/>
+			</div>
+
+			{/* STATYSTYKI PRZEJĘĆ I NOWYCH FIRM */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<KPICard
+					title="Przejęcia (Wszystkie)"
+					value={stats.totalClaims.toLocaleString('pl-PL')}
+					change={`${stats.approvedClaims} zaakceptowanych`}
+					subtext={`${stats.claimsLast30Days} w ostatnich 30 dniach`}
+					icon={<ShieldCheck className="w-5 h-5" />}
+					color="blue"
+				/>
+				<KPICard
+					title="Zaakceptowane Przejęcia"
+					value={stats.approvedClaims.toLocaleString('pl-PL')}
+					change={`${stats.totalClaims > 0 ? ((stats.approvedClaims / stats.totalClaims) * 100).toFixed(1) : 0}%`}
+					subtext="Ze wszystkich przejęć"
+					icon={<CheckCircle2 className="w-5 h-5" />}
+					color="emerald"
+				/>
+				<KPICard
+					title="Odrzucone Przejęcia"
+					value={stats.rejectedClaims.toLocaleString('pl-PL')}
+					change={`${stats.totalClaims > 0 ? ((stats.rejectedClaims / stats.totalClaims) * 100).toFixed(1) : 0}%`}
+					subtext="Ze wszystkich przejęć"
+					icon={<XCircle className="w-5 h-5" />}
+					color="amber"
+				/>
+				<KPICard
+					title="Nowe Wizytówki"
+					value={stats.newCompaniesLast30Days.toLocaleString('pl-PL')}
+					change="Ostatnie 30 dni"
+					subtext="Utworzone przez formularz"
+					icon={<Building2 className="w-5 h-5" />}
+					color="purple"
 				/>
 			</div>
 
@@ -332,6 +401,45 @@ export default async function AdminDashboard() {
 								))
 							) : (
 								<p className="text-sm text-slate-400 text-center py-4">Brak leadów</p>
+							)}
+						</div>
+					</div>
+
+					{/* Recent Claims */}
+					<div className="bg-white rounded-xl border border-slate-200 p-4">
+						<div className="flex items-center justify-between mb-4">
+							<h3 className="font-semibold text-slate-900 flex items-center gap-2">
+								<ShieldCheck className="w-4 h-4 text-slate-400" />
+								Ostatnie Przejęcia
+							</h3>
+							<Link href="/admin/zgloszenia" className="text-xs text-indigo-600 hover:underline">
+								Zobacz wszystkie
+							</Link>
+						</div>
+						<div className="space-y-3">
+							{stats.recentClaims.length > 0 ? (
+								stats.recentClaims.map((claim) => (
+									<div key={claim.id} className="flex items-center gap-3 text-sm">
+										<div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+											claim.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+											claim.status === 'REJECTED' ? 'bg-red-100 text-red-600' :
+											'bg-amber-100 text-amber-600'
+										}`}>
+											{claim.status === 'APPROVED' ? '✓' : claim.status === 'REJECTED' ? '✗' : '⏱'}
+										</div>
+										<div className="flex-1 min-w-0">
+											<p className="font-medium text-slate-900 truncate">{claim.fullName}</p>
+											<p className="text-xs text-slate-500 truncate">
+												{claim.company?.name || 'Firma usunięta'}
+											</p>
+										</div>
+										<span className="text-xs text-slate-400">
+											{new Date(claim.createdAt).toLocaleDateString('pl-PL')}
+										</span>
+									</div>
+								))
+							) : (
+								<p className="text-sm text-slate-400 text-center py-4">Brak przejęć</p>
 							)}
 						</div>
 					</div>
