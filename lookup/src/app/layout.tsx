@@ -12,13 +12,30 @@ const inter = Inter({ subsets: ['latin'] })
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://katalogo.pl' // Zmień na HTTPS w produkcji
 
 export async function generateMetadata(): Promise<Metadata> {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx:14',message:'generateMetadata called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+	// #endregion
+
 	// Podczas build time może nie być dostępu do bazy - użyj fallback
 	let siteName = 'Katalogo'
 	try {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx:18',message:'Before prisma.setting.findMany',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+		// #endregion
+
 		const settings = await prisma.setting.findMany()
+		
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx:22',message:'After prisma.setting.findMany',data:{settingsCount:settings.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+		// #endregion
+
 		const get = (key: string) => settings.find(s => s.key === key)?.value
 		siteName = get('site_name') || 'Katalogo'
-	} catch (error) {
+	} catch (error: any) {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx:28',message:'prisma.setting.findMany error',data:{errorCode:error?.code,errorMessage:error?.message?.substring(0,100),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+		// #endregion
+
 		// Podczas build time baza może być niedostępna - użyj domyślnej wartości
 		console.warn('[METADATA] Could not fetch settings, using default:', error)
 	}

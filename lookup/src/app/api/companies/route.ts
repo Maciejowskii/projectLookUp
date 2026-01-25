@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from 'next/server'
 const COMPANIES_PER_PAGE = 50
 
 export async function GET(request: NextRequest) {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:7',message:'GET /api/companies called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+	// #endregion
+
 	try {
 		const searchParams = request.nextUrl.searchParams
 		const page = parseInt(searchParams.get('page') || '1', 10)
@@ -48,6 +52,10 @@ export async function GET(request: NextRequest) {
 			whereClause.categoryId = categoryId
 		}
 
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:45',message:'Before Prisma queries',data:{page,limit,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+		// #endregion
+
 		// Optymalizacja: select tylko potrzebne pola
 		const [companies, total] = await Promise.all([
 			prisma.company.findMany({
@@ -88,6 +96,10 @@ export async function GET(request: NextRequest) {
 			}),
 			prisma.company.count({ where: whereClause }),
 		])
+
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:75',message:'After Prisma queries',data:{companiesCount:companies.length,total,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+		// #endregion
 
 		// Oblicz ratingi
 		const companiesWithRating = companies.map((c) => {
