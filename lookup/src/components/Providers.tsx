@@ -43,13 +43,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 			})
 	}, [])
 
-	// Only render SessionProvider on client side to avoid hydration issues
-	if (!mounted) {
-		return <>{children}</>
-	}
-
-	// Wrap with QueryClientProvider for React Query
-	const content = nextAuthAvailable ? (
+	// Always wrap with QueryClientProvider (works in SSR too)
+	// Only SessionProvider needs to wait for mount
+	const content = (!mounted || !nextAuthAvailable) ? (
+		<>{children}</>
+	) : (
 		<SessionProvider
 			basePath='/api/auth'
 			refetchInterval={0}
@@ -57,8 +55,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
 		>
 			{children}
 		</SessionProvider>
-	) : (
-		<>{children}</>
 	)
 
 	return (
