@@ -38,7 +38,7 @@ function extractIdFromSlug(slug: string): string | null {
 
 // Funkcja pomocnicza do sprawdzania czy slug może być prefiksem dłuższego slugu w bazie
 // (np. slug w URL: "com-komputery" -> slug w bazie: "com-komputery-3725a8d5")
-async function findCompanyBySlugPrefix(slug: string): Promise<typeof prisma.company.$inferSelect & { category: any; reviews: any[] } | null> {
+async function findCompanyBySlugPrefix(slug: string) {
 	// Szukaj firm gdzie slug zaczyna się od podanego slugu + "-"
 	const companies = await prisma.$queryRaw<Array<{
 		id: string
