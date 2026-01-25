@@ -103,15 +103,15 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
       <header className="flex-none bg-white border-b border-gray-200 z-30 px-4 py-3 shadow-sm sticky top-0" style={{ paddingTop: `calc(0.75rem + var(--safe-area-inset-top))` }}>
         <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
           {/* Logo / Nazwa Tenanta */}
-          <Link href="/" className="flex items-center gap-2 group touch-manipulation active:scale-95 transition-transform">
-            <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md md:group-hover:scale-105 transition-transform">
+          <Link href="/" className="flex items-center gap-2 group touch-manipulation active:scale-95 transition-transform min-w-0 flex-shrink">
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md md:group-hover:scale-105 transition-transform flex-shrink-0">
               {tenant.name.charAt(0)}
             </div>
-            <div>
-              <h1 className="text-base md:text-lg font-bold text-gray-900 leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-sm md:text-base lg:text-lg font-bold text-gray-900 leading-tight truncate">
                 {tenant.name}
               </h1>
-              <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+              <p className="text-[8px] md:text-[9px] lg:text-[10px] text-gray-500 uppercase tracking-wider font-semibold truncate">
                 Katalog branżowy
               </p>
             </div>

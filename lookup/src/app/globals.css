@@ -28,6 +28,13 @@
 * {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  /* Prevent text overflow */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 body {
@@ -38,6 +45,31 @@ body {
   overflow-x: hidden;
   /* Smooth scrolling for iOS */
   -webkit-overflow-scrolling: touch;
+  /* Prevent text overflow */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Fix flex items overflow */
+.flex, [class*="flex"] {
+  min-width: 0;
+}
+
+/* Fix grid items overflow */
+.grid, [class*="grid"] {
+  min-width: 0;
+}
+
+/* Prevent text overflow in containers */
+.container, [class*="container"], [class*="max-w"] {
+  overflow-x: hidden;
+}
+
+/* Fix long words and URLs */
+p, span, div, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 /* Touch-friendly clickable areas - minimum 44x44px */

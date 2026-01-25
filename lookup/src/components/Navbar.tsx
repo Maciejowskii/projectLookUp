@@ -50,16 +50,16 @@ export const Navbar = () => {
           paddingTop: `calc(0.75rem + var(--safe-area-inset-top))`,
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between overflow-hidden">
           {/* --- LOGO (Mobile-First) --- */}
           <Link
             href="/"
-            className="text-xl md:text-2xl font-extrabold tracking-tighter flex items-center gap-2 group touch-manipulation"
+            className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tighter flex items-center gap-2 group touch-manipulation flex-shrink-0 min-w-0"
             aria-label="Strona główna"
           >
-            <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg skew-x-[-10deg] group-active:scale-95 transition-transform duration-200 shadow-lg shadow-blue-500/20"></div>
-            <span className="text-gray-900">katalogo</span>
-            <span className="text-blue-600">.</span>
+            <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg skew-x-[-10deg] group-active:scale-95 transition-transform duration-200 shadow-lg shadow-blue-500/20 flex-shrink-0"></div>
+            <span className="text-gray-900 truncate">katalogo</span>
+            <span className="text-blue-600 flex-shrink-0">.</span>
           </Link>
 
           {/* --- DESKTOP MENU (Hidden on mobile) --- */}

@@ -91,27 +91,27 @@ const CompanyCard = React.memo(function CompanyCard({
 				<div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
 			)}
 
-			<div className="flex justify-between items-start gap-3">
-				<div className="flex-1">
-					<div className="flex items-center gap-2 mb-1">
-						<span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide bg-blue-50 px-1.5 py-0.5 rounded">
+			<div className="flex justify-between items-start gap-3 min-w-0">
+				<div className="flex-1 min-w-0">
+					<div className="flex items-center gap-2 mb-1 flex-wrap">
+						<span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">
 							{company.category.name}
 						</span>
 						{company.plan === 'PREMIUM' && (
-							<span className="flex items-center gap-0.5 text-[10px] text-green-700 font-bold">
+							<span className="flex items-center gap-0.5 text-[10px] text-green-700 font-bold whitespace-nowrap">
 								<ShieldCheck size={12} /> Zweryfikowana
 							</span>
 						)}
 					</div>
 
-					<h3 className="font-bold text-gray-900 text-base md:text-lg leading-snug md:group-hover:text-blue-600 transition-colors">
+					<h3 className="font-bold text-gray-900 text-base md:text-lg leading-snug md:group-hover:text-blue-600 transition-colors break-words line-clamp-2">
 						{company.name}
 					</h3>
 
-					<div className="mt-2 flex items-center text-xs md:text-sm text-gray-500 gap-1.5">
+					<div className="mt-2 flex items-center text-xs md:text-sm text-gray-500 gap-1.5 min-w-0">
 						<MapPin size={14} className="flex-shrink-0" />
-						<span className="truncate">
-							{company.address}, {company.city}
+						<span className="truncate min-w-0">
+							{company.address ? `${company.address}, ` : ''}{company.city}
 						</span>
 					</div>
 				</div>

@@ -30,16 +30,16 @@ export const Footer = async () => {
   });
 
   return (
-    <footer className="bg-gray-950 text-gray-400 py-16 mt-20 border-t border-gray-900 font-sans">
-      <div className="container mx-auto px-4">
+    <footer className="bg-gray-950 text-gray-400 py-12 md:py-16 mt-12 md:mt-20 border-t border-gray-900 font-sans overflow-hidden">
+      <div className="container mx-auto px-4 md:px-6">
         {/* GÓRNA SEKCJA STOPKI */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 mb-8 md:mb-12">
           {/* Kolumna 1: Brand */}
-          <div className="space-y-4">
-            <h3 className="text-white font-black text-2xl tracking-tight">
+          <div className="space-y-3 md:space-y-4 min-w-0">
+            <h3 className="text-white font-black text-xl md:text-2xl tracking-tight break-words">
               katalogo<span className="text-blue-600">.</span>
             </h3>
-            <p className="text-sm leading-relaxed opacity-80">
+            <p className="text-xs md:text-sm leading-relaxed opacity-80 break-words">
               Największa baza firm i specjalistów w Twojej okolicy. Łączymy
               klientów z najlepszymi wykonawcami w Polsce.
             </p>
@@ -54,11 +54,11 @@ export const Footer = async () => {
           </div>
 
           {/* Kolumna 2: Dla Partnerów */}
-          <div>
-            <h4 className="text-white font-bold mb-6 flex items-center gap-2">
+          <div className="min-w-0">
+            <h4 className="text-white font-bold mb-4 md:mb-6 flex items-center gap-2 text-base md:text-lg">
               Strefa Firmy
             </h4>
-            <ul className="space-y-3 text-sm">
+            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
               <li>
                 <Link
                   href="/dodaj-firme"
@@ -97,9 +97,9 @@ export const Footer = async () => {
           </div>
 
           {/* Kolumna 3: Popularne Kategorie */}
-          <div>
-            <h4 className="text-white font-bold mb-6">Popularne Usługi</h4>
-            <ul className="space-y-3 text-sm">
+          <div className="min-w-0">
+            <h4 className="text-white font-bold mb-4 md:mb-6 text-base md:text-lg break-words">Popularne Usługi</h4>
+            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
               {categories.map((cat) => (
                 <li key={cat.id}>
                   <Link
@@ -122,9 +122,9 @@ export const Footer = async () => {
           </div>
 
           {/* Kolumna 4: Informacje & Blog */}
-          <div>
-            <h4 className="text-white font-bold mb-6">Informacje</h4>
-            <ul className="space-y-3 text-sm">
+          <div className="min-w-0">
+            <h4 className="text-white font-bold mb-4 md:mb-6 text-base md:text-lg break-words">Informacje</h4>
+            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
               <li>
                 <Link
                   href="/kontakt"
@@ -171,11 +171,11 @@ export const Footer = async () => {
         </div>
 
         {/* DOLNA SEKCJA SEO (SEO LINKS) */}
-        <div className="border-t border-gray-900 pt-10 pb-6">
-          <h5 className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-4 text-center">
+        <div className="border-t border-gray-900 pt-6 md:pt-10 pb-4 md:pb-6 overflow-hidden">
+          <h5 className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-gray-600 mb-3 md:mb-4 text-center break-words">
             Popularne wyszukiwania lokalne
           </h5>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs text-gray-500">
+          <div className="flex flex-wrap justify-center gap-x-3 md:gap-x-6 gap-y-2 md:gap-y-3 text-[10px] md:text-xs text-gray-500">
             {seoLinks.map((link, i) => (
               <Link
                 key={i}
@@ -195,10 +195,10 @@ export const Footer = async () => {
         </div>
 
         {/* COMPANY INFO & PAYMENT METHODS */}
-        <div className="border-t border-gray-900 pt-8 mt-8">
-          <div className="text-center space-y-4">
+        <div className="border-t border-gray-900 pt-6 md:pt-8 mt-6 md:mt-8 overflow-hidden">
+          <div className="text-center space-y-3 md:space-y-4">
             {/* Company Details */}
-            <div className="text-xs text-gray-500 space-y-2">
+            <div className="text-[10px] md:text-xs text-gray-500 space-y-1 md:space-y-2 break-words">
               <p className="font-semibold text-gray-400 mb-2">Jakub Wolert</p>
               <p>ul. Targowa 6/5, 72-010 Police</p>
               <p>NIP: 8513315629 | REGON: 52918637000000</p>

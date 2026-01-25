@@ -324,22 +324,22 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			)}
 
 			{/* HEADER PROFILU */}
-			<div className={`bg-white border-b pb-12 ${hasTopBanners ? 'pt-8' : 'pt-24'}`}>
-				<div className='container mx-auto px-4 max-w-5xl'>
+			<div className={`bg-white border-b pb-8 md:pb-12 ${hasTopBanners ? 'pt-6 md:pt-8' : 'pt-20 md:pt-24'}`}>
+				<div className='container mx-auto px-4 md:px-6 max-w-5xl overflow-hidden'>
 					{/* --- 1. BREADCRUMBS (SEO) --- */}
-					<nav className='flex flex-wrap items-center text-sm text-gray-500 mb-6 gap-2'>
-						<Link href='/' className='hover:text-blue-600 hover:underline'>
+					<nav className='flex flex-wrap items-center text-xs md:text-sm text-gray-500 mb-4 md:mb-6 gap-1 md:gap-2 overflow-x-auto pb-2 -mx-4 px-4'>
+						<Link href='/' className='hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0'>
 							Strona główna
 						</Link>
-						<ChevronRight size={14} className='text-gray-400' />
+						<ChevronRight size={12} className='text-gray-400 flex-shrink-0' />
 
-						<Link href={`/kategoria/${company.category.slug}`} className='hover:text-blue-600 hover:underline'>
+						<Link href={`/kategoria/${company.category.slug}`} className='hover:text-blue-600 hover:underline truncate max-w-[150px] md:max-w-none'>
 							{company.category.name}
 						</Link>
 
 						{company.city && (
 							<>
-								<ChevronRight size={14} className='text-gray-400' />
+								<ChevronRight size={12} className='text-gray-400 flex-shrink-0' />
 								<Link
 									href={`/kategoria/${company.category.slug}/${company.city
 										.toLowerCase()
@@ -347,77 +347,78 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 										.replace(/[\u0300-\u036f]/g, '')
 										.replace(/ł/g, 'l')
 										.replace(/[^a-z0-9]+/g, '-')}`}
-									className='hover:text-blue-600 hover:underline'
+									className='hover:text-blue-600 hover:underline truncate max-w-[150px] md:max-w-none'
 								>
 									{company.category.name} {company.city}
 								</Link>
 							</>
 						)}
 
-						<ChevronRight size={14} className='text-gray-400' />
-						<span className='font-semibold text-gray-900 truncate max-w-[200px]'>{company.name}</span>
+						<ChevronRight size={12} className='text-gray-400 flex-shrink-0' />
+						<span className='font-semibold text-gray-900 truncate max-w-[120px] md:max-w-[200px]'>{company.name}</span>
 					</nav>
 
-					<div className='flex flex-col md:flex-row gap-8'>
+					<div className='flex flex-col md:flex-row gap-6 md:gap-8'>
 						{/* LOGO */}
-						<div className='flex-shrink-0'>
+						<div className='flex-shrink-0 flex justify-center md:justify-start'>
 							{company.logo ? (
-								<div className='w-32 h-32 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm'>
+								<div className='w-24 h-24 md:w-32 md:h-32 relative rounded-xl md:rounded-2xl overflow-hidden border border-gray-100 shadow-sm'>
 									<Image src={company.logo} alt={`Logo ${getInitial(company.name)}`} fill className='object-cover' />
 								</div>
 							) : (
-								<div className='w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold shadow-sm'>
+								<div className='w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-sm'>
 									{company.name.charAt(0)}
 								</div>
 							)}
 						</div>
 
 						{/* DANE GŁÓWNE */}
-						<div className='flex-grow'>
-							<div className='flex flex-wrap gap-3 mb-3'>
+						<div className='flex-grow min-w-0'>
+							<div className='flex flex-wrap gap-2 md:gap-3 mb-3'>
 								{/* --- 2. KATEGORIA JAKO LINK (SEO) --- */}
 								<Link
 									href={`/kategoria/${company.category.slug}`}
-									className='bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors'
+									className='bg-blue-50 text-blue-700 px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors whitespace-nowrap'
 								>
 									{company.category.name}
 								</Link>
 
 								{company.nip && (
-									<span className='bg-gray-50 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border border-gray-200 text-gray-600'>
-										<FileText size={12} /> NIP: {company.nip}
+									<span className='bg-gray-50 px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold flex items-center gap-1 border border-gray-200 text-gray-600 whitespace-nowrap'>
+										<FileText size={10} className='md:w-3 md:h-3' /> <span className='hidden sm:inline'>NIP: </span>{company.nip}
 									</span>
 								)}
 
 								{company.isVerified && (
-									<span className='bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border border-green-100'>
-										<CheckCircle size={12} /> Zweryfikowana
+									<span className='bg-green-50 text-green-700 px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold flex items-center gap-1 border border-green-100 whitespace-nowrap'>
+										<CheckCircle size={10} className='md:w-3 md:h-3' /> Zweryfikowana
 									</span>
 								)}
 							</div>
 
-							<h1 className='text-3xl md:text-4xl font-extrabold mb-4 text-gray-900 leading-tight'>{company.name}</h1>
+							<h1 className='text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 md:mb-4 text-gray-900 leading-tight break-words'>{company.name}</h1>
 
-							<div className='flex flex-wrap gap-4 text-sm text-gray-600'>
+							<div className='flex flex-wrap gap-3 md:gap-4 text-xs md:text-sm text-gray-600'>
 								{company.city && (
-									<div className='flex items-center gap-2'>
-										<MapPin size={16} className='text-gray-400' /> {company.city}, {company.address}
+									<div className='flex items-center gap-2 min-w-0'>
+										<MapPin size={14} className='text-gray-400 flex-shrink-0' /> <span className='truncate'>{company.city}{company.address ? `, ${company.address}` : ''}</span>
 									</div>
 								)}
 								{company.website && (
 									<a
 										href={company.website}
 										target='_blank'
-										className='flex items-center gap-2 text-blue-600 hover:underline'
+										rel='noopener noreferrer'
+										className='flex items-center gap-2 text-blue-600 hover:underline whitespace-nowrap flex-shrink-0'
 									>
-										<Globe size={16} /> Strona www
+										<Globe size={14} /> Strona www
 									</a>
 								)}
 							</div>
 						</div>
 
 						{/* AKCJE */}
-						<div className='bg-gray-50 p-6 rounded-2xl w-full md:w-[300px] md:min-w-[300px] md:max-w-[300px] shrink-0 border border-gray-100 h-fit space-y-3 text-center'>
+						<div className='bg-gray-50 p-4 md:p-6 rounded-xl md:rounded-2xl w-full md:w-[280px] lg:w-[300px] md:min-w-[280px] lg:min-w-[300px] md:max-w-[300px] shrink-0 border border-gray-100 h-fit space-y-3 text-center'>
 							{company.phone && <PhoneRevealButton phone={company.phone} companyId={company.id} />}
 
 							<a
@@ -446,16 +447,16 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 			</div>
 
 			{/* TREŚĆ GŁÓWNA */}
-			<main className='container mx-auto px-4 py-12 max-w-5xl grid lg:grid-cols-3 gap-12'>
-				<div className='lg:col-span-2 space-y-12'>
+			<main className='container mx-auto px-4 md:px-6 py-8 md:py-12 max-w-5xl grid lg:grid-cols-3 gap-6 md:gap-12'>
+				<div className='lg:col-span-2 space-y-8 md:space-y-12 min-w-0'>
 					{/* Opis */}
-					<section className='bg-white p-8 rounded-3xl shadow-sm border border-gray-100'>
-						<h2 className='text-2xl font-bold mb-4 text-gray-900'>O firmie</h2>
-						<div className='prose prose-blue text-gray-600 leading-relaxed whitespace-pre-line'>
+					<section className='bg-white p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl shadow-sm border border-gray-100 overflow-hidden'>
+						<h2 className='text-xl md:text-2xl font-bold mb-3 md:mb-4 text-gray-900'>O firmie</h2>
+						<div className='prose prose-blue text-gray-600 leading-relaxed whitespace-pre-line max-w-none break-words overflow-wrap-anywhere'>
 							{company.description || 'Ta firma nie dodała jeszcze szczegółowego opisu swojej działalności.'}
 
 							{/* --- 3. SEO TEXT INJECTION --- */}
-							<p className='mt-6 text-gray-500 italic text-sm border-t pt-4 border-gray-100'>
+							<p className='mt-4 md:mt-6 text-gray-500 italic text-xs md:text-sm border-t pt-3 md:pt-4 border-gray-100 break-words'>
 								Świadczymy usługi w lokalizacji {company.city} i okolicach. Zapraszamy do kontaktu telefonicznego lub
 								mailowego w celu ustalenia szczegółów współpracy.
 							</p>
@@ -467,18 +468,18 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 				</div>
 
 				{/* Sidebar */}
-				<aside className='space-y-8'>
-					<div className='bg-white p-2 rounded-3xl overflow-hidden shadow-sm border border-gray-100'>
+				<aside className='space-y-6 md:space-y-8 min-w-0'>
+					<div className='bg-white p-2 md:p-3 rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-gray-100'>
 						<iframe
 							loading='lazy'
 							referrerPolicy='no-referrer-when-downgrade'
-							className='w-full h-64 rounded-2xl grayscale hover:grayscale-0 transition-all duration-500'
+							className='w-full h-48 md:h-64 rounded-xl md:rounded-2xl grayscale md:hover:grayscale-0 transition-all duration-500'
 							src={`https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed`}
 						/>
-						<div className='p-4'>
-							<p className='font-bold text-gray-900'>{company.address}</p>
-							<p className='text-sm text-gray-500'>
-								{company.city}, {company.zip}
+						<div className='p-3 md:p-4'>
+							<p className='font-bold text-sm md:text-base text-gray-900 break-words'>{company.address}</p>
+							<p className='text-xs md:text-sm text-gray-500 break-words'>
+								{company.city}{company.zip ? `, ${company.zip}` : ''}
 							</p>
 						</div>
 					</div>
