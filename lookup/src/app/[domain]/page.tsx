@@ -99,46 +99,46 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
-      {/* === HEADER / NAVBAR === */}
-      <header className="flex-none bg-white border-b border-gray-200 z-30 px-4 py-3 shadow-sm">
-        <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      {/* === HEADER / NAVBAR (Mobile-First) === */}
+      <header className="flex-none bg-white border-b border-gray-200 z-30 px-4 py-3 shadow-sm sticky top-0" style={{ paddingTop: `calc(0.75rem + var(--safe-area-inset-top))` }}>
+        <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
           {/* Logo / Nazwa Tenanta */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md group-hover:scale-105 transition-transform">
+          <Link href="/" className="flex items-center gap-2 group touch-manipulation active:scale-95 transition-transform">
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md md:group-hover:scale-105 transition-transform">
               {tenant.name.charAt(0)}
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">
+              <h1 className="text-base md:text-lg font-bold text-gray-900 leading-tight">
                 {tenant.name}
               </h1>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+              <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
                 Katalog branżowy
               </p>
             </div>
           </Link>
 
           {/* SearchBar - kompaktowy na headerze */}
-          <div className="w-full md:w-auto md:flex-1 md:max-w-2xl">
+          <div className="w-full md:w-auto md:flex-1 md:max-w-2xl order-3 md:order-2">
             <SearchBarOptimized />
           </div>
 
-          {/* CTA Button (Opcjonalnie) */}
+          {/* CTA Button (Desktop only) */}
           <Link
             href="/dodaj-firme"
-            className="hidden md:block text-sm font-medium text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-full transition-colors"
+            className="hidden md:flex text-sm font-medium text-blue-600 md:hover:bg-blue-50 px-4 py-2 rounded-full transition-colors touch-manipulation min-h-[44px] items-center justify-center order-3"
           >
             Dodaj firmę
           </Link>
         </div>
       </header>
 
-      {/* === MAIN CONTENT (SPLIT VIEW) === */}
-      <main className="flex-1 flex overflow-hidden relative">
-        {/* --- LEWA KOLUMNA: LISTA (Scroll) --- */}
-        <div className="w-full lg:w-[40%] xl:w-[500px] h-full bg-gray-50 border-r border-gray-200 flex flex-col">
+      {/* === MAIN CONTENT (Mobile: Single Column, Desktop: Split View) === */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        {/* --- LEWA KOLUMNA: LISTA (Scroll) - Full width on mobile --- */}
+        <div className="w-full lg:w-[40%] xl:w-[500px] h-full bg-gray-50 lg:border-r border-gray-200 flex flex-col pb-20 md:pb-0" style={{ paddingBottom: `calc(5rem + var(--safe-area-inset-bottom))` }}>
           {/* Statystyki wyników */}
-          <div className="sticky top-0 bg-gray-50/95 backdrop-blur z-10 px-4 py-3 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-            <span className="text-xs font-bold text-gray-500 uppercase">
+          <div className="sticky top-0 bg-gray-50/95 backdrop-blur z-10 px-4 py-2 md:py-3 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+            <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase">
               Wyniki wyszukiwania
             </span>
           </div>

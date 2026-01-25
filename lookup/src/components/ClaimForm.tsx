@@ -39,52 +39,61 @@ export default function ClaimForm({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
+    <form action={handleSubmit} className="space-y-4 md:space-y-6">
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="subdomain" value={subdomain} />
       <input type="hidden" name="slug" value={slug} />
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm md:text-base font-medium text-gray-700 mb-2">
           Imię i nazwisko
         </label>
         <input
           name="contactName"
           required
           type="text"
-          className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+          autoComplete="name"
+          inputMode="text"
+          className="w-full border-2 border-gray-200 rounded-xl p-3 md:p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation bg-white text-gray-900"
+          style={{ fontSize: '16px' }}
           placeholder="Jan Kowalski"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm md:text-base font-medium text-gray-700 mb-2">
           Telefon
         </label>
         <input
           name="phone"
           required
           type="tel"
-          className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+          autoComplete="tel"
+          inputMode="tel"
+          className="w-full border-2 border-gray-200 rounded-xl p-3 md:p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation bg-white text-gray-900"
+          style={{ fontSize: '16px' }}
           placeholder="500 600 700"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm md:text-base font-medium text-gray-700 mb-2">
           Email (opcjonalnie)
         </label>
         <input
           name="email"
           type="email"
-          className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+          autoComplete="email"
+          inputMode="email"
+          className="w-full border-2 border-gray-200 rounded-xl p-3 md:p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation bg-white text-gray-900"
+          style={{ fontSize: '16px' }}
           placeholder="biuro@firma.pl"
         />
       </div>
 
       <button
         type="submit"
-        className="w-full bg-blue-600 text-white py-3 rounded font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition mt-2"
+        className="w-full bg-blue-600 text-white py-4 md:py-3 rounded-xl font-bold md:hover:bg-blue-700 active:bg-blue-700 active:scale-[0.98] shadow-lg shadow-blue-200 transition-all mt-2 touch-manipulation min-h-[44px] text-base md:text-sm"
       >
         Odbierz dostęp do wizytówki
       </button>

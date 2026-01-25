@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { BottomNavigation } from "@/components/BottomNavigation";
 
 // W layout też musimy pobrać dane tenanta, żeby przekazać nazwę do Navbara
 export default async function TenantLayout({
@@ -31,8 +32,9 @@ export default async function TenantLayout({
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
       <Navbar />
-      <main className="flex-grow">{children}</main>
+      <main className="flex-grow pb-20 md:pb-0">{children}</main>
       <Footer />
+      <BottomNavigation />
     </div>
   );
 }

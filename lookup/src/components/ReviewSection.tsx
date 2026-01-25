@@ -121,8 +121,11 @@ export const ReviewSection = ({
                   name="userEmail"
                   type="email"
                   required
+                  autoComplete="email"
+                  inputMode="email"
                   placeholder="twoj@email.pl"
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900"
+                  className="w-full pl-12 pr-4 py-3 md:py-3.5 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900 touch-manipulation"
+                  style={{ fontSize: '16px' }}
                 />
               </div>
             </div>
@@ -139,8 +142,11 @@ export const ReviewSection = ({
                   name="userPhone"
                   type="tel"
                   required
+                  autoComplete="tel"
+                  inputMode="tel"
                   placeholder="123 456 789"
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900"
+                  className="w-full pl-12 pr-4 py-3 md:py-3.5 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400 font-medium text-gray-900 touch-manipulation"
+                  style={{ fontSize: '16px' }}
                 />
               </div>
             </div>

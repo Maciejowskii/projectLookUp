@@ -85,7 +85,7 @@ const CompanyCard = React.memo(function CompanyCard({
 	return (
 		<Link
 			href={`/${slugifyCity(company.city ?? '')}/${company.slug}`}
-			className="group block bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-blue-400 transition-all duration-200 relative overflow-hidden mb-3"
+			className="group block bg-white border border-gray-200 rounded-xl p-4 md:p-5 shadow-sm md:hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] md:hover:border-blue-400 active:bg-gray-50 active:scale-[0.98] transition-all duration-200 relative overflow-hidden mb-3 touch-manipulation"
 		>
 			{company.plan === 'PREMIUM' && (
 				<div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
@@ -104,11 +104,11 @@ const CompanyCard = React.memo(function CompanyCard({
 						)}
 					</div>
 
-					<h3 className="font-bold text-gray-900 text-lg leading-snug group-hover:text-blue-600 transition-colors">
+					<h3 className="font-bold text-gray-900 text-base md:text-lg leading-snug md:group-hover:text-blue-600 transition-colors">
 						{company.name}
 					</h3>
 
-					<div className="mt-2 flex items-center text-sm text-gray-500 gap-1.5">
+					<div className="mt-2 flex items-center text-xs md:text-sm text-gray-500 gap-1.5">
 						<MapPin size={14} className="flex-shrink-0" />
 						<span className="truncate">
 							{company.address}, {company.city}
@@ -120,14 +120,14 @@ const CompanyCard = React.memo(function CompanyCard({
 			<div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
 				{company.reviewCount > 0 ? (
 					<div className="flex items-center gap-1.5">
-						<span className="font-semibold text-gray-900 text-sm">
+						<span className="font-semibold text-gray-900 text-xs md:text-sm">
 							{company.averageRating.toFixed(1).replace('.', ',')}
 						</span>
 						<div className="flex gap-0.5">
 							{[1, 2, 3, 4, 5].map((i) => (
 								<Star
 									key={i}
-									size={14}
+									size={12}
 									className={
 										i <= Math.round(company.averageRating)
 											? 'text-amber-400 fill-amber-400'
@@ -136,16 +136,16 @@ const CompanyCard = React.memo(function CompanyCard({
 								/>
 							))}
 						</div>
-						<span className="text-gray-500 text-xs">({company.reviewCount})</span>
+						<span className="text-gray-500 text-[10px] md:text-xs">({company.reviewCount})</span>
 						<span title="Średnia ocena z opinii">
-							<Info size={12} className="text-gray-400" />
+							<Info size={12} className="text-gray-400 hidden md:block" />
 						</span>
 					</div>
 				) : (
-					<span className="text-xs text-gray-400">Brak opinii</span>
+					<span className="text-[10px] md:text-xs text-gray-400">Brak opinii</span>
 				)}
-				<span className="text-xs font-medium text-blue-600 group-hover:underline">
-					Zobacz szczegóły
+				<span className="text-[10px] md:text-xs font-medium text-blue-600 md:group-hover:underline">
+					Zobacz szczegóły →
 				</span>
 			</div>
 		</Link>

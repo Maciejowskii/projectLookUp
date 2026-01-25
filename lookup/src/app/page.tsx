@@ -6,6 +6,7 @@ import { HomeSearchBar } from '@/components/HomeSearchBar'
 import { Footer } from '@/components/Footer'
 import { Navbar } from '@/components/Navbar'
 import { FeaturedCompanyCard } from '@/components/FeaturedCompanyCard'
+import { BottomNavigation } from '@/components/BottomNavigation'
 
 export default async function LandingPage() {
 	// Pobieramy dane z bazy równolegle z error handling
@@ -200,6 +201,7 @@ export default async function LandingPage() {
 			</section>
 
 			<Footer />
+			<BottomNavigation />
 		</div>
 	)
 }

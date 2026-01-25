@@ -3,6 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Safe area insets for iPhone (notch, home indicator) */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
 }
 
 @theme inline {
@@ -19,8 +24,57 @@
   }
 }
 
+/* Mobile-First Base Styles */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  /* Smooth scrolling for iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch-friendly clickable areas - minimum 44x44px */
+button, a, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Remove hover styles on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  *:hover {
+    /* Disable hover effects on touch devices */
+  }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* iOS Safari bottom bar fix */
+@supports (-webkit-touch-callout: none) {
+  .h-screen-safe {
+    height: calc(100vh - var(--safe-area-inset-bottom));
+  }
+  
+  .min-h-screen-safe {
+    min-height: calc(100vh - var(--safe-area-inset-bottom));
+  }
 }
