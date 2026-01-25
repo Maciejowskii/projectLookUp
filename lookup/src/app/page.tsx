@@ -8,40 +8,53 @@ import { Navbar } from '@/components/Navbar'
 import { FeaturedCompanyCard } from '@/components/FeaturedCompanyCard'
 
 export default async function LandingPage() {
-	// Pobieramy dane z bazy równolegle
-	const [companyCount, categories, recentCompanies] = await prisma.$transaction([
-		prisma.company.count(),
-		// Pobierz 4 kategorie z największą liczbą firm
-		prisma.category.findMany({
-			take: 4,
-			orderBy: { companies: { _count: 'desc' } },
-			include: { _count: { select: { companies: true } } },
-		}),
-		// Pobierz 6 ostatnich firm (Dobre dla SEO - strona "żyje")
-		prisma.company.findMany({
-			take: 6,
-			orderBy: { createdAt: 'desc' },
-			where: { isVerified: true }, // Opcjonalnie: tylko zweryfikowane
-			include: { category: true },
-		}),
-	])
+	// Pobieramy dane z bazy równolegle z error handling
+	let companyCount = 0
+	let categories: any[] = []
+	let recentCompanies: any[] = []
+	
+	try {
+		[companyCount, categories, recentCompanies] = await Promise.all([
+			prisma.company.count().catch(() => 0),
+			// Pobierz 4 kategorie z największą liczbą firm
+			prisma.category.findMany({
+				take: 4,
+				orderBy: { companies: { _count: 'desc' } },
+				include: { _count: { select: { companies: true } } },
+			}).catch(() => []),
+			// Pobierz 6 ostatnich firm (Dobre dla SEO - strona "żyje")
+			prisma.company.findMany({
+				take: 6,
+				orderBy: { createdAt: 'desc' },
+				where: { isVerified: true }, // Opcjonalnie: tylko zweryfikowane
+				include: { category: true },
+			}).catch(() => []),
+		])
+	} catch (error) {
+		// Podczas build time baza może być niedostępna
+		console.warn('[LANDING] Could not fetch data, using defaults:', error)
+	}
 
 	// Pobierz wyróżnioną firmę
-	const featuredSetting = await prisma.setting.findUnique({
-		where: { key: 'featured_company_id' },
-	})
-	
 	let featuredCompany = null
-	if (featuredSetting?.value) {
-		featuredCompany = await prisma.company.findUnique({
-			where: { id: featuredSetting.value },
-			select: {
-				id: true,
-				name: true,
-				slug: true,
-				city: true,
-			},
-		})
+	try {
+		const featuredSetting = await prisma.setting.findUnique({
+			where: { key: 'featured_company_id' },
+		}).catch(() => null)
+		
+		if (featuredSetting?.value) {
+			featuredCompany = await prisma.company.findUnique({
+				where: { id: featuredSetting.value },
+				select: {
+					id: true,
+					name: true,
+					slug: true,
+					city: true,
+				},
+			}).catch(() => null)
+		}
+	} catch (error) {
+		console.warn('[LANDING] Could not fetch featured company:', error)
 	}
 
 	return (

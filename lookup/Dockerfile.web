@@ -14,7 +14,11 @@ RUN npx prisma generate
 
 COPY . .
 
-RUN npx next build
+# Zwiększ pamięć dla Node.js podczas build (zapobiega SIGSEGV)
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# Build z timeout i retry
+RUN npx next build || (echo "Build failed, retrying..." && sleep 5 && npx next build)
 
 EXPOSE 3000
 

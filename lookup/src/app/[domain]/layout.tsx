@@ -15,9 +15,16 @@ export default async function TenantLayout({
 }) {
   const { domain } = await params;
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { subdomain: domain },
-  });
+  let tenant
+  try {
+    tenant = await prisma.tenant.findUnique({
+      where: { subdomain: domain },
+    })
+  } catch (error) {
+    // Podczas build time baza może być niedostępna
+    console.warn('[TENANT LAYOUT] Could not fetch tenant, using notFound:', error)
+    return notFound()
+  }
 
   if (!tenant) return notFound();
 

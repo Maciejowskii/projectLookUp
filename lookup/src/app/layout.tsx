@@ -12,10 +12,16 @@ const inter = Inter({ subsets: ['latin'] })
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://katalogo.pl' // Zmień na HTTPS w produkcji
 
 export async function generateMetadata(): Promise<Metadata> {
-	const settings = await prisma.setting.findMany()
-	const get = (key: string) => settings.find(s => s.key === key)?.value
-
-	const siteName = get('site_name') || 'Katalogo'
+	// Podczas build time może nie być dostępu do bazy - użyj fallback
+	let siteName = 'Katalogo'
+	try {
+		const settings = await prisma.setting.findMany()
+		const get = (key: string) => settings.find(s => s.key === key)?.value
+		siteName = get('site_name') || 'Katalogo'
+	} catch (error) {
+		// Podczas build time baza może być niedostępna - użyj domyślnej wartości
+		console.warn('[METADATA] Could not fetch settings, using default:', error)
+	}
 
 	return {
 		metadataBase: new URL(BASE_URL),
