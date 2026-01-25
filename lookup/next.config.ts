@@ -1,10 +1,20 @@
 // next.config.ts
 import type { NextConfig } from 'next'
 
-// Bundle analyzer (opcjonalnie)
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-	enabled: process.env.ANALYZE === 'true',
-})
+// Bundle analyzer (opcjonalnie) - używamy dynamic import dla kompatybilności
+let withBundleAnalyzer: (config: NextConfig) => NextConfig = (config) => config
+
+if (process.env.ANALYZE === 'true') {
+	try {
+		const bundleAnalyzer = require('@next/bundle-analyzer')
+		withBundleAnalyzer = bundleAnalyzer({
+			enabled: true,
+		})
+	} catch (e) {
+		// Bundle analyzer nie jest dostępny - kontynuuj bez niego
+		console.warn('Bundle analyzer not available, continuing without it')
+	}
+}
 
 const nextConfig: NextConfig = {
 	images: {
