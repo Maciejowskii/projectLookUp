@@ -3,9 +3,11 @@ export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { SearchBar } from "@/components/SearchBar";
+import { SearchBarOptimized } from "@/components/SearchBarOptimized";
 import MapWrapper from "@/components/MapWrapper";
-import { MapPin, Star, ShieldCheck, Phone, Info } from "lucide-react";
+import { CompaniesListClient } from "@/components/CompaniesListClient";
+import { Suspense } from "react";
+import { CompanyListSkeleton } from "@/components/CompanyListSkeleton";
 
 // --- TYPY ---
 type Props = {
@@ -64,39 +66,36 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
     whereClause.city = { contains: city, mode: "insensitive" };
   }
 
-  // 3. Pobranie danych (Server Side)
-  const companiesRaw = await prisma.company.findMany({
-    where: whereClause,
-    take: 500, // Zwiększono limit z 100 do 500
+  // 3. Pobranie danych dla mapy (tylko pierwsze 50 z współrzędnymi)
+  // Reszta będzie ładowana przez React Query w komponencie klienckim
+  const mapDataRaw = await prisma.company.findMany({
+    where: {
+      ...whereClause,
+      lat: { not: null },
+      lng: { not: null },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      address: true,
+      city: true,
+      lat: true,
+      lng: true,
+    },
+    take: 50, // Tylko pierwsze 50 dla mapy
     orderBy: [
       { isVerified: "desc" },
       { logo: "desc" },
       { name: "asc" },
     ],
-    include: {
-      category: true,
-      reviews: { select: { rating: true } },
-    },
   });
 
-  const companies = companiesRaw.map((c) => {
-    const reviewCount = c.reviews.length;
-    const averageRating =
-      reviewCount > 0
-        ? c.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount
-        : 0;
-    return { ...c, reviewCount, averageRating };
-  });
-
-  // 4. Przygotowanie danych dla mapy
-  // Filtrujemy tylko te, które mają współrzędne, żeby nie psuć mapy
-  const mapData = companies
-    .filter((c) => c.lat && c.lng)
-    .map((c) => ({
-      ...c,
-      lat: c.lat!,
-      lng: c.lng!,
-    }));
+  const mapData = mapDataRaw.map((c) => ({
+    ...c,
+    lat: c.lat!,
+    lng: c.lng!,
+  }));
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
@@ -120,9 +119,7 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
 
           {/* SearchBar - kompaktowy na headerze */}
           <div className="w-full md:w-auto md:flex-1 md:max-w-2xl">
-            <SearchBar />
-            {/* Upewnij się, że SearchBar nie ma marginesów (mb-8) w środku. 
-                 Najlepiej usuń 'mb-8' z klasy w komponencie SearchBar.tsx */}
+            <SearchBarOptimized />
           </div>
 
           {/* CTA Button (Opcjonalnie) */}
@@ -138,118 +135,28 @@ export default async function TenantHomePage({ params, searchParams }: Props) {
       {/* === MAIN CONTENT (SPLIT VIEW) === */}
       <main className="flex-1 flex overflow-hidden relative">
         {/* --- LEWA KOLUMNA: LISTA (Scroll) --- */}
-        <div className="w-full lg:w-[40%] xl:w-[500px] h-full overflow-y-auto bg-gray-50 border-r border-gray-200 scrollbar-thin scrollbar-thumb-gray-300">
+        <div className="w-full lg:w-[40%] xl:w-[500px] h-full bg-gray-50 border-r border-gray-200 flex flex-col">
           {/* Statystyki wyników */}
-          <div className="sticky top-0 bg-gray-50/95 backdrop-blur z-10 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+          <div className="sticky top-0 bg-gray-50/95 backdrop-blur z-10 px-4 py-3 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
             <span className="text-xs font-bold text-gray-500 uppercase">
               Wyniki wyszukiwania
             </span>
-            <span className="bg-white border border-gray-200 px-2 py-0.5 rounded-full text-xs font-medium text-gray-700">
-              {companies.length} firm
-            </span>
           </div>
 
-          <div className="p-4 space-y-3">
-            {companies.length > 0 ? (
-              companies.map((company) => (
-                <Link
-                  key={company.id}
-                  href={`/${slugifyCity(company.city ?? "")}/${company.slug}`}
-                  className="group block bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-blue-400 transition-all duration-200 relative overflow-hidden"
-                >
-                  {/* Pasek Premium */}
-                  {company.plan === "PREMIUM" && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                  )}
+          {/* Lista firm z React Query i virtualizacją */}
+          <Suspense fallback={<div className="p-4"><CompanyListSkeleton /></div>}>
+            <CompaniesListClient
+              initialDomain={decodedDomain}
+              initialTenantId={tenant.id}
+              initialQuery={q}
+              initialCity={city}
+              slugifyCity={slugifyCity}
+            />
+          </Suspense>
 
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide bg-blue-50 px-1.5 py-0.5 rounded">
-                          {company.category.name}
-                        </span>
-                        {company.plan === "PREMIUM" && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-green-700 font-bold">
-                            <ShieldCheck size={12} /> Zweryfikowana
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="font-bold text-gray-900 text-lg leading-snug group-hover:text-blue-600 transition-colors">
-                        {company.name}
-                      </h3>
-
-                      <div className="mt-2 flex items-center text-sm text-gray-500 gap-1.5">
-                        <MapPin size={14} className="flex-shrink-0" />
-                        <span className="truncate">
-                          {company.address}, {company.city}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ocena + Akcje */}
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
-                    {company.reviewCount > 0 ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {company.averageRating.toFixed(1).replace(".", ",")}
-                        </span>
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <Star
-                              key={i}
-                              size={14}
-                              className={
-                                i <= Math.round(company.averageRating)
-                                  ? "text-amber-400 fill-amber-400"
-                                  : "text-gray-200"
-                              }
-                            />
-                          ))}
-                        </div>
-                        <span className="text-gray-500 text-xs">
-                          ({company.reviewCount})
-                        </span>
-                        <span title="Średnia ocena z opinii">
-                          <Info size={12} className="text-gray-400" />
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">Brak opinii</span>
-                    )}
-                    <span className="text-xs font-medium text-blue-600 group-hover:underline">
-                      Zobacz szczegóły
-                    </span>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              // Empty State
-              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <MapPin size={32} className="text-gray-400" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  Brak wyników
-                </h3>
-                <p className="text-sm text-gray-500 max-w-xs mt-1">
-                  Nie znaleźliśmy firm spełniających Twoje kryteria w tym
-                  katalogu.
-                </p>
-                <Link
-                  href="/"
-                  className="mt-4 text-blue-600 text-sm font-medium hover:underline"
-                >
-                  Wyczyść filtry
-                </Link>
-              </div>
-            )}
-
-            {/* Footer listy */}
-            <div className="pt-8 pb-4 text-center text-xs text-gray-400">
-              &copy; 2025 {tenant.name}. Wszystkie prawa zastrzeżone.
-            </div>
+          {/* Footer listy */}
+          <div className="pt-4 pb-4 px-4 text-center text-xs text-gray-400 flex-shrink-0 border-t border-gray-200">
+            &copy; 2025 {tenant.name}. Wszystkie prawa zastrzeżone.
           </div>
         </div>
 

@@ -1,20 +1,52 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { Search } from "lucide-react"; // upewnij się, że masz lucide-react
+import { useState, useCallback, useEffect } from "react";
+import { Search } from "lucide-react";
+import { useDebouncedCallback } from "use-debounce";
+import React from "react";
 
-export const SearchBar = () => {
+export const SearchBar = React.memo(function SearchBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.trim()) {
-      router.push(`/szukaj?q=${encodeURIComponent(query)}`);
+  // Debounce search input - 400ms delay
+  const debouncedSearch = useDebouncedCallback(
+    (value: string) => {
+      if (value.trim()) {
+        router.push(`/szukaj?q=${encodeURIComponent(value)}`);
+      }
+    },
+    400
+  );
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setQuery(value);
+      debouncedSearch(value);
+    },
+    [debouncedSearch]
+  );
+
+  const handleSearch = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (query.trim()) {
+        router.push(`/szukaj?q=${encodeURIComponent(query)}`);
+      }
+    },
+    [query, router]
+  );
+
+  // Sync with URL params
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") || "";
+    if (urlQuery !== query) {
+      setQuery(urlQuery);
     }
-  };
+  }, [searchParams, query]);
 
   return (
     <form onSubmit={handleSearch} className="relative w-full max-w-2xl mx-auto">
@@ -25,7 +57,7 @@ export const SearchBar = () => {
           placeholder="Czego szukasz? Np. mechanik, hydraulik, nazwa firmy..."
           className="w-full py-4 pl-12 pr-4 rounded-full border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleInputChange}
         />
         <button
           type="submit"
@@ -36,4 +68,4 @@ export const SearchBar = () => {
       </div>
     </form>
   );
-};
+});

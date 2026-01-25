@@ -1,6 +1,11 @@
 // next.config.ts
 import type { NextConfig } from 'next'
 
+// Bundle analyzer (opcjonalnie)
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+	enabled: process.env.ANALYZE === 'true',
+})
+
 const nextConfig: NextConfig = {
 	images: {
 		remotePatterns: [
@@ -13,6 +18,11 @@ const nextConfig: NextConfig = {
 				hostname: 'placehold.co',
 			},
 		],
+		// Optymalizacja obrazów
+		formats: ['image/avif', 'image/webp'],
+		deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+		minimumCacheTTL: 60 * 60 * 24 * 365, // 1 rok cache dla obrazów
 	},
 	experimental: {
 		typedRoutes: false,
@@ -20,6 +30,46 @@ const nextConfig: NextConfig = {
 	eslint: {
 		ignoreDuringBuilds: true,
 	},
+	// Optymalizacja kompresji
+	compress: true,
+	// Optymalizacja bundle
+	swcMinify: true,
+	// Headers dla cache
+	async headers() {
+		return [
+			{
+				source: '/:path*',
+				headers: [
+					{
+						key: 'X-DNS-Prefetch-Control',
+						value: 'on',
+					},
+					{
+						key: 'X-Frame-Options',
+						value: 'SAMEORIGIN',
+					},
+				],
+			},
+			{
+				source: '/_next/static/:path*',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=31536000, immutable', // 1 rok dla statycznych assets
+					},
+				],
+			},
+			{
+				source: '/images/:path*',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=31536000, immutable', // 1 rok dla obrazów
+					},
+				],
+			},
+		]
+	},
 }
 
-export default nextConfig
+export default withBundleAnalyzer(nextConfig)

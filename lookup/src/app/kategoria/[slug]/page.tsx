@@ -4,15 +4,9 @@ import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
-import { MapPin, ArrowRight } from 'lucide-react'
 import { Metadata } from 'next/dist/lib/metadata/types/metadata-interface'
 import { safeDecode } from '@/lib/text'
-
-const getInitial = (name?: string) => {
-	const s = safeDecode((name ?? '').trim())
-	const m = s.match(/[\p{L}\p{N}]/u) // pierwsza litera/cyfra Unicode
-	return (m?.[0] ?? '?').toUpperCase()
-}
+import { CategoryCompaniesList } from '@/components/CategoryCompaniesList'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
 	const { slug } = await params
@@ -49,45 +43,13 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 
 	if (isUuid(slug)) permanentRedirect(`/kategoria/${category.slug}`)
 
-	// 2. Pobierz firmy z kategorii
-	const companies = await prisma.company.findMany({
+	// 2. Pobierz tylko liczbę firm (reszta przez React Query)
+	const totalCompanies = await prisma.company.count({
 		where: {
 			categoryId: category.id,
 		},
-		include: {
-			category: true,
-		},
-		orderBy: [
-			{ isVerified: 'desc' },
-			{ logo: 'desc' },
-			{ name: 'asc' },
-		],
-		take: 1000,
 	})
 
-	// Debug: loguj informacje (tylko w development)
-	if (process.env.NODE_ENV === 'development') {
-		console.log(`[DEBUG] Category: ${category.name} (ID: ${category.id}, tenantId: ${category.tenantId})`)
-		console.log(`[DEBUG] Found ${companies.length} companies`)
-		if (companies.length === 0) {
-			const count = await prisma.company.count({
-				where: { categoryId: category.id },
-			})
-			console.log(`[DEBUG] Total companies with categoryId=${category.id}: ${count}`)
-			
-			// Sprawdź czy są firmy z innym tenantId
-			const companiesWithDifferentTenant = await prisma.company.findMany({
-				where: {
-					categoryId: category.id,
-					tenantId: { not: category.tenantId },
-				},
-				take: 5,
-			})
-			if (companiesWithDifferentTenant.length > 0) {
-				console.log(`[DEBUG] Found ${companiesWithDifferentTenant.length} companies with different tenantId`)
-			}
-		}
-	}
 
 	return (
 		// Używamy <div> jako głównego kontenera, to bezpieczne.
@@ -100,68 +62,12 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 					<span className='text-blue-600 font-bold uppercase tracking-wider text-sm mb-2 block'>Kategoria</span>
 					<h1 className='text-4xl md:text-5xl font-extrabold text-gray-900 mb-4'>{safeDecode(category.name)}</h1>
 					<p className='text-gray-500 text-lg max-w-2xl'>
-						Znaleziono {companies.length} firm w tej kategorii. Przeglądaj najlepszych specjalistów w Twojej okolicy.
+						Znaleziono {totalCompanies} firm w tej kategorii. Przeglądaj najlepszych specjalistów w Twojej okolicy.
 					</p>
 				</div>
 
-				{/* LISTA FIRM */}
-				{companies.length > 0 ? (
-					<div className='grid grid-cols-1 gap-6'>
-						{companies.map(company => (
-							<Link
-								key={company.id}
-								href={`/firma/${company.slug}`}
-								className='group block bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300'
-							>
-								<div className='flex flex-col md:flex-row gap-6 items-start'>
-									{/* LOGO / AVATAR */}
-									<div className='w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 rounded-xl flex items-center justify-center font-bold text-2xl flex-shrink-0 group-hover:scale-110 transition-transform'>
-										{getInitial(company.name)}
-									</div>
-
-									{/* TREŚĆ */}
-									<div className='flex-grow'>
-										<div className='flex flex-wrap items-center gap-3 mb-2'>
-											<h2 className='text-xl md:text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors'>
-												{company.name}
-											</h2>
-											{company.isVerified && (
-												<span className='bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold'>
-													Zweryfikowana
-												</span>
-											)}
-										</div>
-
-										<div className='flex items-center gap-2 text-gray-500 text-sm mb-4 font-medium'>
-											<MapPin size={16} className='text-gray-400' />
-											{company.city || 'Polska'}, {company.address || ''}
-										</div>
-
-										{/* OPIS - Teraz obsługuje newlines ze scrapera */}
-										<p className='text-gray-600 leading-relaxed line-clamp-3 md:line-clamp-2 whitespace-pre-line'>
-											{company.description || 'Brak opisu.'}
-										</p>
-
-										<div className='mt-4 flex items-center text-blue-600 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-300'>
-											Zobacz profil <ArrowRight size={16} className='ml-1' />
-										</div>
-									</div>
-								</div>
-							</Link>
-						))}
-					</div>
-				) : (
-					<div className='text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200'>
-						<h3 className='text-xl font-bold text-gray-400'>Brak firm w tej kategorii</h3>
-						<p className='text-gray-400 mt-2'>Bądź pierwszy i dodaj swoją firmę!</p>
-						<Link
-							href='/dodaj-firme'
-							className='mt-6 inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition'
-						>
-							Dodaj firmę
-						</Link>
-					</div>
-				)}
+				{/* LISTA FIRM - używamy zoptymalizowanego komponentu */}
+				<CategoryCompaniesList categoryId={category.id} totalCompanies={totalCompanies} />
 			</main>
 
 			<Footer />
