@@ -42,8 +42,6 @@ const nextConfig: NextConfig = {
 	},
 	// Optymalizacja kompresji
 	compress: true,
-	// Optymalizacja bundle
-	swcMinify: true,
 	// Headers dla cache
 	async headers() {
 		return [
