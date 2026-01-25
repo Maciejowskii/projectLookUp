@@ -19,11 +19,59 @@ import { safeDecode } from '@/lib/text'
    METADATA (SEO)
 ========================================================= */
 
+// Funkcja pomocnicza do normalizacji slugu (usuwa ID na końcu jeśli istnieje)
+function normalizeSlug(slug: string): string {
+	// Jeśli slug kończy się na `-` + 8 znaków alfanumerycznych (prawdopodobnie część ID)
+	// Usuń to i zwróć znormalizowany slug
+	const match = slug.match(/^(.+)-([a-z0-9]{8})$/i)
+	if (match) {
+		return match[1] // Zwróć slug bez ostatnich 8 znaków
+	}
+	return slug
+}
+
+// Funkcja pomocnicza do wyodrębnienia ID z slugu (jeśli istnieje)
+function extractIdFromSlug(slug: string): string | null {
+	const match = slug.match(/-([a-z0-9]{8})$/i)
+	return match ? match[1] : null
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
 	const { slug } = await params
-	const company = await prisma.company.findFirst({
+	
+	// Najpierw szukaj po dokładnym slugu
+	let company = await prisma.company.findFirst({
 		where: { slug },
+		select: { id: true, name: true, slug: true, city: true, description: true, logo: true },
 	})
+
+	// Jeśli nie znaleziono, spróbuj znormalizować slug (usuń ID na końcu)
+	if (!company) {
+		const normalizedSlug = normalizeSlug(slug)
+		if (normalizedSlug !== slug) {
+			company = await prisma.company.findFirst({
+				where: { slug: normalizedSlug },
+				select: { id: true, name: true, slug: true, city: true, description: true, logo: true },
+			})
+		}
+	}
+
+	// Jeśli nadal nie znaleziono, spróbuj znaleźć po ID (jeśli slug kończy się na ID)
+	if (!company) {
+		const idSuffix = extractIdFromSlug(slug)
+		if (idSuffix) {
+			// Szukaj firm gdzie ID kończy się na te 8 znaków (używamy surowego SQL)
+			const companies = await prisma.$queryRaw<Array<{ id: string; name: string; slug: string; city: string | null; description: string | null; logo: string | null }>>`
+				SELECT id, name, slug, city, description, logo
+				FROM "Company"
+				WHERE id LIKE ${`%${idSuffix}`}
+				LIMIT 1
+			`
+			if (companies.length > 0) {
+				company = companies[0]
+			}
+		}
+	}
 
 	if (!company) {
 		return { title: 'Firma nie znaleziona | katalogo' }
@@ -62,18 +110,90 @@ const getInitial = (name?: string) => {
 export default async function CompanyProfilePage({ params }: { params: Promise<{ slug: string }> }) {
 	const { slug } = await params
 
-	const [company, featuredSetting] = await Promise.all([
-		prisma.company.findFirst({
-			where: { slug },
-			include: {
-				category: true,
-				reviews: { orderBy: { createdAt: 'desc' } },
-			},
-		}),
-		prisma.setting.findUnique({ where: { key: 'featured_company_id' } }),
-	])
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:113',message:'CompanyProfilePage called',data:{slug,slugLength:slug.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+	// #endregion
+
+	// Najpierw szukaj po dokładnym slugu
+	let company = await prisma.company.findFirst({
+		where: { slug },
+		include: {
+			category: true,
+			reviews: { orderBy: { createdAt: 'desc' } },
+		},
+	})
+
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:123',message:'After exact slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+	// #endregion
+
+	// Jeśli nie znaleziono, spróbuj znormalizować slug (usuń ID na końcu)
+	if (!company) {
+		const normalizedSlug = normalizeSlug(slug)
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:130',message:'Trying normalized slug',data:{normalizedSlug,isDifferent:normalizedSlug!==slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+		// #endregion
+
+		if (normalizedSlug !== slug) {
+			company = await prisma.company.findFirst({
+				where: { slug: normalizedSlug },
+				include: {
+					category: true,
+					reviews: { orderBy: { createdAt: 'desc' } },
+				},
+			})
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:140',message:'After normalized slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+			// #endregion
+		}
+	}
+
+	// Jeśli nadal nie znaleziono, spróbuj znaleźć po ID (jeśli slug kończy się na ID)
+	if (!company) {
+		const idSuffix = extractIdFromSlug(slug)
+		if (idSuffix) {
+			// Szukaj firm gdzie ID kończy się na te 8 znaków (używamy surowego SQL)
+			const companies = await prisma.$queryRaw<Array<{
+				id: string
+				name: string
+				slug: string
+				city: string | null
+				description: string | null
+				logo: string | null
+				categoryId: string
+			}>>`
+				SELECT id, name, slug, city, description, logo, "categoryId"
+				FROM "Company"
+				WHERE id LIKE ${`%${idSuffix}`}
+				LIMIT 1
+			`
+			if (companies.length > 0) {
+				const foundCompany = companies[0]
+				// Pobierz pełne dane firmy z relacjami
+				company = await prisma.company.findUnique({
+					where: { id: foundCompany.id },
+					include: {
+						category: true,
+						reviews: { orderBy: { createdAt: 'desc' } },
+					},
+				})
+			}
+		}
+	}
+
+	// Jeśli znaleziono firmę, ale slug się nie zgadza, zrób redirect do poprawnego URL
+	if (company && company.slug !== slug) {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:170',message:'Redirecting to correct slug',data:{requestedSlug:slug,correctSlug:company.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+		// #endregion
+
+		const { permanentRedirect } = await import('next/navigation')
+		permanentRedirect(`/firma/${company.slug}`)
+	}
 
 	if (!company) return notFound()
+
+	const featuredSetting = await prisma.setting.findUnique({ where: { key: 'featured_company_id' } })
 
 	let featuredCompany: { id: string; name: string; slug: string; city: string | null } | null = null
 	if (featuredSetting?.value) {
