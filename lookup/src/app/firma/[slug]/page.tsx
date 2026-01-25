@@ -36,6 +36,39 @@ function extractIdFromSlug(slug: string): string | null {
 	return match ? match[1] : null
 }
 
+// Funkcja pomocnicza do sprawdzania czy slug może być prefiksem dłuższego slugu w bazie
+// (np. slug w URL: "com-komputery" -> slug w bazie: "com-komputery-3725a8d5")
+async function findCompanyBySlugPrefix(slug: string): Promise<typeof prisma.company.$inferSelect & { category: any; reviews: any[] } | null> {
+	// Szukaj firm gdzie slug zaczyna się od podanego slugu + "-"
+	const companies = await prisma.$queryRaw<Array<{
+		id: string
+		name: string
+		slug: string
+		city: string | null
+		description: string | null
+		logo: string | null
+		categoryId: string
+	}>>`
+		SELECT id, name, slug, city, description, logo, "categoryId"
+		FROM "Company"
+		WHERE slug LIKE ${`${slug}-%`}
+		LIMIT 1
+	`
+	
+	if (companies.length > 0) {
+		const foundCompany = companies[0]
+		// Pobierz pełne dane firmy z relacjami
+		return await prisma.company.findUnique({
+			where: { id: foundCompany.id },
+			include: {
+				category: true,
+				reviews: { orderBy: { createdAt: 'desc' } },
+			},
+		})
+	}
+	return null
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
 	const { slug } = await params
 	
@@ -127,11 +160,25 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:123',message:'After exact slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
 	// #endregion
 
-	// Jeśli nie znaleziono, spróbuj znormalizować slug (usuń ID na końcu)
+	// Jeśli nie znaleziono, spróbuj znaleźć firmę gdzie slug w bazie ZACZYNA SIĘ od tego slugu
+	// (np. URL: "com-komputery" -> baza: "com-komputery-3725a8d5")
+	if (!company) {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:145',message:'Trying to find company by slug prefix',data:{slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+		// #endregion
+
+		company = await findCompanyBySlugPrefix(slug)
+		
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:150',message:'After slug prefix search',data:{found:!!company,companySlug:company?.slug,requestedSlug:slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+		// #endregion
+	}
+
+	// Jeśli nadal nie znaleziono, spróbuj znormalizować slug (usuń ID na końcu jeśli istnieje)
 	if (!company) {
 		const normalizedSlug = normalizeSlug(slug)
 		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:130',message:'Trying normalized slug',data:{normalizedSlug,isDifferent:normalizedSlug!==slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:157',message:'Trying normalized slug',data:{normalizedSlug,isDifferent:normalizedSlug!==slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
 		// #endregion
 
 		if (normalizedSlug !== slug) {
@@ -143,7 +190,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 				},
 			})
 			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:140',message:'After normalized slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+			fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:167',message:'After normalized slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
 			// #endregion
 		}
 	}
