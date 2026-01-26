@@ -15,7 +15,17 @@ from openai import OpenAI
 import httpx
 import openai
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-from playwright_stealth import stealth_sync
+
+# Opcjonalny import playwright-stealth (z fallbackiem)
+try:
+    from playwright_stealth import stealth_sync
+    STEALTH_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ playwright-stealth not available: {e}. Continuing without stealth mode.", flush=True)
+    STEALTH_AVAILABLE = False
+    # Fallback - pusta funkcja
+    def stealth_sync(page):
+        pass
 
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -1949,8 +1959,11 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
         browser, context = create_stealth_browser(p)
         page = context.new_page()
         
-        # Zastosuj playwright-stealth
-        stealth_sync(page)
+        # Zastosuj playwright-stealth (jeśli dostępne)
+        if STEALTH_AVAILABLE:
+            stealth_sync(page)
+        else:
+            log("⚠️ Using basic anti-detection (playwright-stealth not available)")
         
         # Override navigator.webdriver
         page.add_init_script("""

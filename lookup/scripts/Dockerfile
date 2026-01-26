@@ -35,6 +35,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# Zainstaluj setuptools najpierw (wymagane przez playwright-stealth w Python 3.13)
+RUN pip install --no-cache-dir setuptools>=65.0.0
+
 # Zainstaluj zależności Pythona (z requirements.txt)
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
