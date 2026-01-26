@@ -559,11 +559,6 @@ def scrape_all_categories():
     categories = []
 
     popular = [
-        "https://panoramafirm.pl/administracja_obiektów_użyteczności_publicznej",
-        "https://panoramafirm.pl/wykończenia_wnętrz",
-        "https://panoramafirm.pl/malowanie_i_tapetowanie",
-        "https://panoramafirm.pl/renowacje_i_remonty",
-        "https://panoramafirm.pl/ślusarze",
         "https://panoramafirm.pl/ślusarstwo_i_dorabianie_kluczy",
         "https://panoramafirm.pl/serwis_sprzętu_agd",
         "https://panoramafirm.pl/serwis_i_instalacja_klimatyzacji",
@@ -587,6 +582,11 @@ def scrape_all_categories():
         "https://panoramafirm.pl/łożyska",
         "https://panoramafirm.pl/świece_i_znicze",
         "https://panoramafirm.pl/artykuły_rolnicze",
+        "https://panoramafirm.pl/administracja_obiektów_użyteczności_publicznej",
+        "https://panoramafirm.pl/wykończenia_wnętrz",
+        "https://panoramafirm.pl/malowanie_i_tapetowanie",
+        "https://panoramafirm.pl/renowacje_i_remonty",
+        "https://panoramafirm.pl/ślusarze",
         "https://panoramafirm.pl/giełdy",
         "https://panoramafirm.pl/grzyby_i_runo_leśne",
         "https://panoramafirm.pl/hodowla_i_hurtownie_ryb",
@@ -1904,19 +1904,30 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 log(f"  Listing page {page_num}: {url}")
 
                 try:
-                    page.goto(url, wait_until='networkidle', timeout=30000)
+                    # Zwiększony timeout dla wolnych stron
+                    page.goto(url, wait_until='domcontentloaded', timeout=45000)
                     
+                    # Czekaj na załadowanie treści - ale nie przerywaj jeśli timeout
                     try:
                         page.wait_for_selector(
-                            'a[href*="/firma/"], a.company-link, .company-item a, article a, a[class*="company"]',
-                            timeout=10000
+                            'a[href*="/firma/"], a.company-link, .company-item a, article a, a[class*="company"], .listing-item a, .result-item a',
+                            timeout=15000
                         )
+                        log(f"  ✅ Company links selector found")
                     except PlaywrightTimeout:
-                        log(f"  ⚠️ Timeout waiting for company links on page {page_num}")
-                        break
+                        log(f"  ⚠️ Timeout waiting for company links selector, trying to parse HTML anyway...")
+                        # Nie przerywaj - spróbuj parsować HTML bez czekania na selektor
                     
+                    # Scrolluj w dół, żeby załadować lazy-loaded content
                     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    time.sleep(random.uniform(1, 2))
+                    time.sleep(random.uniform(1.5, 2.5))
+                    
+                    # Spróbuj jeszcze raz scrollować i czekać
+                    try:
+                        page.evaluate("window.scrollTo(0, 0); window.scrollTo(0, document.body.scrollHeight)")
+                        time.sleep(1)
+                    except:
+                        pass
                     
                     html = page.content()
                     
@@ -1933,28 +1944,64 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                             log(f"  Page appears to be error page: {title_text[:50]}")
                             break
                     
-                    log(f"  Listing items: {len(soup.select('a[href]'))}")
+                    all_links_count = len(soup.select('a[href]'))
+                    log(f"  Listing items: {all_links_count} total links found")
                     
-                    # Zbierz linki
+                    # Zbierz linki - rozszerzona lista selektorów
                     links = []
                     
-                    # Próbuj różne selektory
+                    # Próbuj różne selektory (w kolejności prawdopodobieństwa)
                     selectors = [
-                        "a[class*='company']",
-                        "a[href*='/firma/']",
+                        "a[href*='/firma/']",  # Najbardziej specyficzny
+                        "a.company-link",
+                        ".company-item a",
+                        ".listing-item a",
+                        ".result-item a",
                         ".results a",
+                        "article a[href*='/firma/']",
+                        "h2 a[href*='/firma/']",
+                        "h3 a[href*='/firma/']",
+                        "a[class*='company']",
+                        "article a",
                         "h2 a",
-                        "article a"
+                        "h3 a",
+                        ".item a",
+                        "[data-company-id] a",  # Jeśli strona używa data attributes
                     ]
                     
                     for selector in selectors:
-                        links = soup.select(selector)
-                        if links:
-                            log(f"  Found {len(links)} links via selector: {selector}")
-                            break
+                        found_links = soup.select(selector)
+                        if found_links:
+                            # Filtruj tylko linki do firm (zawierają /firma/ w href)
+                            filtered = [l for l in found_links if l.get('href') and '/firma/' in l.get('href', '')]
+                            if filtered:
+                                links = filtered
+                                log(f"  ✅ Found {len(links)} company links via selector: {selector}")
+                                break
+                    
+                    # Jeśli nadal brak linków, spróbuj znaleźć wszystkie linki zawierające /firma/
+                    if not links:
+                        all_firma_links = soup.select('a[href*="/firma/"]')
+                        if all_firma_links:
+                            links = all_firma_links
+                            log(f"  ✅ Found {len(links)} company links via fallback (all /firma/ links)")
                     
                     if not links:
-                        log(f"  ⚠️ No company links found on page {page_num}")
+                        log(f"  ⚠️ No company links found on page {page_num} (tried {len(selectors)} selectors)")
+                        # Diagnostyka - sprawdź co jest na stronie
+                        if page_num == 1:
+                            # Sprawdź czy są jakieś linki w ogóle
+                            all_links = soup.select('a[href]')
+                            log(f"  ℹ️  Total links on page: {len(all_links)}")
+                            if all_links:
+                                # Pokaż kilka przykładowych linków dla diagnostyki
+                                sample_links = [a.get('href', '')[:80] for a in all_links[:5]]
+                                log(f"  ℹ️  Sample links: {sample_links}")
+                            # Sprawdź czy strona ma treść
+                            body_text = soup.get_text()[:200] if soup.body else ""
+                            if "brak wyników" in body_text.lower() or "no results" in body_text.lower():
+                                log(f"  ℹ️  Page indicates no results")
+                            log(f"  ℹ️  This category might be empty or have different structure")
                         break
 
                     new_count = 0
