@@ -1950,13 +1950,26 @@ def create_stealth_browser(p):
     return browser, context
 
 
-def scrape_category_listing_until_end(session: requests.Session, listing_url: str, page=None, context=None):
-    """Scraper z obejściem bot detection"""
+def scrape_category_listing_until_end(session: requests.Session, listing_url: str, page=None, context=None, browser=None):
+    """Scraper z obejściem bot detection
+    
+    Args:
+        session: requests.Session (nieużywane, dla kompatybilności)
+        listing_url: URL kategorii do scrapowania
+        page: Playwright page object (opcjonalne - jeśli None, tworzy nowy)
+        context: Playwright context (opcjonalne - jeśli None, tworzy nowy)
+        browser: Playwright browser (opcjonalne - jeśli None, tworzy nowy)
+    """
     results = []
     seen_urls = set()
+    should_close_browser = False
+    playwright = None
     
-    with sync_playwright() as p:
-        browser, context = create_stealth_browser(p)
+    # Jeśli nie przekazano page/context/browser, utwórz nowy (dla kompatybilności wstecznej)
+    if page is None or context is None or browser is None:
+        should_close_browser = True
+        playwright = sync_playwright().start()
+        browser, context = create_stealth_browser(playwright)
         page = context.new_page()
         
         # Zastosuj playwright-stealth (jeśli dostępne)
@@ -1979,7 +1992,7 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             });
         """)
         
-        # KROK 1: Inicjalizacja sesji
+        # KROK 1: Inicjalizacja sesji (tylko jeśli tworzymy nowy browser)
         log("🏠 Visiting homepage once to initialize session...")
         try:
             page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
@@ -2001,6 +2014,9 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             log("✅ Homepage visited, session initialized (cookies saved for all categories)")
         except Exception as e:
             log(f"⚠️ Homepage init failed: {e}")
+    else:
+        # Używamy przekazanego browsera - nie odwiedzamy homepage ponownie
+        log("ℹ️ Using existing browser session (homepage already visited)")
         
         # KROK 2: Scrapowanie kategorii
         page_num = 1
@@ -2022,10 +2038,14 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             
             log(f"  Listing page {page_num}: {url}")
             
-            # Losowe opóźnienie (jak człowiek)
+            # Losowe opóźnienie (jak człowiek) - zwiększone dla lepszego omijania detection
             if page_num > 1:
-                delay = random.uniform(5, 10)
+                delay = random.uniform(8, 15)  # Zwiększone z 5-10 do 8-15 sekund
                 log(f"  ⏳ Waiting {delay:.1f}s before next page...")
+                page.wait_for_timeout(int(delay * 1000))
+            else:
+                # Dla pierwszej strony też dodaj opóźnienie
+                delay = random.uniform(3, 6)
                 page.wait_for_timeout(int(delay * 1000))
             
             try:
@@ -2039,14 +2059,29 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                         
                         # Sprawdź status code
                         if response and response.status == 403:
-                            log(f"  ⚠️ HTTP 403 on attempt {attempt}/{max_retries}, waiting {3 + attempt * 3}s before retry...")
+                            wait_time = (5 + attempt * 5)  # Zwiększone: 10s, 15s, 20s
+                            log(f"  ⚠️ HTTP 403 on attempt {attempt}/{max_retries}, waiting {wait_time}s before retry...")
                             if attempt < max_retries:
-                                page.wait_for_timeout((3 + attempt * 3) * 1000)
+                                page.wait_for_timeout(wait_time * 1000)
                                 
-                                # Odśwież sesję - wróć na homepage
+                                # Odśwież sesję - wróć na homepage i zachowuj się jak człowiek
                                 log("  🔄 Refreshing session via homepage...")
-                                page.goto("https://panoramafirm.pl", wait_until='networkidle')
-                                page.wait_for_timeout(random.randint(3000, 5000))
+                                page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
+                                
+                                # Symuluj czytanie strony
+                                page.wait_for_timeout(random.randint(5000, 8000))
+                                
+                                # Scroll jak człowiek
+                                page.evaluate("window.scrollTo({top: document.body.scrollHeight / 2, behavior: 'smooth'});")
+                                page.wait_for_timeout(random.randint(2000, 4000))
+                                
+                                # Kliknij gdzieś (symuluj interakcję)
+                                try:
+                                    page.mouse.move(random.randint(200, 800), random.randint(200, 600))
+                                    page.wait_for_timeout(random.randint(1000, 2000))
+                                except:
+                                    pass
+                                
                                 continue
                             else:
                                 log(f"  ❌ HTTP 403 error for {url}")
@@ -2072,13 +2107,26 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 if not success:
                     continue
                 
-                # Zachowuj się jak człowiek
-                page.wait_for_timeout(random.randint(2000, 4000))
+                # Zachowuj się jak człowiek - więcej realistycznych zachowań
+                page.wait_for_timeout(random.randint(3000, 6000))  # Zwiększone z 2-4s do 3-6s
                 
-                # Random scroll
-                scroll_amount = random.randint(300, 800)
-                page.evaluate(f"window.scrollTo({{top: {scroll_amount}, behavior: 'smooth'}});")
-                page.wait_for_timeout(random.randint(1000, 2000))
+                # Symuluj ruch myszy (jeśli nie headless)
+                if not HEADLESS:
+                    try:
+                        page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                        page.wait_for_timeout(random.randint(500, 1000))
+                    except:
+                        pass
+                
+                # Random scroll - więcej scrollowań
+                for _ in range(random.randint(1, 3)):
+                    scroll_amount = random.randint(200, 1000)
+                    page.evaluate(f"window.scrollTo({{top: {scroll_amount}, behavior: 'smooth'}});")
+                    page.wait_for_timeout(random.randint(1500, 3000))
+                
+                # Ostatnie scrollowanie do dołu
+                page.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});")
+                page.wait_for_timeout(random.randint(2000, 4000))
                 
                 # Czekaj na załadowanie
                 try:
@@ -2145,8 +2193,19 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 log(f"  ❌ Error on page {page_num}: {e}")
                 consecutive_failures += 1
                 continue
-        
-        browser.close()
+    
+    # Zamykaj browser tylko jeśli sam go utworzyliśmy
+    if should_close_browser:
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
+        if playwright:
+            try:
+                playwright.stop()
+            except:
+                pass
     
     return results
 
@@ -2558,19 +2617,83 @@ def main():
     session = requests.Session()
     session.headers.update(HEADERS)
 
+    # Utwórz JEDEN browser dla wszystkich kategorii (ważne dla omijania detection)
+    browser = None
+    context = None
+    page = None
+    playwright = None
+    
+    try:
+        log("🚀 Initializing browser session for all categories...")
+        playwright = sync_playwright().start()
+        browser, context = create_stealth_browser(playwright)
+        page = context.new_page()
+        
+        # Zastosuj playwright-stealth (jeśli dostępne)
+        if STEALTH_AVAILABLE:
+            stealth_sync(page)
+        else:
+            log("⚠️ Using basic anti-detection (playwright-stealth not available)")
+        
+        # Override navigator.webdriver
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            window.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['pl-PL', 'pl', 'en-US', 'en']
+            });
+        """)
+        
+        # Odwiedź homepage RAZ na początku
+        log("🏠 Visiting homepage once to initialize session...")
+        try:
+            page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
+            page.wait_for_timeout(random.randint(3000, 5000))
+            
+            # Akceptuj cookies
+            try:
+                accept_btn = page.locator('button:has-text("Akceptuj"), button:has-text("Zgadzam")').first
+                if accept_btn.is_visible(timeout=2000):
+                    accept_btn.click()
+                    log("✅ Cookies accepted")
+            except:
+                pass
+            
+            # Scroll jak człowiek
+            page.evaluate("window.scrollTo({top: document.body.scrollHeight / 3, behavior: 'smooth'});")
+            page.wait_for_timeout(random.randint(1500, 2500))
+            
+            log("✅ Homepage visited, session initialized (cookies saved for all categories)")
+        except Exception as e:
+            log(f"⚠️ Homepage init failed: {e}, continuing anyway...")
+    
+    except Exception as e:
+        log(f"⚠️ Could not initialize browser: {e}, will create new browser for each category")
+        browser = None
+        context = None
+        page = None
+        playwright = None
+
     try:
         for i, cat in enumerate(categories, 1):
             cat_name = normalize_text(cat["name"])
             cat_url = cat["url"]
             log(f"\n[{i}/{len(categories)}] Category: {cat_name} -> {cat_url}")
 
-            # Nowa funkcja sama tworzy browser z stealth
-            companies = scrape_category_listing_until_end(session, cat_url)
+            # Przekaż istniejący browser jeśli dostępny
+            companies = scrape_category_listing_until_end(session, cat_url, page=page, context=context, browser=browser)
             log(f"  Listing items: {len(companies)}")
             
-            # Krótka przerwa między kategoriami (symuluj ludzkie zachowanie)
+            # Dłuższa przerwa między kategoriami (symuluj ludzkie zachowanie)
             if i < len(categories):
-                time.sleep(random.uniform(1, 2))
+                delay = random.uniform(5, 10)  # Zwiększone z 1-2s do 5-10s
+                log(f"  ⏸️  Pausing {delay:.1f}s before next category...")
+                time.sleep(delay)
 
             for j, item in enumerate(companies, 1):
                 log(f"  ({j}/{len(companies)}) {item.get('name','')[:60]}")
@@ -2587,6 +2710,17 @@ def main():
                 time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     finally:
+        # Zamknij browser jeśli został utworzony
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
+        if playwright:
+            try:
+                playwright.stop()
+            except:
+                pass
         conn.close()
 
     log(f"\nDONE. Inserted={total_inserted} | AI used={ai_usage_counter}")
