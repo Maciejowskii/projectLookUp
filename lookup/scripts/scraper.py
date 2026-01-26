@@ -1889,18 +1889,22 @@ def scrape_all_categories():
     return unique
 
 
-def scrape_category_listing_until_end(session: requests.Session, listing_url: str):
+def scrape_category_listing_until_end(session: requests.Session, listing_url: str, page=None, context=None):
     """
     Scrapuje listę firm z kategorii używając Playwright (obsługuje JavaScript).
+    Jeśli page i context są None, tworzy nowy browser (dla kompatybilności wstecznej).
     """
     results = []
     seen_urls = set()
     browser = None
+    should_close_browser = False
 
     try:
-        with sync_playwright() as p:
-            # Użyj bardziej realistycznego browser context
-            browser = p.chromium.launch(
+        # Jeśli nie przekazano page/context, utwórz nowy browser (stary sposób)
+        if page is None or context is None:
+            should_close_browser = True
+            playwright_context = sync_playwright().start()
+            browser = playwright_context.chromium.launch(
                 headless=True,
                 args=[
                     '--disable-blink-features=AutomationControlled',
@@ -1928,7 +1932,6 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 }
             )
             
-            # Usuń webdriver flag
             page = context.new_page()
             
             # Usuń automatyczne wykrywanie webdrivera
@@ -1943,25 +1946,12 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     get: () => [1, 2, 3, 4, 5],
                 });
             """)
-            
-            # Najpierw odwiedź stronę główną, żeby dostać cookies i wyglądać jak normalny użytkownik
-            try:
-                log(f"  🏠 Visiting homepage first to get cookies...")
-                page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=30000)
-                time.sleep(random.uniform(2, 4))  # Symuluj czytanie strony
-                
-                # Symuluj ruch myszy i scrollowanie
-                page.mouse.move(100, 100)
-                page.evaluate("window.scrollTo(0, 300)")
-                time.sleep(random.uniform(0.5, 1.5))
-                log(f"  ✅ Homepage visited, cookies obtained")
-            except Exception as e:
-                log(f"  ⚠️ Could not visit homepage: {e}, continuing anyway...")
-            
-            page_num = 1
-            while True:
-                if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
-                    break
+        
+        # Użyj przekazanego page lub nowo utworzonego
+        page_num = 1
+        while True:
+            if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
+                break
 
                 if page_num > 1:
                     url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
@@ -2192,17 +2182,21 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 except Exception as e:
                     log(f"  ❌ Error on page {page_num}: {e}")
                     break
-            
-            if browser:
-                browser.close()
     
     except Exception as e:
         log(f"❌ Critical error in scraping: {e}")
-        if browser:
+        if browser and should_close_browser:
             try:
                 browser.close()
             except:
                 pass
+    
+    # Zamykaj browser tylko jeśli sam go utworzyliśmy
+    if should_close_browser and browser:
+        try:
+            browser.close()
+        except:
+            pass
     
     return results
 
@@ -2609,14 +2603,90 @@ def main():
     session = requests.Session()
     session.headers.update(HEADERS)
 
+    # Utwórz jeden browser context dla wszystkich kategorii
+    browser = None
+    context = None
+    page = None
+    playwright = None
+    
+    try:
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+            ]
+        )
+        
+        context = browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport={'width': 1920, 'height': 1080},
+            locale='pl-PL',
+            timezone_id='Europe/Warsaw',
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+            }
+        )
+        
+        page = context.new_page()
+        
+        # Usuń automatyczne wykrywanie webdrivera
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            window.navigator.chrome = {
+                runtime: {},
+            };
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+        """)
+        
+        # Odwiedź stronę główną RAZ na początku, żeby dostać cookies
+        try:
+            log(f"🏠 Visiting homepage once to initialize session...")
+            page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=30000)
+            time.sleep(random.uniform(2, 4))  # Symuluj czytanie strony
+            
+            # Symuluj ruch myszy i scrollowanie
+            page.mouse.move(100, 100)
+            page.evaluate("window.scrollTo(0, 300)")
+            time.sleep(random.uniform(0.5, 1.5))
+            log(f"✅ Homepage visited, session initialized (cookies saved for all categories)")
+        except Exception as e:
+            log(f"⚠️ Could not visit homepage: {e}, continuing anyway...")
+    
+    except Exception as e:
+        log(f"⚠️ Could not initialize browser: {e}, will create new browser for each category")
+        browser = None
+        context = None
+        page = None
+
     try:
         for i, cat in enumerate(categories, 1):
             cat_name = normalize_text(cat["name"])
             cat_url = cat["url"]
             log(f"\n[{i}/{len(categories)}] Category: {cat_name} -> {cat_url}")
 
-            companies = scrape_category_listing_until_end(session, cat_url)
+            # Przekaż page i context jeśli są dostępne
+            companies = scrape_category_listing_until_end(session, cat_url, page=page, context=context)
             log(f"  Listing items: {len(companies)}")
+            
+            # Krótka przerwa między kategoriami (symuluj ludzkie zachowanie)
+            if i < len(categories):
+                time.sleep(random.uniform(1, 2))
 
             for j, item in enumerate(companies, 1):
                 log(f"  ({j}/{len(companies)}) {item.get('name','')[:60]}")
@@ -2633,6 +2703,17 @@ def main():
                 time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     finally:
+        # Zamknij browser i playwright jeśli zostały utworzone
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
+        if playwright:
+            try:
+                playwright.stop()
+            except:
+                pass
         conn.close()
 
     log(f"\nDONE. Inserted={total_inserted} | AI used={ai_usage_counter}")
