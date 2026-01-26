@@ -172,6 +172,16 @@ Przykłady ZŁYCH opinii (NIE pisz tak):
 export async function generateReviewsForCompanies() {
   console.log('🚀 Rozpoczynam generowanie opinii dla firm...\n')
 
+  // Sprawdź czy nie trwa deployment
+  if (process.env.DEPLOYING === 'true' || process.env.SKIP_REVIEW_GENERATION === 'true') {
+    console.log('⏸️  Pomijam generowanie opinii - trwa deployment')
+    return {
+      success: false,
+      skipped: true,
+      message: 'Review generation skipped - deployment in progress'
+    }
+  }
+
   // Sprawdź czy OpenAI API key jest dostępny
   const openaiApiKey = process.env.OPENAI_API_KEY
   if (!openaiApiKey) {
@@ -284,8 +294,18 @@ export async function generateReviewsForCompanies() {
       totalReviewsCreated += reviewsToCreate.length
       console.log(`   ✅ Dodano ${reviewsToCreate.length} opinii`)
 
-      // Opóźnienie między firmami
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Opóźnienie między firmami (zmniejszone dla szybszego przetwarzania)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Co 50 firm, wykonaj garbage collection hint i daj systemowi odpocząć
+      if (companiesProcessed % 50 === 0) {
+        console.log(`   💤 Przerwa po ${companiesProcessed} firmach...`)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wymuś garbage collection jeśli dostępne
+        if (global.gc) {
+          global.gc()
+        }
+      }
     } catch (error) {
       const errorMsg = `Błąd dla firmy ${company.name}: ${error instanceof Error ? error.message : String(error)}`
       console.error(`   ❌ ${errorMsg}`)

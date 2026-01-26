@@ -2,6 +2,10 @@
 # Don't exit on error - we want the app to start even if some SQL commands fail
 set +e
 
+# Ustaw flagę deploymentu (zapobiega uruchamianiu review generation podczas deploy)
+export DEPLOYING=true
+export SKIP_REVIEW_GENERATION=true
+
 # Change to script directory if not already there
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
@@ -11,15 +15,15 @@ echo "Working directory: $(pwd)"
 
 # 1. Oznacz wszystkie migracje jako zastosowane (rozwiązuje konflikt z istniejącymi obiektami)
 echo "Marking all migrations as applied..."
-npx prisma migrate resolve --applied 20260111011940_add_premium_until 2>/dev/null || true
-npx prisma migrate resolve --applied 20260114213634_add_userid_to_claim_request 2>/dev/null || true
-npx prisma migrate resolve --applied 20260114215643_add_company_user_many_to_many 2>/dev/null || true
-npx prisma migrate resolve --applied 20260114222417_add_oauth_support 2>/dev/null || true
-npx prisma migrate resolve --applied 20250115000000_add_description_and_source_to_leads 2>/dev/null || true
+npx prisma migrate resolve --applied 20260111011940_add_premium_until --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
+npx prisma migrate resolve --applied 20260114213634_add_userid_to_claim_request --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
+npx prisma migrate resolve --applied 20260114215643_add_company_user_many_to_many --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
+npx prisma migrate resolve --applied 20260114222417_add_oauth_support --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
+npx prisma migrate resolve --applied 20250115000000_add_description_and_source_to_leads --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
 
 # 2. Aplikuj oczekujące migracje (jeśli są jakieś nowe)
 echo "Applying pending migrations..."
-npx prisma migrate deploy || true
+timeout 120 npx prisma migrate deploy --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
 
 # 3. Dodaj brakujące kolumny bezpośrednio przez SQL (jeśli nie istnieją)
 echo "Ensuring all required columns exist..."
@@ -174,7 +178,7 @@ echo "Database schema synchronized!"
 
 # 4. Generate Prisma Client (important - in case schema changed)
 echo "Generating Prisma Client..."
-if npx prisma generate 2>&1; then
+if timeout 60 npx prisma generate --schema=./prisma/schema.prisma >/dev/null 2>&1; then
     echo "Prisma Client generated successfully"
 else
     echo "Warning: prisma generate had errors (continuing anyway - client may already be generated)"
@@ -186,6 +190,10 @@ echo "Node version: $(node --version)"
 echo "NPM version: $(npm --version)"
 echo "Current directory: $(pwd)"
 echo "Files in current directory: $(ls -la | head -10)"
+
+# Usuń flagę deploymentu przed uruchomieniem aplikacji (po zakończeniu migracji)
+unset DEPLOYING
+unset SKIP_REVIEW_GENERATION
 
 # Start the application
 exec npm run start

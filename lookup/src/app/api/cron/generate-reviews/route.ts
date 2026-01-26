@@ -14,6 +14,15 @@ export async function GET(request: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  // Sprawdź czy trwa deployment (zapobiega konfliktom zasobów)
+  if (process.env.DEPLOYING === 'true' || process.env.SKIP_REVIEW_GENERATION === 'true') {
+    console.log('⏸️  Cron generate-reviews: Pomijam - trwa deployment')
+    return NextResponse.json({
+      message: 'Review generation skipped - deployment in progress',
+      skipped: true
+    })
+  }
+
   try {
     console.log('🚀 Cron: Rozpoczynam generowanie opinii dla firm...')
     

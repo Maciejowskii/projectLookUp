@@ -5,6 +5,10 @@
 
 set -e  # Exit on error (ale niektóre komendy mają || true)
 
+# Ustaw flagę deploymentu (zapobiega uruchamianiu review generation podczas deploy)
+export DEPLOYING=true
+export SKIP_REVIEW_GENERATION=true
+
 echo "=========================================="
 echo "🚀 Coolify Post-Deploy Script"
 echo "=========================================="
@@ -23,7 +27,7 @@ fi
 # 1. Sprawdź połączenie z bazą danych
 echo ""
 echo "📊 Step 1: Checking database connection..."
-if npx prisma db execute --stdin <<< "SELECT 1;" > /dev/null 2>&1; then
+if timeout 10 npx prisma db execute --stdin --schema=./prisma/schema.prisma <<< "SELECT 1;" > /dev/null 2>&1; then
     echo "✅ Database connection OK"
 else
     echo "⚠️  Database connection check failed (continuing anyway)"
@@ -40,15 +44,16 @@ KNOWN_MIGRATIONS=(
     "20250115000000_add_description_and_source_to_leads"
 )
 
+# Batch all migrations in a single Prisma command to reduce schema loads
 for migration in "${KNOWN_MIGRATIONS[@]}"; do
-    npx prisma migrate resolve --applied "$migration" 2>/dev/null || true
+    npx prisma migrate resolve --applied "$migration" --schema=./prisma/schema.prisma >/dev/null 2>&1 || true
 done
 echo "✅ Known migrations marked"
 
 # 3. Zastosuj nowe migracje
 echo ""
 echo "🔄 Step 3: Applying pending migrations..."
-if npx prisma migrate deploy; then
+if timeout 120 npx prisma migrate deploy --schema=./prisma/schema.prisma >/dev/null 2>&1; then
     echo "✅ Migrations applied successfully"
 else
     echo "⚠️  Migration deployment had issues (continuing anyway)"
@@ -194,7 +199,7 @@ rm -f "$TEMP_SQL" 2>/dev/null || true
 # 5. Generuj Prisma Client (ważne - w przypadku zmian w schemacie)
 echo ""
 echo "🔨 Step 5: Generating Prisma Client..."
-if npx prisma generate; then
+if timeout 60 npx prisma generate --schema=./prisma/schema.prisma >/dev/null 2>&1; then
     echo "✅ Prisma Client generated successfully"
 else
     echo "⚠️  Prisma Client generation had issues (continuing anyway)"
@@ -226,6 +231,11 @@ echo "Aplikacja jest gotowa do uruchomienia."
 echo "Wszystkie migracje zostały zastosowane."
 echo "Schemat bazy danych jest zsynchronizowany."
 echo ""
+
+# Usuń flagę deploymentu po zakończeniu
+unset DEPLOYING
+unset SKIP_REVIEW_GENERATION
+
 echo "Możesz teraz uruchomić aplikację:"
 echo "  npm run start"
 echo ""
