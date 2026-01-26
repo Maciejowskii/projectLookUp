@@ -15,6 +15,7 @@ from openai import OpenAI
 import httpx
 import openai
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from playwright_stealth import stealth_sync
 
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -52,6 +53,29 @@ REQUEST_DELAY_MIN = float(os.getenv("REQUEST_DELAY_MIN", "0.6"))
 REQUEST_DELAY_MAX = float(os.getenv("REQUEST_DELAY_MAX", "1.2"))
 LISTING_DELAY_MIN = float(os.getenv("LISTING_DELAY_MIN", "1.0"))
 LISTING_DELAY_MAX = float(os.getenv("LISTING_DELAY_MAX", "2.0"))
+
+# Browser headless mode
+# Automatycznie wykrywa środowisko serwerowe (Docker/Coolify)
+# Na serwerze MUSI być headless=True (brak GUI/X11)
+# Lokalnie można ustawić HEADLESS=false dla lepszego anti-detection
+def detect_headless_mode():
+    """Automatycznie wykrywa czy powinien być headless mode"""
+    # Sprawdź zmienną środowiskową (ma pierwszeństwo)
+    env_headless = os.getenv("HEADLESS", "").lower()
+    if env_headless in ("true", "false"):
+        return env_headless == "true"
+    
+    # Automatyczne wykrywanie środowiska serwerowego
+    # Docker/Coolify - brak DISPLAY oznacza brak GUI
+    if not os.getenv("DISPLAY"):
+        # Sprawdź czy jesteśmy w kontenerze Docker
+        if os.path.exists("/.dockerenv") or os.path.exists("/proc/self/cgroup"):
+            return True  # Na serwerze zawsze headless
+    
+    # Lokalnie domyślnie False (lepsze anti-detection)
+    return False
+
+HEADLESS = detect_headless_mode()
 
 # API retry (PanoramaFirm)
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "6"))
@@ -1889,282 +1913,206 @@ def scrape_all_categories():
     return unique
 
 
+def create_stealth_browser(p):
+    """Tworzy przeglądarkę z anti-detection"""
+    # Na serwerze (Docker/Coolify) headless=True jest wymagane (brak GUI)
+    # Lokalnie headless=False może pomóc w omijaniu detection
+    browser = p.chromium.launch(
+        headless=HEADLESS,
+        args=[
+            '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-web-security',
+        ]
+    )
+    
+    context = browser.new_context(
+        viewport={'width': 1920, 'height': 1080},
+        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        locale='pl-PL',
+        timezone_id='Europe/Warsaw',
+        permissions=['geolocation'],
+        geolocation={'latitude': 52.2297, 'longitude': 21.0122},
+    )
+    
+    return browser, context
+
+
 def scrape_category_listing_until_end(session: requests.Session, listing_url: str, page=None, context=None):
-    """
-    Scrapuje listę firm z kategorii używając Playwright (obsługuje JavaScript).
-    Jeśli page i context są None, tworzy nowy browser (dla kompatybilności wstecznej).
-    """
+    """Scraper z obejściem bot detection"""
     results = []
     seen_urls = set()
-    browser = None
-    should_close_browser = False
-
-    try:
-        # Jeśli nie przekazano page/context, utwórz nowy browser (stary sposób)
-        if page is None or context is None:
-            should_close_browser = True
-            playwright_context = sync_playwright().start()
-            browser = playwright_context.chromium.launch(
-                headless=True,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-dev-shm-usage',
-                    '--no-sandbox',
-                ]
-            )
-            
-            context = browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                viewport={'width': 1920, 'height': 1080},
-                locale='pl-PL',
-                timezone_id='Europe/Warsaw',
-                extra_http_headers={
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Cache-Control': 'max-age=0',
-                }
-            )
-            
-            page = context.new_page()
-            
-            # Usuń automatyczne wykrywanie webdrivera
-            page.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-                window.navigator.chrome = {
-                    runtime: {},
-                };
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5],
-                });
-            """)
+    
+    with sync_playwright() as p:
+        browser, context = create_stealth_browser(p)
+        page = context.new_page()
         
-        # Użyj przekazanego page lub nowo utworzonego
+        # Zastosuj playwright-stealth
+        stealth_sync(page)
+        
+        # Override navigator.webdriver
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            window.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['pl-PL', 'pl', 'en-US', 'en']
+            });
+        """)
+        
+        # KROK 1: Inicjalizacja sesji
+        log("🏠 Visiting homepage once to initialize session...")
+        try:
+            page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
+            page.wait_for_timeout(random.randint(3000, 5000))
+            
+            # Akceptuj cookies
+            try:
+                accept_btn = page.locator('button:has-text("Akceptuj"), button:has-text("Zgadzam")').first
+                if accept_btn.is_visible(timeout=2000):
+                    accept_btn.click()
+                    log("✅ Cookies accepted")
+            except:
+                pass
+            
+            # Scroll jak człowiek
+            page.evaluate("window.scrollTo({top: document.body.scrollHeight / 3, behavior: 'smooth'});")
+            page.wait_for_timeout(random.randint(1500, 2500))
+            
+            log("✅ Homepage visited, session initialized (cookies saved for all categories)")
+        except Exception as e:
+            log(f"⚠️ Homepage init failed: {e}")
+        
+        # KROK 2: Scrapowanie kategorii
         page_num = 1
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+        
         while True:
             if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
                 break
-
+            
+            if consecutive_failures >= max_consecutive_failures:
+                log(f"⚠️ 403 Forbidden after {consecutive_failures} attempts - possible bot detection, skipping category")
+                break
+            
             if page_num > 1:
                 url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
             else:
                 url = listing_url.rstrip('/')
+            
             log(f"  Listing page {page_num}: {url}")
-
+            
+            # Losowe opóźnienie (jak człowiek)
+            if page_num > 1:
+                delay = random.uniform(5, 10)
+                log(f"  ⏳ Waiting {delay:.1f}s before next page...")
+                page.wait_for_timeout(int(delay * 1000))
+            
             try:
-                # Losowe opóźnienie przed requestem (symuluj ludzkie zachowanie)
-                time.sleep(random.uniform(LISTING_DELAY_MIN, LISTING_DELAY_MAX))
-                
-                # Retry z backoff dla 403
+                # Nawigacja z retry mechanism
                 max_retries = 3
-                retry_delay = 5
-                response = None
-                last_error = None
+                success = False
                 
-                for retry in range(max_retries):
+                for attempt in range(1, max_retries + 1):
                     try:
-                        # Dodaj referer dla kolejnych stron (wygląda bardziej naturalnie)
-                        if page_num > 1:
-                            referer_url = listing_url.rstrip('/') if retry == 0 else (listing_url.rstrip('/') + f'/firmy,{page_num-1}.html' if page_num > 2 else listing_url.rstrip('/'))
-                            context.set_extra_http_headers({
-                                'Referer': referer_url
-                            })
-                        else:
-                            # Dla pierwszej strony, użyj strony głównej jako referer
-                            context.set_extra_http_headers({
-                                'Referer': f"{BASE_URL}/"
-                            })
+                        response = page.goto(url, wait_until='networkidle', timeout=30000)
                         
-                        # Zwiększony timeout dla wolnych stron
-                        response = page.goto(url, wait_until='domcontentloaded', timeout=45000)
-                        
-                        # Sprawdź status odpowiedzi
-                        if response:
-                            status = response.status
-                            
-                            # Jeśli 403, spróbuj ponownie z dłuższym opóźnieniem
-                            if status == 403 and retry < max_retries - 1:
-                                wait_time = retry_delay * (retry + 1) + random.uniform(2, 5)
-                                log(f"  ⚠️ HTTP 403 on attempt {retry + 1}/{max_retries}, waiting {wait_time:.1f}s before retry...")
-                                time.sleep(wait_time)
+                        # Sprawdź status code
+                        if response and response.status == 403:
+                            log(f"  ⚠️ HTTP 403 on attempt {attempt}/{max_retries}, waiting {3 + attempt * 3}s before retry...")
+                            if attempt < max_retries:
+                                page.wait_for_timeout((3 + attempt * 3) * 1000)
                                 
-                                # Spróbuj odwiedzić stronę główną ponownie przed retry
-                                try:
-                                    page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=20000)
-                                    time.sleep(random.uniform(1, 2))
-                                except:
-                                    pass
-                                
+                                # Odśwież sesję - wróć na homepage
+                                log("  🔄 Refreshing session via homepage...")
+                                page.goto("https://panoramafirm.pl", wait_until='networkidle')
+                                page.wait_for_timeout(random.randint(3000, 5000))
                                 continue
-                            
-                            if status >= 400:
-                                log(f"  ❌ HTTP {status} error for {url}")
-                                if status == 403:
-                                    log(f"  ⚠️ 403 Forbidden after {retry + 1} attempts - possible bot detection, skipping category")
+                            else:
+                                log(f"  ❌ HTTP 403 error for {url}")
+                                consecutive_failures += 1
                                 break
-                            
-                            # Sukces - przerwij retry loop
+                        elif response and response.status >= 400:
+                            log(f"  ⚠️ HTTP {response.status} error")
+                            consecutive_failures += 1
                             break
-                            
-                        # Sprawdź czy to przekierowanie
-                        final_url = page.url
-                        if final_url != url and final_url != url + '/':
-                            log(f"  ℹ️ Redirected from {url} to {final_url}")
+                        
+                        # Success
+                        consecutive_failures = 0
+                        success = True
+                        break
                         
                     except Exception as e:
-                        last_error = e
-                        if retry < max_retries - 1:
-                            wait_time = retry_delay * (retry + 1)
-                            log(f"  ⚠️ Error on attempt {retry + 1}/{max_retries}: {e}, retrying in {wait_time}s...")
-                            time.sleep(wait_time)
-                        else:
-                            log(f"  ⚠️ Error loading page after {max_retries} attempts: {e}")
-                            # Spróbuj kontynuować - może strona się załadowała częściowo
+                        log(f"  ⚠️ Navigation error on attempt {attempt}/{max_retries}: {e}")
+                        if attempt >= max_retries:
+                            consecutive_failures += 1
+                            break
+                        page.wait_for_timeout(random.randint(3000, 5000))
                 
-                # Jeśli nadal 403 po retries, przerwij kategorię
-                if response and response.status == 403:
-                    break
+                if not success:
+                    continue
                 
-                # Czekaj na załadowanie treści - ale nie przerywaj jeśli timeout
+                # Zachowuj się jak człowiek
+                page.wait_for_timeout(random.randint(2000, 4000))
+                
+                # Random scroll
+                scroll_amount = random.randint(300, 800)
+                page.evaluate(f"window.scrollTo({{top: {scroll_amount}, behavior: 'smooth'}});")
+                page.wait_for_timeout(random.randint(1000, 2000))
+                
+                # Czekaj na załadowanie
                 try:
-                    page.wait_for_selector(
-                        'a[href*="/firma/"], a.company-link, .company-item a, article a, a[class*="company"], .listing-item a, .result-item a',
-                        timeout=15000
-                    )
-                    log(f"  ✅ Company links selector found")
+                    page.wait_for_selector('a[href], h2, article', timeout=10000)
                 except PlaywrightTimeout:
-                    log(f"  ⚠️ Timeout waiting for company links selector, trying to parse HTML anyway...")
-                    # Nie przerywaj - spróbuj parsować HTML bez czekania na selektor
-                
-                # Scrolluj w dół, żeby załadować lazy-loaded content
-                try:
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    time.sleep(random.uniform(1.5, 2.5))
-                    
-                    # Spróbuj jeszcze raz scrollować i czekać
-                    page.evaluate("window.scrollTo(0, 0); window.scrollTo(0, document.body.scrollHeight)")
-                    time.sleep(1)
-                except Exception as e:
-                    log(f"  ⚠️ Error during scroll: {e}")
+                    log(f"  ⚠️ Timeout waiting for content on page {page_num}")
+                    break
                 
                 html = page.content()
                 
-                # Diagnostyka dla krótkich stron
                 if len(html) < 1000:
-                    # Pokaż co faktycznie jest w odpowiedzi
-                    preview = html[:500].replace('\n', ' ').replace('\r', ' ')
-                    log(f"  ⚠️ Page seems too short ({len(html)} bytes)")
-                    log(f"  📄 Content preview: {preview}")
-                    
-                    # Sprawdź czy to przekierowanie HTML
-                    if 'location.href' in html or 'window.location' in html or '<meta http-equiv="refresh"' in html.lower():
-                        log(f"  ℹ️ Page contains redirect, extracting target...")
-                        # Spróbuj wyciągnąć URL przekierowania
-                        import re
-                        redirect_match = re.search(r'location\.href\s*=\s*["\']([^"\']+)["\']', html)
-                        if redirect_match:
-                            redirect_url = redirect_match.group(1)
-                            log(f"  ℹ️ Redirect target: {redirect_url}")
-                    
-                    # Sprawdź czy to strona błędu
-                    if any(keyword in html.lower() for keyword in ['403', 'forbidden', 'access denied', 'blocked', 'captcha']):
-                        log(f"  ❌ Page appears to be blocked (403/Forbidden/CAPTCHA)")
-                        break
-                    
-                    log(f"  ⚠️ Skipping page - too short or redirect")
+                    log(f"  ⚠️ Page too short ({len(html)} bytes)")
                     break
-
+                
                 soup = BeautifulSoup(html, "html.parser")
-        
+                
+                # Sprawdź tytuł
                 page_title = soup.find("title")
                 if page_title:
                     title_text = page_title.get_text().lower()
-                    if any(keyword in title_text for keyword in ["404", "not found", "błąd", "error"]):
-                        log(f"  Page appears to be error page: {title_text[:50]}")
+                    if any(kw in title_text for kw in ["404", "błąd", "error", "access denied"]):
+                        log(f"  ⚠️ Error page: {title_text[:50]}")
                         break
                 
-                all_links_count = len(soup.select('a[href]'))
-                log(f"  Listing items: {all_links_count} total links found")
-                
-                # Zbierz linki - rozszerzona lista selektorów
+                # Zbierz linki
                 links = []
-                
-                # Próbuj różne selektory (w kolejności prawdopodobieństwa)
-                selectors = [
-                    "a[href*='/firma/']",  # Najbardziej specyficzny
-                    "a.company-link",
-                    ".company-item a",
-                    ".listing-item a",
-                    ".result-item a",
-                    ".results a",
-                    "article a[href*='/firma/']",
-                    "h2 a[href*='/firma/']",
-                    "h3 a[href*='/firma/']",
-                    "a[class*='company']",
-                    "article a",
-                    "h2 a",
-                    "h3 a",
-                    ".item a",
-                    "[data-company-id] a",  # Jeśli strona używa data attributes
-                ]
+                selectors = ["h2 a[href]", "a[class*='company']", "article a[href]", ".company-item a[href]"]
                 
                 for selector in selectors:
-                    found_links = soup.select(selector)
-                    if found_links:
-                        # Filtruj tylko linki do firm (zawierają /firma/ w href)
-                        filtered = [l for l in found_links if l.get('href') and '/firma/' in l.get('href', '')]
-                        if filtered:
-                            links = filtered
-                            log(f"  ✅ Found {len(links)} company links via selector: {selector}")
-                            break
-                
-                # Jeśli nadal brak linków, spróbuj znaleźć wszystkie linki zawierające /firma/
-                if not links:
-                    all_firma_links = soup.select('a[href*="/firma/"]')
-                    if all_firma_links:
-                        links = all_firma_links
-                        log(f"  ✅ Found {len(links)} company links via fallback (all /firma/ links)")
+                    links = soup.select(selector)
+                    if links:
+                        break
                 
                 if not links:
-                    log(f"  ⚠️ No company links found on page {page_num} (tried {len(selectors)} selectors)")
-                    # Diagnostyka - sprawdź co jest na stronie
-                    if page_num == 1:
-                        # Sprawdź czy są jakieś linki w ogóle
-                        all_links = soup.select('a[href]')
-                        log(f"  ℹ️  Total links on page: {len(all_links)}")
-                        if all_links:
-                            # Pokaż kilka przykładowych linków dla diagnostyki
-                            sample_links = [a.get('href', '')[:80] for a in all_links[:5]]
-                            log(f"  ℹ️  Sample links: {sample_links}")
-                        # Sprawdź czy strona ma treść
-                        body_text = soup.get_text()[:200] if soup.body else ""
-                        if "brak wyników" in body_text.lower() or "no results" in body_text.lower():
-                            log(f"  ℹ️  Page indicates no results")
-                        log(f"  ℹ️  This category might be empty or have different structure")
+                    log(f"  ⚠️ No company links found on page {page_num}")
                     break
-
+                
+                # Przetwórz linki
                 new_count = 0
                 for link in links:
                     href = link.get("href")
                     name = normalize_text(link.get_text(strip=True))
                     
-                    if not href or href == "#" or not name or len(name) < 2:
+                    if not href or not name or len(name) < 2:
                         continue
                     
-                    if href.startswith("/"):
-                        full_href = f"{BASE_URL}{href}"
-                    elif href.startswith("http"):
-                        full_href = href
-                    else:
-                        continue
+                    full_href = href if href.startswith("http") else f"{BASE_URL}{href}"
                     
                     if full_href in seen_urls:
                         continue
@@ -2172,31 +2120,20 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     seen_urls.add(full_href)
                     results.append({"name": name, "url": full_href})
                     new_count += 1
-
+                
+                log(f"  ✅ Found {new_count} new companies on page {page_num}")
+                
                 if new_count == 0:
                     break
-
-                time.sleep(random.uniform(LISTING_DELAY_MIN, LISTING_DELAY_MAX))
+                
                 page_num += 1
                 
             except Exception as e:
                 log(f"  ❌ Error on page {page_num}: {e}")
-                break
-    
-    except Exception as e:
-        log(f"❌ Critical error in scraping: {e}")
-        if browser and should_close_browser:
-            try:
-                browser.close()
-            except:
-                pass
-    
-    # Zamykaj browser tylko jeśli sam go utworzyliśmy
-    if should_close_browser and browser:
-        try:
-            browser.close()
-        except:
-            pass
+                consecutive_failures += 1
+                continue
+        
+        browser.close()
     
     return results
 
@@ -2593,8 +2530,13 @@ def process_company(conn, session: requests.Session, listing_item: dict, categor
 def main():
     log(
         f"Mode={SCRAPER_MODE} | REQUIRE_AI={'YES' if REQUIRE_AI else 'NO'} | "
-        f"MAX_PAGES_PER_CATEGORY={MAX_PAGES_PER_CATEGORY} | AI_MODEL={OPENAI_MODEL}"
+        f"MAX_PAGES_PER_CATEGORY={MAX_PAGES_PER_CATEGORY} | AI_MODEL={OPENAI_MODEL} | "
+        f"HEADLESS={'YES' if HEADLESS else 'NO'}"
     )
+    if HEADLESS:
+        log("ℹ️  Running in HEADLESS mode (server environment detected)")
+    else:
+        log("ℹ️  Running in GUI mode (local environment - better anti-detection)")
 
     conn = connect_db()
     categories = scrape_all_categories()
@@ -2603,85 +2545,14 @@ def main():
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    # Utwórz jeden browser context dla wszystkich kategorii
-    browser = None
-    context = None
-    page = None
-    playwright = None
-    
-    try:
-        playwright = sync_playwright().start()
-        browser = playwright.chromium.launch(
-            headless=True,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-            ]
-        )
-        
-        context = browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080},
-            locale='pl-PL',
-            timezone_id='Europe/Warsaw',
-            extra_http_headers={
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-            }
-        )
-        
-        page = context.new_page()
-        
-        # Usuń automatyczne wykrywanie webdrivera
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            window.navigator.chrome = {
-                runtime: {},
-            };
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5],
-            });
-        """)
-        
-        # Odwiedź stronę główną RAZ na początku, żeby dostać cookies
-        try:
-            log(f"🏠 Visiting homepage once to initialize session...")
-            page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=30000)
-            time.sleep(random.uniform(2, 4))  # Symuluj czytanie strony
-            
-            # Symuluj ruch myszy i scrollowanie
-            page.mouse.move(100, 100)
-            page.evaluate("window.scrollTo(0, 300)")
-            time.sleep(random.uniform(0.5, 1.5))
-            log(f"✅ Homepage visited, session initialized (cookies saved for all categories)")
-        except Exception as e:
-            log(f"⚠️ Could not visit homepage: {e}, continuing anyway...")
-    
-    except Exception as e:
-        log(f"⚠️ Could not initialize browser: {e}, will create new browser for each category")
-        browser = None
-        context = None
-        page = None
-
     try:
         for i, cat in enumerate(categories, 1):
             cat_name = normalize_text(cat["name"])
             cat_url = cat["url"]
             log(f"\n[{i}/{len(categories)}] Category: {cat_name} -> {cat_url}")
 
-            # Przekaż page i context jeśli są dostępne
-            companies = scrape_category_listing_until_end(session, cat_url, page=page, context=context)
+            # Nowa funkcja sama tworzy browser z stealth
+            companies = scrape_category_listing_until_end(session, cat_url)
             log(f"  Listing items: {len(companies)}")
             
             # Krótka przerwa między kategoriami (symuluj ludzkie zachowanie)
@@ -2703,17 +2574,6 @@ def main():
                 time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     finally:
-        # Zamknij browser i playwright jeśli zostały utworzone
-        if browser:
-            try:
-                browser.close()
-            except:
-                pass
-        if playwright:
-            try:
-                playwright.stop()
-            except:
-                pass
         conn.close()
 
     log(f"\nDONE. Inserted={total_inserted} | AI used={ai_usage_counter}")

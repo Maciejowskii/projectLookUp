@@ -4,7 +4,8 @@ FROM python:3.13-slim
 
 # Ustawienia podstawowe
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HEADLESS=true
 
 WORKDIR /app
 
