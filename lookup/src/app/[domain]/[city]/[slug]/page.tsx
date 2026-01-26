@@ -178,6 +178,7 @@ export default async function CompanyProfilePage({
               reviews={company.reviews}
               companyId={company.id}
               companySlug={company.slug}
+              companyName={company.name}
             />
           </div>
 

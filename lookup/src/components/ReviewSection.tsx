@@ -18,10 +18,12 @@ export const ReviewSection = ({
   reviews,
   companyId,
   companySlug,
+  companyName,
 }: {
   reviews: Review[];
   companyId: string;
   companySlug: string;
+  companyName?: string;
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const router = useRouter();
@@ -37,7 +39,7 @@ export const ReviewSection = ({
     <section id="opinie" className="scroll-mt-32">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          Opinie klientów
+          {companyName ? `Opinie klientów o ${companyName}` : 'Opinie klientów'}
           <span className="bg-blue-100 text-blue-700 text-sm px-2 py-1 rounded-full">
             {reviews.length}
           </span>

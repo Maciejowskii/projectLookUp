@@ -464,7 +464,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 					</section>
 
 					{/* Sekcja Opinii */}
-					<ReviewSection reviews={company.reviews} companyId={company.id} companySlug={company.slug} />
+					<ReviewSection reviews={company.reviews} companyId={company.id} companySlug={company.slug} companyName={company.name} />
 				</div>
 
 				{/* Sidebar */}
