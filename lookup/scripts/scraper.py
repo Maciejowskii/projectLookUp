@@ -1899,11 +1899,21 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            # Użyj bardziej realistycznego browser context
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                ]
+            )
             
             context = browser.new_context(
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 viewport={'width': 1920, 'height': 1080},
+                locale='pl-PL',
+                timezone_id='Europe/Warsaw',
                 extra_http_headers={
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                     'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -1913,11 +1923,40 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                     'Sec-Fetch-Dest': 'document',
                     'Sec-Fetch-Mode': 'navigate',
                     'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
                     'Cache-Control': 'max-age=0',
                 }
             )
             
+            # Usuń webdriver flag
             page = context.new_page()
+            
+            # Usuń automatyczne wykrywanie webdrivera
+            page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                window.navigator.chrome = {
+                    runtime: {},
+                };
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+            """)
+            
+            # Najpierw odwiedź stronę główną, żeby dostać cookies i wyglądać jak normalny użytkownik
+            try:
+                log(f"  🏠 Visiting homepage first to get cookies...")
+                page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=30000)
+                time.sleep(random.uniform(2, 4))  # Symuluj czytanie strony
+                
+                # Symuluj ruch myszy i scrollowanie
+                page.mouse.move(100, 100)
+                page.evaluate("window.scrollTo(0, 300)")
+                time.sleep(random.uniform(0.5, 1.5))
+                log(f"  ✅ Homepage visited, cookies obtained")
+            except Exception as e:
+                log(f"  ⚠️ Could not visit homepage: {e}, continuing anyway...")
             
             page_num = 1
             while True:
@@ -1931,28 +1970,78 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 log(f"  Listing page {page_num}: {url}")
 
                 try:
-                    # Sprawdź status odpowiedzi przed parsowaniem
+                    # Losowe opóźnienie przed requestem (symuluj ludzkie zachowanie)
+                    time.sleep(random.uniform(LISTING_DELAY_MIN, LISTING_DELAY_MAX))
+                    
+                    # Retry z backoff dla 403
+                    max_retries = 3
+                    retry_delay = 5
                     response = None
-                    try:
-                        # Zwiększony timeout dla wolnych stron
-                        response = page.goto(url, wait_until='domcontentloaded', timeout=45000)
-                        
-                        # Sprawdź status odpowiedzi
-                        if response:
-                            status = response.status
-                            if status >= 400:
-                                log(f"  ❌ HTTP {status} error for {url}")
-                                if status == 403:
-                                    log(f"  ⚠️ 403 Forbidden - possible bot detection, skipping category")
-                                break
+                    last_error = None
+                    
+                    for retry in range(max_retries):
+                        try:
+                            # Dodaj referer dla kolejnych stron (wygląda bardziej naturalnie)
+                            if page_num > 1:
+                                referer_url = listing_url.rstrip('/') if retry == 0 else (listing_url.rstrip('/') + f'/firmy,{page_num-1}.html' if page_num > 2 else listing_url.rstrip('/'))
+                                context.set_extra_http_headers({
+                                    'Referer': referer_url
+                                })
+                            else:
+                                # Dla pierwszej strony, użyj strony głównej jako referer
+                                context.set_extra_http_headers({
+                                    'Referer': f"{BASE_URL}/"
+                                })
                             
+                            # Zwiększony timeout dla wolnych stron
+                            response = page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                            
+                            # Sprawdź status odpowiedzi
+                            if response:
+                                status = response.status
+                                
+                                # Jeśli 403, spróbuj ponownie z dłuższym opóźnieniem
+                                if status == 403 and retry < max_retries - 1:
+                                    wait_time = retry_delay * (retry + 1) + random.uniform(2, 5)
+                                    log(f"  ⚠️ HTTP 403 on attempt {retry + 1}/{max_retries}, waiting {wait_time:.1f}s before retry...")
+                                    time.sleep(wait_time)
+                                    
+                                    # Spróbuj odwiedzić stronę główną ponownie przed retry
+                                    try:
+                                        page.goto(f"{BASE_URL}/", wait_until='domcontentloaded', timeout=20000)
+                                        time.sleep(random.uniform(1, 2))
+                                    except:
+                                        pass
+                                    
+                                    continue
+                                
+                                if status >= 400:
+                                    log(f"  ❌ HTTP {status} error for {url}")
+                                    if status == 403:
+                                        log(f"  ⚠️ 403 Forbidden after {retry + 1} attempts - possible bot detection, skipping category")
+                                    break
+                                
+                                # Sukces - przerwij retry loop
+                                break
+                                
                             # Sprawdź czy to przekierowanie
                             final_url = page.url
                             if final_url != url and final_url != url + '/':
                                 log(f"  ℹ️ Redirected from {url} to {final_url}")
-                    except Exception as e:
-                        log(f"  ⚠️ Error loading page: {e}")
-                        # Spróbuj kontynuować - może strona się załadowała częściowo
+                            
+                        except Exception as e:
+                            last_error = e
+                            if retry < max_retries - 1:
+                                wait_time = retry_delay * (retry + 1)
+                                log(f"  ⚠️ Error on attempt {retry + 1}/{max_retries}: {e}, retrying in {wait_time}s...")
+                                time.sleep(wait_time)
+                            else:
+                                log(f"  ⚠️ Error loading page after {max_retries} attempts: {e}")
+                                # Spróbuj kontynuować - może strona się załadowała częściowo
+                    
+                    # Jeśli nadal 403 po retries, przerwij kategorię
+                    if response and response.status == 403:
+                        break
                     
                     # Czekaj na załadowanie treści - ale nie przerywaj jeśli timeout
                     try:
