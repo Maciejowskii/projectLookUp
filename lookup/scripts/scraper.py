@@ -1851,15 +1851,31 @@ def scrape_all_categories():
         log("Pobieram dodatkowe kategorie...")
         try:
             resp = requests.get(f"{BASE_URL}/biuro", headers=HEADERS, timeout=20)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
-            for link in soup.select("a.dropdown-item[href*='/branze.html']"):
-                href = link.get("href", "")
-                title = link.get_text(strip=True)
-                if href and title:
-                    categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
+            
+            # Sprawdź status przed parsowaniem
+            if resp.status_code == 403:
+                log(f"⚠️ 403 Forbidden przy pobieraniu kategorii - używam tylko kategorii z listy")
+                log(f"   (Masz już {len(categories)} kategorii w liście)")
+            elif resp.status_code >= 400:
+                log(f"⚠️ HTTP {resp.status_code} przy pobieraniu kategorii - używam tylko kategorii z listy")
+            else:
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "html.parser")
+                found_count = 0
+                for link in soup.select("a.dropdown-item[href*='/branze.html']"):
+                    href = link.get("href", "")
+                    title = link.get_text(strip=True)
+                    if href and title:
+                        categories.append({"name": title, "url": f"{BASE_URL}{href.replace('/branze.html', '')}"})
+                        found_count += 1
+                if found_count > 0:
+                    log(f"✅ Dodano {found_count} dodatkowych kategorii")
+        except requests.exceptions.RequestException as e:
+            log(f"⚠️ Błąd pobierania kategorii: {e}")
+            log(f"   Kontynuuję z {len(categories)} kategoriami z listy")
         except Exception as e:
-            log(f"Błąd pobierania kategorii: {e}")
+            log(f"⚠️ Nieoczekiwany błąd przy pobieraniu kategorii: {e}")
+            log(f"   Kontynuuję z {len(categories)} kategoriami z listy")
 
     # dedupe
     seen = set()
@@ -1887,7 +1903,18 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
             
             context = browser.new_context(
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                viewport={'width': 1920, 'height': 1080}
+                viewport={'width': 1920, 'height': 1080},
+                extra_http_headers={
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Cache-Control': 'max-age=0',
+                }
             )
             
             page = context.new_page()
@@ -1904,8 +1931,28 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                 log(f"  Listing page {page_num}: {url}")
 
                 try:
-                    # Zwiększony timeout dla wolnych stron
-                    page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                    # Sprawdź status odpowiedzi przed parsowaniem
+                    response = None
+                    try:
+                        # Zwiększony timeout dla wolnych stron
+                        response = page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                        
+                        # Sprawdź status odpowiedzi
+                        if response:
+                            status = response.status
+                            if status >= 400:
+                                log(f"  ❌ HTTP {status} error for {url}")
+                                if status == 403:
+                                    log(f"  ⚠️ 403 Forbidden - possible bot detection, skipping category")
+                                break
+                            
+                            # Sprawdź czy to przekierowanie
+                            final_url = page.url
+                            if final_url != url and final_url != url + '/':
+                                log(f"  ℹ️ Redirected from {url} to {final_url}")
+                    except Exception as e:
+                        log(f"  ⚠️ Error loading page: {e}")
+                        # Spróbuj kontynuować - może strona się załadowała częściowo
                     
                     # Czekaj na załadowanie treści - ale nie przerywaj jeśli timeout
                     try:
@@ -1919,20 +1966,41 @@ def scrape_category_listing_until_end(session: requests.Session, listing_url: st
                         # Nie przerywaj - spróbuj parsować HTML bez czekania na selektor
                     
                     # Scrolluj w dół, żeby załadować lazy-loaded content
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    time.sleep(random.uniform(1.5, 2.5))
-                    
-                    # Spróbuj jeszcze raz scrollować i czekać
                     try:
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        time.sleep(random.uniform(1.5, 2.5))
+                        
+                        # Spróbuj jeszcze raz scrollować i czekać
                         page.evaluate("window.scrollTo(0, 0); window.scrollTo(0, document.body.scrollHeight)")
                         time.sleep(1)
-                    except:
-                        pass
+                    except Exception as e:
+                        log(f"  ⚠️ Error during scroll: {e}")
                     
                     html = page.content()
                     
+                    # Diagnostyka dla krótkich stron
                     if len(html) < 1000:
-                        log(f"  Page seems too short ({len(html)} bytes), might be empty or redirect")
+                        # Pokaż co faktycznie jest w odpowiedzi
+                        preview = html[:500].replace('\n', ' ').replace('\r', ' ')
+                        log(f"  ⚠️ Page seems too short ({len(html)} bytes)")
+                        log(f"  📄 Content preview: {preview}")
+                        
+                        # Sprawdź czy to przekierowanie HTML
+                        if 'location.href' in html or 'window.location' in html or '<meta http-equiv="refresh"' in html.lower():
+                            log(f"  ℹ️ Page contains redirect, extracting target...")
+                            # Spróbuj wyciągnąć URL przekierowania
+                            import re
+                            redirect_match = re.search(r'location\.href\s*=\s*["\']([^"\']+)["\']', html)
+                            if redirect_match:
+                                redirect_url = redirect_match.group(1)
+                                log(f"  ℹ️ Redirect target: {redirect_url}")
+                        
+                        # Sprawdź czy to strona błędu
+                        if any(keyword in html.lower() for keyword in ['403', 'forbidden', 'access denied', 'blocked', 'captcha']):
+                            log(f"  ❌ Page appears to be blocked (403/Forbidden/CAPTCHA)")
+                            break
+                        
+                        log(f"  ⚠️ Skipping page - too short or redirect")
                         break
 
                     soup = BeautifulSoup(html, "html.parser")
