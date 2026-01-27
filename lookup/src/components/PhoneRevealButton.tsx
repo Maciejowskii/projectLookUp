@@ -47,13 +47,7 @@ export const PhoneRevealButton = ({ phone, companyId }: Props) => {
       return;
     }
 
-    // Jeśli użytkownik nie jest zalogowany, pokaż formularz
-    if (isLoggedIn === false) {
-      setShowForm(true);
-      return;
-    }
-
-    // Jeśli zalogowany i formularz nie jest wymagany, od razu pokaż numer
+    // Jeśli formularz nie jest wymagany, od razu pokaż numer (dla wszystkich)
     revealPhone();
   };
 
@@ -91,7 +85,7 @@ export const PhoneRevealButton = ({ phone, companyId }: Props) => {
     );
   }
 
-  if (showForm && (requireForm === true || isLoggedIn === false)) {
+  if (showForm && requireForm === true) {
     // Formularz do zbierania danych dla niezalogowanych
     return (
       <form
