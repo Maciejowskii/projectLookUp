@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "react-hot-toast";
 const Toaster = () => {
   return (
     <Sonner
-      position="top-right"
+      position="top-center"
       toastOptions={{
         duration: 4000,
         style: {
@@ -13,8 +13,9 @@ const Toaster = () => {
           color: "white",
           fontWeight: "500",
           borderRadius: "12px",
-          padding: "12px 20px",
+          padding: "14px 20px",
           boxShadow: "0 10px 25px rgba(16, 185, 129, 0.3)",
+          maxWidth: "calc(100vw - 2rem)",
         },
       }}
     />

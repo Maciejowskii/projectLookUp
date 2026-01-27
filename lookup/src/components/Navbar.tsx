@@ -3,13 +3,37 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, X, Plus } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { UserMenu } from "./UserMenu";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Zapobiegaj błędom hydratacji - renderuj tylko po zamontowaniu
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Sprawdź czy użytkownik jest zalogowany
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        setIsLoggedIn(!!data.user);
+      } catch (error) {
+        setIsLoggedIn(false);
+      }
+    };
+    if (mounted) {
+      checkAuth();
+    }
+  }, [mounted]);
 
   // Efekt scrolla - zmienia tło na solidniejsze przy przewijaniu
   useEffect(() => {
@@ -32,10 +56,19 @@ export const Navbar = () => {
     };
   }, [isMobileMenuOpen]);
 
-  const navLinks = [
+  const handleStrefaPartneraClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (isLoggedIn) {
+      router.push('/dashboard');
+    } else {
+      router.push('/strefa-partnera');
+    }
+  };
+
+  const navLinks: Array<{ name: string; href: string; isSpecial?: boolean }> = [
     { name: "Kategorie", href: "/kategorie" },
     { name: "Dla Firm", href: "/dla-firm" },
-    { name: "Strefa Partnera", href: "/strefa-partnera" },
+    { name: "Strefa Partnera", href: "/strefa-partnera", isSpecial: true },
   ];
 
   return (
@@ -50,8 +83,8 @@ export const Navbar = () => {
           paddingTop: `calc(0.75rem + var(--safe-area-inset-top))`,
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between overflow-hidden">
-          {/* --- LOGO (Mobile-First) --- */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-4 overflow-hidden" suppressHydrationWarning>
+          {/* --- LOGO (Left) --- */}
           <Link
             href="/"
             className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tighter flex items-center gap-2 group touch-manipulation flex-shrink-0 min-w-0"
@@ -62,28 +95,49 @@ export const Navbar = () => {
             <span className="text-blue-600 flex-shrink-0">.</span>
           </Link>
 
-          {/* --- DESKTOP MENU (Hidden on mobile) --- */}
-          <div className="hidden md:flex items-center gap-1 bg-gray-100/50 p-1.5 rounded-full border border-gray-200/50 backdrop-blur-sm">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-4 lg:px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 touch-manipulation ${
-                    isActive
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50"
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              );
-            })}
+          {/* --- DESKTOP MENU (Center - flex-1 for symmetry) --- */}
+          <div className="hidden md:flex items-center justify-center flex-1" suppressHydrationWarning>
+            <div className="flex items-center gap-1 bg-gray-100/50 p-1.5 rounded-full border border-gray-200/50 backdrop-blur-sm">
+              {navLinks.map((link) => {
+                const isActive = mounted && (pathname === link.href || (link.isSpecial && isLoggedIn && pathname === '/dashboard'));
+                const href = link.isSpecial && isLoggedIn ? '/dashboard' : link.href;
+                
+                if (link.isSpecial) {
+                  return (
+                    <a
+                      key={link.href}
+                      href={href}
+                      onClick={handleStrefaPartneraClick}
+                      className={`px-4 lg:px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 touch-manipulation cursor-pointer ${
+                        isActive
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50"
+                      }`}
+                    >
+                      {link.name}
+                    </a>
+                  );
+                }
+                
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-4 lg:px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 touch-manipulation ${
+                      isActive
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50"
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
           {/* --- RIGHT SIDE (Desktop) --- */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 flex-shrink-0">
             <Link
               href="/dodaj-firme"
               className="group relative inline-flex items-center gap-2 px-4 lg:px-5 py-2 bg-gray-900 text-white rounded-full text-sm font-semibold overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 touch-manipulation active:scale-95"
@@ -101,9 +155,9 @@ export const Navbar = () => {
             <UserMenu />
           </div>
 
-          {/* --- MOBILE HAMBURGER (Touch-friendly 44x44px) --- */}
+          {/* --- MOBILE HAMBURGER (Touch-friendly 44x44px) - Hidden on desktop --- */}
           <button
-            className="md:hidden p-3 text-gray-600 active:bg-gray-100 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="mobile-menu-button flex md:hidden p-3 text-gray-600 active:bg-gray-100 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] items-center justify-center ml-auto"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
@@ -139,7 +193,29 @@ export const Navbar = () => {
             </div>
             
             {navLinks.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive = mounted && (pathname === link.href || (link.isSpecial && isLoggedIn && pathname === '/dashboard'));
+              const href = link.isSpecial && isLoggedIn ? '/dashboard' : link.href;
+              
+              if (link.isSpecial) {
+                return (
+                  <a
+                    key={link.href}
+                    href={href}
+                    onClick={(e) => {
+                      handleStrefaPartneraClick(e);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`py-4 px-4 rounded-xl text-base font-medium touch-manipulation active:bg-gray-100 transition-colors min-h-[44px] flex items-center cursor-pointer ${
+                      isActive
+                        ? "bg-blue-50 text-blue-600 font-semibold"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    {link.name}
+                  </a>
+                );
+              }
+              
               return (
                 <Link
                   key={link.href}

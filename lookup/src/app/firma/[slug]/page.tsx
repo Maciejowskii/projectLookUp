@@ -423,9 +423,14 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
 							<a
 								href={company.email ? `mailto:${company.email}` : '/kontakt'}
-								className='flex items-center justify-center gap-2 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors'
+								className='group relative flex items-center justify-center gap-3 w-full bg-white text-gray-900 font-bold py-3 rounded-xl border-2 border-gray-300 hover:border-blue-600 hover:bg-blue-50 transition-all shadow-md shadow-gray-200 hover:shadow-lg hover:shadow-blue-200 overflow-hidden'
 							>
-								<Mail size={18} /> Wyślij wiadomość
+								<span className="flex items-center gap-2 relative z-10">
+									<Mail size={18} className="group-hover:text-blue-600 transition-colors" /> 
+									<span className="group-hover:text-blue-600 transition-colors">Wyślij wiadomość</span>
+								</span>
+								{/* Efekt shine - gradient overlay na hover */}
+								<div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
 							</a>
 
 							{!company.isVerified && (

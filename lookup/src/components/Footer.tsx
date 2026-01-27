@@ -30,12 +30,12 @@ export const Footer = async () => {
   });
 
   return (
-    <footer className="bg-gray-950 text-gray-400 py-12 md:py-16 mt-12 md:mt-20 border-t border-gray-900 font-sans overflow-hidden">
+    <footer className="bg-gray-950 text-gray-400 py-8 md:py-10 mt-8 md:mt-12 border-t border-gray-900 font-sans overflow-hidden">
       <div className="container mx-auto px-4 md:px-6">
         {/* GÓRNA SEKCJA STOPKI */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 mb-8 md:mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mb-6 md:mb-8">
           {/* Kolumna 1: Brand */}
-          <div className="space-y-3 md:space-y-4 min-w-0">
+          <div className="space-y-2 md:space-y-3 min-w-0">
             <h3 className="text-white font-black text-xl md:text-2xl tracking-tight break-words">
               katalogo<span className="text-blue-600">.</span>
             </h3>
@@ -55,10 +55,10 @@ export const Footer = async () => {
 
           {/* Kolumna 2: Dla Partnerów */}
           <div className="min-w-0">
-            <h4 className="text-white font-bold mb-4 md:mb-6 flex items-center gap-2 text-base md:text-lg">
+            <h4 className="text-white font-bold mb-3 md:mb-4 flex items-center gap-2 text-base md:text-lg">
               Strefa Firmy
             </h4>
-            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
+            <ul className="space-y-1 md:space-y-1.5 text-xs md:text-sm">
               <li>
                 <Link
                   href="/dodaj-firme"
@@ -98,8 +98,8 @@ export const Footer = async () => {
 
           {/* Kolumna 3: Popularne Kategorie */}
           <div className="min-w-0">
-            <h4 className="text-white font-bold mb-4 md:mb-6 text-base md:text-lg break-words">Popularne Usługi</h4>
-            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
+            <h4 className="text-white font-bold mb-3 md:mb-4 text-base md:text-lg break-words">Popularne Usługi</h4>
+            <ul className="space-y-1 md:space-y-1.5 text-xs md:text-sm">
               {categories.map((cat) => (
                 <li key={cat.id}>
                   <Link
@@ -123,8 +123,8 @@ export const Footer = async () => {
 
           {/* Kolumna 4: Informacje & Blog */}
           <div className="min-w-0">
-            <h4 className="text-white font-bold mb-4 md:mb-6 text-base md:text-lg break-words">Informacje</h4>
-            <ul className="space-y-2 md:space-y-3 text-xs md:text-sm">
+            <h4 className="text-white font-bold mb-3 md:mb-4 text-base md:text-lg break-words">Informacje</h4>
+            <ul className="space-y-1 md:space-y-1.5 text-xs md:text-sm">
               <li>
                 <Link
                   href="/kontakt"
@@ -171,7 +171,7 @@ export const Footer = async () => {
         </div>
 
         {/* DOLNA SEKCJA SEO (SEO LINKS) */}
-        <div className="border-t border-gray-900 pt-6 md:pt-10 pb-4 md:pb-6 overflow-hidden">
+        <div className="border-t border-gray-900 pt-4 md:pt-6 pb-3 md:pb-4 overflow-hidden">
           <h5 className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-gray-600 mb-3 md:mb-4 text-center break-words">
             Popularne wyszukiwania lokalne
           </h5>
@@ -195,8 +195,8 @@ export const Footer = async () => {
         </div>
 
         {/* COMPANY INFO & PAYMENT METHODS */}
-        <div className="border-t border-gray-900 pt-6 md:pt-8 mt-6 md:mt-8 overflow-hidden">
-          <div className="text-center space-y-3 md:space-y-4">
+        <div className="border-t border-gray-900 pt-4 md:pt-6 mt-4 md:mt-6 overflow-hidden">
+          <div className="text-center space-y-2 md:space-y-3">
             {/* Company Details */}
             <div className="text-[10px] md:text-xs text-gray-500 space-y-1 md:space-y-2 break-words">
               <p className="font-semibold text-gray-400 mb-2">Jakub Wolert</p>

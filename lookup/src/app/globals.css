@@ -110,3 +110,33 @@ button, a, [role="button"] {
     min-height: calc(100vh - var(--safe-area-inset-bottom));
   }
 }
+
+/* Toaster - ukryj na desktop, popraw na mobile */
+@media (min-width: 768px) {
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  [data-sonner-toaster] {
+    top: calc(4rem + env(safe-area-inset-top)) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    right: auto !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: 400px !important;
+  }
+  
+  [data-sonner-toast] {
+    width: 100% !important;
+    max-width: calc(100vw - 2rem) !important;
+  }
+}
+
+/* Mobile menu button - ukryj na desktop */
+@media (min-width: 768px) {
+  .mobile-menu-button {
+    display: none !important;
+  }
+}
