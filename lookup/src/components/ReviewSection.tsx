@@ -37,16 +37,18 @@ export const ReviewSection = ({
 
   return (
     <section id="opinie" className="scroll-mt-32">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          {companyName ? `Opinie klientów o ${companyName}` : 'Opinie klientów'}
-          <span className="bg-blue-100 text-blue-700 text-sm px-2 py-1 rounded-full">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 flex-wrap min-w-0">
+          <span className="break-words">
+            {companyName ? `Opinie klientów o ${companyName}` : 'Opinie klientów'}
+          </span>
+          <span className="bg-blue-100 text-blue-700 text-sm px-2 py-1 rounded-full flex-shrink-0">
             {reviews.length}
           </span>
         </h2>
         <button
           onClick={() => setIsFormOpen(!isFormOpen)}
-          className={`font-bold px-5 py-2.5 rounded-xl transition-all duration-300 flex items-center gap-2 ${
+          className={`font-bold px-5 py-2.5 rounded-xl transition-all duration-300 flex items-center gap-2 whitespace-nowrap flex-shrink-0 self-start sm:self-auto ${
             isFormOpen
               ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
               : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200"
