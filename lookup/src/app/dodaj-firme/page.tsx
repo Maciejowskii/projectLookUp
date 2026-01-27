@@ -15,6 +15,13 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { getResend } from "@/lib/resend";
 import { getNotificationEmails } from "@/lib/notificationEmails";
+import {
+  validateNIP,
+  validatePostalCode,
+  validateCityAndPostalCode,
+  formatNIP,
+  formatPostalCode,
+} from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +51,34 @@ export default async function AddCompanyPage() {
       email: formData.get("email") as string,
       phone: formData.get("phone") as string,
       city: formData.get("city") as string,
+      zip: formData.get("zip") as string,
       categoryId: formData.get("categoryId") as string,
     };
 
     if (!rawData.categoryId) throw new Error("Wybierz kategorię!");
+
+    // WALIDACJA NIP
+    const nipValidation = validateNIP(rawData.nip);
+    if (!nipValidation.valid) {
+      throw new Error(nipValidation.error || "Nieprawidłowy NIP");
+    }
+
+    // WALIDACJA KODU POCZTOWEGO
+    const zipValidation = validatePostalCode(rawData.zip);
+    if (!zipValidation.valid) {
+      throw new Error(zipValidation.error || "Nieprawidłowy kod pocztowy");
+    }
+
+    // WALIDACJA MIASTA + KOD POCZTOWY (sprawdzenie czy pasują do siebie)
+    const cityValidation = await validateCityAndPostalCode(rawData.city, rawData.zip);
+    if (!cityValidation.valid) {
+      throw new Error(cityValidation.error || "Miasto i kod pocztowy nie pasują do siebie");
+    }
+
+    // Formatuj dane
+    const formattedNIP = rawData.nip ? formatNIP(rawData.nip) : null;
+    const formattedZip = formatPostalCode(rawData.zip);
+    const normalizedCity = cityValidation.normalizedCity || rawData.city.trim();
 
     // Generujemy losowe hasło dla użytkownika (możesz je wyświetlić na stronie sukcesu)
     const tempPassword = crypto.randomBytes(4).toString("hex");
@@ -67,10 +98,11 @@ export default async function AddCompanyPage() {
         data: {
           name: rawData.name,
           slug,
-          nip: rawData.nip,
+          nip: formattedNIP,
           email: rawData.email,
           phone: rawData.phone,
-          city: rawData.city,
+          city: normalizedCity,
+          zip: formattedZip,
           tenantId: tenant.id,
           categoryId: rawData.categoryId,
           isVerified: false,
@@ -247,7 +279,11 @@ export default async function AddCompanyPage() {
               </div>
               <div class="info-box">
                 <div class="label">MIASTO</div>
-                <div class="value">${rawData.city}</div>
+                <div class="value">${normalizedCity}</div>
+              </div>
+              <div class="info-box">
+                <div class="label">KOD POCZTOWY</div>
+                <div class="value">${formattedZip}</div>
               </div>
               <div class="info-box">
                 <div class="label">BRANŻA</div>
@@ -371,25 +407,50 @@ export default async function AddCompanyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    NIP
+                    NIP <span className="text-gray-400 font-normal">(opcjonalnie)</span>
                   </label>
                   <input
                     name="nip"
-                    placeholder="000-000-00-00"
+                    type="text"
+                    maxLength={13}
+                    placeholder="1234567890"
+                    pattern="[0-9-]{0,13}"
                     className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm"
+                    title="NIP musi składać się z 10 cyfr"
                   />
+                  <p className="text-xs text-gray-500 mt-1 ml-1">10 cyfr (bez myślników)</p>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    Miasto
+                    Kod pocztowy <span className="text-red-500">*</span>
                   </label>
                   <input
-                    name="city"
+                    name="zip"
+                    type="text"
                     required
-                    placeholder="np. Warszawa"
+                    maxLength={6}
+                    placeholder="00-000"
+                    pattern="[0-9]{2}-[0-9]{3}"
                     className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm"
+                    title="Format: XX-XXX (np. 00-001)"
                   />
+                  <p className="text-xs text-gray-500 mt-1 ml-1">Format: XX-XXX</p>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
+                  Miasto <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="city"
+                  required
+                  placeholder="np. Warszawa"
+                  className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1 ml-1">
+                  Miasto zostanie zweryfikowane na podstawie kodu pocztowego
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
