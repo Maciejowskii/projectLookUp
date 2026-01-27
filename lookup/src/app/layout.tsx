@@ -154,6 +154,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 					</>
 				)}
 				{/* End Google tag (gtag.js) */}
+
+				{/* Google AdSense */}
+				<script
+					async
+					src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4373415012845424"
+					crossOrigin="anonymous"
+				/>
 			</head>
 			<body className={inter.className}>
 				{/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
