@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
-import { ArrowRight, Calendar } from 'lucide-react'
+import { ArrowRight, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const metadata = {
 	title: 'Blog i Porady | katalogo',
@@ -18,11 +18,31 @@ export const metadata = {
 	},
 }
 
-export default async function BlogIndexPage() {
-	const posts = await prisma.post.findMany({
-		where: { published: true },
-		orderBy: { createdAt: 'desc' },
-	})
+const POSTS_PER_PAGE = 12
+
+export default async function BlogIndexPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ page?: string }>
+}) {
+	const params = await searchParams
+	const currentPage = Math.max(1, parseInt(params.page || '1', 10))
+	const skip = (currentPage - 1) * POSTS_PER_PAGE
+
+	// Pobierz posty i całkowitą liczbę
+	const [posts, totalPosts] = await Promise.all([
+		prisma.post.findMany({
+			where: { published: true },
+			orderBy: { createdAt: 'desc' },
+			take: POSTS_PER_PAGE,
+			skip: skip,
+		}),
+		prisma.post.count({
+			where: { published: true },
+		}),
+	])
+
+	const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE)
 
 	return (
 		<div className='min-h-screen bg-gray-50 font-sans flex flex-col'>
@@ -74,6 +94,81 @@ export default async function BlogIndexPage() {
 
 				{posts.length === 0 && (
 					<div className='text-center py-20 text-gray-400'>Jeszcze nie ma żadnych wpisów. Wróć wkrótce!</div>
+				)}
+
+				{/* Paginacja */}
+				{totalPages > 1 && (
+					<div className='mt-16 flex flex-col sm:flex-row items-center justify-between gap-4'>
+						{/* Info o stronie */}
+						<p className='text-sm text-gray-500'>
+							Strona {currentPage} z {totalPages} • {totalPosts} {totalPosts === 1 ? 'wpis' : totalPosts < 5 ? 'wpisy' : 'wpisów'}
+						</p>
+
+						{/* Przyciski paginacji */}
+						<div className='flex items-center gap-2'>
+							{/* Poprzednia strona */}
+							{currentPage > 1 ? (
+								<Link
+									href={`/blog${currentPage === 2 ? '' : `?page=${currentPage - 1}`}`}
+									className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors'
+								>
+									<ChevronLeft size={16} />
+									Poprzednia
+								</Link>
+							) : (
+								<span className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed'>
+									<ChevronLeft size={16} />
+									Poprzednia
+								</span>
+							)}
+
+							{/* Numery stron */}
+							<div className='flex items-center gap-1'>
+								{Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+									let pageNum: number
+									if (totalPages <= 5) {
+										pageNum = i + 1
+									} else if (currentPage <= 3) {
+										pageNum = i + 1
+									} else if (currentPage >= totalPages - 2) {
+										pageNum = totalPages - 4 + i
+									} else {
+										pageNum = currentPage - 2 + i
+									}
+
+									return (
+										<Link
+											key={pageNum}
+											href={`/blog${pageNum === 1 ? '' : `?page=${pageNum}`}`}
+											className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+												pageNum === currentPage
+													? 'bg-blue-600 text-white'
+													: 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+											}`}
+										>
+											{pageNum}
+										</Link>
+									)
+								})}
+							</div>
+
+							{/* Następna strona */}
+							{currentPage < totalPages ? (
+								<Link
+									href={`/blog?page=${currentPage + 1}`}
+									className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors'
+								>
+									Następna
+									<ChevronRight size={16} />
+								</Link>
+							) : (
+								<span className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed'>
+									Następna
+									<ChevronRight size={16} />
+								</span>
+							)}
+						</div>
+					</div>
 				)}
 			</main>
 
