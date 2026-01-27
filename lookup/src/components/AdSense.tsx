@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface AdSenseProps {
   adSlot: string
@@ -24,22 +24,86 @@ export function AdSense({
   style,
   className = '',
 }: AdSenseProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        // @ts-ignore - adsbygoogle jest dodawany przez skrypt AdSense
-        ;(window.adsbygoogle = window.adsbygoogle || []).push({})
-      }
-    } catch (err) {
-      console.error('AdSense error:', err)
+    // Funkcja sprawdzająca czy kontener ma szerokość > 0
+    const checkAndInit = () => {
+      if (!containerRef.current) return false
+
+      const rect = containerRef.current.getBoundingClientRect()
+      const hasWidth = rect.width > 0
+      const isVisible = rect.height > 0 && window.getComputedStyle(containerRef.current).display !== 'none'
+
+      return hasWidth && isVisible
     }
-  }, [])
+
+    // Opóźniona inicjalizacja - czekamy aż kontener będzie widoczny
+    let retryCount = 0
+    const maxRetries = 20 // Max 2 sekundy (20 * 100ms)
+    
+    const initAdSense = () => {
+      try {
+        if (typeof window === 'undefined') return
+
+        // Sprawdź czy kontener ma szerokość
+        if (!checkAndInit()) {
+          retryCount++
+          if (retryCount < maxRetries) {
+            // Spróbuj ponownie za 100ms
+            setTimeout(initAdSense, 100)
+            return
+          } else {
+            // Po max próbach, spróbuj zainicjalizować mimo wszystko
+            console.warn('[AdSense] Container width is 0, but initializing anyway')
+          }
+        }
+
+        // @ts-ignore - adsbygoogle jest dodawany przez skrypt AdSense
+        if (window.adsbygoogle) {
+          // @ts-ignore
+          ;(window.adsbygoogle = window.adsbygoogle || []).push({})
+        }
+      } catch (err) {
+        console.error('AdSense error:', err)
+      }
+    }
+
+    // Poczekaj na załadowanie DOM i CSS
+    const timeoutId = setTimeout(initAdSense, 100)
+
+    // Obserwuj zmiany rozmiaru (np. gdy sidebar się pojawia)
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof window !== 'undefined' && containerRef.current && 'ResizeObserver' in window) {
+      resizeObserver = new ResizeObserver(() => {
+        if (checkAndInit() && containerRef.current) {
+          const ins = containerRef.current.querySelector('.adsbygoogle')
+          // Sprawdź czy reklama już nie została zainicjalizowana
+          if (ins && !ins.hasAttribute('data-adsbygoogle-status')) {
+            initAdSense()
+          }
+        }
+      })
+      resizeObserver.observe(containerRef.current)
+    }
+
+    return () => {
+      clearTimeout(timeoutId)
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
+    }
+  }, [adSlot])
 
   return (
-    <div className={`adsense-container ${className}`} style={style}>
+    <div
+      ref={containerRef}
+      className={`adsense-container ${className}`}
+      style={{ minWidth: '1px', minHeight: '1px', ...style }}
+    >
       <ins
         className="adsbygoogle"
-        style={{ display: 'block' }}
+        style={{ display: 'block', minWidth: '1px', minHeight: '1px' }}
         data-ad-client="ca-pub-4373415012845424"
         data-ad-slot={adSlot}
         data-ad-format={adFormat}
@@ -73,11 +137,12 @@ export function AdSenseBanner({ className = '' }: { className?: string }) {
   }
 
   return (
-    <div className={`w-full flex justify-center my-4 ${className}`}>
+    <div className={`w-full flex justify-center my-4 ${className}`} style={{ minWidth: '320px' }}>
       <AdSense
         adSlot={adSlot}
         adFormat="auto"
         className="w-full max-w-5xl"
+        style={{ minWidth: '320px', width: '100%' }}
       />
     </div>
   )
@@ -93,11 +158,12 @@ export function AdSenseSidebar({ className = '' }: { className?: string }) {
   }
 
   return (
-    <div className={`w-full flex justify-center ${className}`}>
+    <div className={`w-full flex justify-center ${className}`} style={{ minWidth: '250px' }}>
       <AdSense
         adSlot={adSlot}
         adFormat="rectangle"
         className="w-full"
+        style={{ minWidth: '250px', width: '100%' }}
       />
     </div>
   )
@@ -113,11 +179,12 @@ export function AdSenseInContent({ className = '' }: { className?: string }) {
   }
 
   return (
-    <div className={`w-full flex justify-center my-8 ${className}`}>
+    <div className={`w-full flex justify-center my-8 ${className}`} style={{ minWidth: '320px' }}>
       <AdSense
         adSlot={adSlot}
         adFormat="auto"
         className="w-full max-w-4xl"
+        style={{ minWidth: '320px', width: '100%' }}
       />
     </div>
   )
