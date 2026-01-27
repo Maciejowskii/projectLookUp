@@ -238,7 +238,7 @@ export async function rejectClaim(claimId: string) {
 	revalidatePath('/admin/zgloszenia')
 }
 
-export async function deleteReview(reviewId: string) {
+export async function deleteReview(reviewId: string, redirectUrl?: string) {
 	const admin = await checkAdminAuth()
 
 	const review = await prisma.review.findUnique({
@@ -259,6 +259,12 @@ export async function deleteReview(reviewId: string) {
 	})
 
 	revalidatePath('/admin/reviews')
+	
+	// Jeśli podano redirectUrl, przekieruj
+	if (redirectUrl) {
+		const { redirect } = await import('next/navigation')
+		redirect(redirectUrl)
+	}
 }
 
 // --- KATEGORIE ---

@@ -2,8 +2,10 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { deleteReview } from "@/actions/adminActions";
-import { Star, Trash2, MessageSquare, Bot } from "lucide-react";
+import { Star, Trash2, MessageSquare, Bot, User, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+
+const REVIEWS_PER_PAGE = 25;
 
 // Funkcja sprawdzająca czy opinia jest od bota
 function isBotReview(review: { userPhone: string }): boolean {
@@ -12,12 +14,58 @@ function isBotReview(review: { userPhone: string }): boolean {
   return normalizedPhone === '000000000' || normalizedPhone === '00000000'
 }
 
-export default async function AdminReviewsPage() {
-  const reviews = await prisma.review.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    include: { company: true },
-  });
+export default async function AdminReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; page?: string }>
+}) {
+  const params = await searchParams;
+  const activeTab = params.tab || 'all'; // 'all' | 'bot' | 'user'
+  const currentPage = Math.max(1, parseInt(params.page || '1', 10));
+  const skip = (currentPage - 1) * REVIEWS_PER_PAGE;
+
+  // Pobierz wszystkie opinie z filtrowaniem
+  const whereClause: any = {};
+  if (activeTab === 'bot') {
+    // Filtruj tylko opinie bota (telefon zaczyna się od "000")
+    whereClause.userPhone = {
+      startsWith: '000',
+    };
+  } else if (activeTab === 'user') {
+    // Filtruj tylko opinie użytkowników (telefon NIE zaczyna się od "000")
+    whereClause.NOT = {
+      userPhone: {
+        startsWith: '000',
+      },
+    };
+  }
+
+  // Pobierz opinie i całkowitą liczbę
+  const [reviews, totalReviews] = await Promise.all([
+    prisma.review.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: REVIEWS_PER_PAGE,
+      skip: skip,
+      include: { company: true },
+    }),
+    prisma.review.count({
+      where: whereClause,
+    }),
+  ]);
+
+  const totalPages = Math.ceil(totalReviews / REVIEWS_PER_PAGE);
+  
+  // Liczniki dla zakładek
+  const [botCount, userCount, allCount] = await Promise.all([
+    prisma.review.count({
+      where: { userPhone: { startsWith: '000' } },
+    }),
+    prisma.review.count({
+      where: { NOT: { userPhone: { startsWith: '000' } } },
+    }),
+    prisma.review.count(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -27,9 +75,46 @@ export default async function AdminReviewsPage() {
             Moderacja Opinii
           </h1>
           <p className="text-sm text-gray-500">
-            Ostatnie opinie dodane w portalu. Usuwaj spam i hejt.
+            Zarządzaj opiniami użytkowników i botów. Usuwaj spam i hejt.
           </p>
         </div>
+      </div>
+
+      {/* ZAKŁADKI */}
+      <div className="bg-white rounded-xl border border-gray-200 p-1 flex gap-1">
+        <Link
+          href="/admin/reviews?tab=all"
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'all'
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <MessageSquare size={16} />
+          Wszystkie ({allCount})
+        </Link>
+        <Link
+          href="/admin/reviews?tab=bot"
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'bot'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <Bot size={16} />
+          Boty ({botCount})
+        </Link>
+        <Link
+          href="/admin/reviews?tab=user"
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'user'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <User size={16} />
+          Użytkownicy ({userCount})
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -112,8 +197,17 @@ export default async function AdminReviewsPage() {
 
             {/* AKCJE */}
             <div className="flex items-center">
-              <form action={deleteReview.bind(null, review.id)}>
+              <form 
+                action={deleteReview.bind(
+                  null, 
+                  review.id,
+                  currentPage === 1 
+                    ? `/admin/reviews?tab=${activeTab}`
+                    : `/admin/reviews?tab=${activeTab}&page=${currentPage}`
+                )}
+              >
                 <button
+                  type="submit"
                   className="p-3 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                   title="Usuń opinię"
                 >
@@ -126,10 +220,97 @@ export default async function AdminReviewsPage() {
 
         {reviews.length === 0 && (
           <div className="text-center py-12 text-gray-400">
-            Cisza i spokój. Brak nowych opinii.
+            {activeTab === 'bot' 
+              ? 'Brak opinii od botów.' 
+              : activeTab === 'user'
+              ? 'Brak opinii od użytkowników.'
+              : 'Cisza i spokój. Brak opinii.'}
           </div>
         )}
       </div>
+
+      {/* PAGINACJA */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200">
+          {/* Info o stronie */}
+          <p className="text-sm text-gray-500">
+            Strona {currentPage} z {totalPages} • {totalReviews} {totalReviews === 1 ? 'opinia' : totalReviews < 5 ? 'opinie' : 'opinii'}
+          </p>
+
+          {/* Przyciski paginacji */}
+          <div className="flex items-center gap-2">
+            {/* Poprzednia strona */}
+            {currentPage > 1 ? (
+              <Link
+                href={`/admin/reviews?tab=${activeTab}${currentPage === 2 ? '' : `&page=${currentPage - 1}`}`}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              >
+                <ChevronLeft size={16} />
+                Poprzednia
+              </Link>
+            ) : (
+              <span className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+                <ChevronLeft size={16} />
+                Poprzednia
+              </span>
+            )}
+
+            {/* Numery stron */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+
+                const pageUrl = pageNum === 1 
+                  ? `/admin/reviews?tab=${activeTab}`
+                  : `/admin/reviews?tab=${activeTab}&page=${pageNum}`
+
+                return (
+                  <Link
+                    key={pageNum}
+                    href={pageUrl}
+                    className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      pageNum === currentPage
+                        ? activeTab === 'bot'
+                          ? 'bg-purple-600 text-white'
+                          : activeTab === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-900 text-white'
+                        : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    {pageNum}
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* Następna strona */}
+            {currentPage < totalPages ? (
+              <Link
+                href={`/admin/reviews?tab=${activeTab}&page=${currentPage + 1}`}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              >
+                Następna
+                <ChevronRight size={16} />
+              </Link>
+            ) : (
+              <span className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+                Następna
+                <ChevronRight size={16} />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
