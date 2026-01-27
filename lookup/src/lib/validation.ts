@@ -12,7 +12,10 @@
  */
 export function validateNIP(nip: string | null | undefined): { valid: boolean; error?: string } {
   if (!nip || nip.trim() === "") {
-    return { valid: true }; // NIP jest opcjonalny
+    return {
+      valid: false,
+      error: "NIP jest wymagany",
+    };
   }
 
   // Usuń wszystkie znaki niebędące cyframi

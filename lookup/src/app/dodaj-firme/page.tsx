@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { CategorySearch } from "@/components/CategorySearch";
 import Link from "next/link";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -379,46 +380,35 @@ export default async function AddCompanyPage() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    Branża
+                    Branża <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <select
-                      name="categoryId"
-                      required
-                      defaultValue=""
-                      className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 appearance-none cursor-pointer shadow-sm font-medium"
-                    >
-                      <option value="" disabled>
-                        Wybierz kategorię...
-                      </option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                      <ArrowRight className="rotate-90" size={18} />
-                    </div>
-                  </div>
+                  <CategorySearch
+                    categories={categories}
+                    name="categoryId"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1 ml-1">
+                    Wpisz nazwę kategorii aby wyszukać ({categories.length} dostępnych)
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    NIP <span className="text-gray-400 font-normal">(opcjonalnie)</span>
+                    NIP <span className="text-red-500">*</span>
                   </label>
                   <input
                     name="nip"
                     type="text"
+                    required
                     maxLength={13}
                     placeholder="1234567890"
                     pattern="[0-9-]{0,13}"
                     className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm"
                     title="NIP musi składać się z 10 cyfr"
                   />
-                  <p className="text-xs text-gray-500 mt-1 ml-1">10 cyfr (bez myślników)</p>
+                  <p className="text-xs text-gray-500 mt-1 ml-1">10 cyfr (bez myślników) - zostanie zweryfikowany</p>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
@@ -456,10 +446,11 @@ export default async function AddCompanyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    Telefon
+                    Telefon <span className="text-red-500">*</span>
                   </label>
                   <input
                     name="phone"
+                    type="tel"
                     required
                     placeholder="+48 500 600 700"
                     className="w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm"
@@ -467,7 +458,7 @@ export default async function AddCompanyPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
-                    Email (Login)
+                    Email (Login) <span className="text-red-500">*</span>
                   </label>
                   <input
                     name="email"
