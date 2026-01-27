@@ -329,6 +329,10 @@ export async function updateSettings(formData: FormData) {
 	const entries = Array.from(formData.entries())
 	const changes: Record<string, string> = {}
 
+	// Specjalna obsługa dla checkboxów - jeśli nie ma wartości, ustaw na "false"
+	const checkboxKeys = ['phone_reveal_require_form']
+	const processedKeys = new Set<string>()
+
 	for (const [key, value] of entries) {
 		if (!key.startsWith('$')) {
 			changes[key] = value as string
@@ -336,6 +340,19 @@ export async function updateSettings(formData: FormData) {
 				where: { key },
 				update: { value: value as string },
 				create: { key, value: value as string },
+			})
+			processedKeys.add(key)
+		}
+	}
+
+	// Dla checkboxów, które nie zostały wysłane, ustaw na "false"
+	for (const key of checkboxKeys) {
+		if (!processedKeys.has(key)) {
+			changes[key] = 'false'
+			await prisma.setting.upsert({
+				where: { key },
+				update: { value: 'false' },
+				create: { key, value: 'false' },
 			})
 		}
 	}

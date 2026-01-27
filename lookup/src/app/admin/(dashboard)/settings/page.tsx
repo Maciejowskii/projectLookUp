@@ -110,6 +110,42 @@ export default async function AdminSettingsPage() {
           </div>
         </div>
 
+        {/* Sekcja: Ustawienia Numeru Telefonu */}
+        <div>
+          <h3 className="font-bold text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
+            <Phone size={18} className="text-blue-500" />
+            Ustawienia Numeru Telefonu
+          </h3>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="phone_reveal_require_form"
+                value="true"
+                defaultChecked={get("phone_reveal_require_form") === "true"}
+                className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900 mb-1">
+                  Wymagaj formularza do pokazania numeru telefonu
+                </div>
+                <div className="text-sm text-gray-600">
+                  Jeśli włączone, użytkownicy będą musieli wypełnić formularz (email, telefon, opis) 
+                  przed zobaczeniem numeru telefonu firmy. Przydatne do testowania konwersji - 
+                  możesz sprawdzić ile osób kliknie bez podawania danych vs. ile wypełni formularz.
+                </div>
+              </div>
+            </label>
+            <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
+              <Info size={14} className="mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Wyłączone:</strong> Zalogowani użytkownicy widzą numer od razu, niezalogowani muszą wypełnić formularz.<br />
+                <strong>Włączone:</strong> Wszyscy użytkownicy (również zalogowani) muszą wypełnić formularz przed zobaczeniem numeru.
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Sekcja: Cennik */}
         <div>
           <h3 className="font-bold text-gray-900 mb-4 border-b pb-2">

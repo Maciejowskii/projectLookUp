@@ -13,36 +13,47 @@ export const PhoneRevealButton = ({ phone, companyId }: Props) => {
   const [isRevealed, setIsRevealed] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [requireForm, setRequireForm] = useState<boolean | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     phone: "",
     description: "",
   });
 
-  // Sprawdź czy użytkownik jest zalogowany
+  // Sprawdź czy użytkownik jest zalogowany i ustawienie wymagania formularza
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        setIsLoggedIn(!!data.user);
-        if (data.user) {
-          setFormData((prev) => ({
-            ...prev,
-            email: data.user.email || "",
-          }));
-        }
-      })
-      .catch(() => setIsLoggedIn(false));
+    Promise.all([
+      fetch("/api/auth/me").then((res) => res.json()),
+      fetch("/api/settings/phone-reveal-require-form").then((res) => res.json()).catch(() => ({ requireForm: false })),
+    ]).then(([authData, settingsData]) => {
+      setIsLoggedIn(!!authData.user);
+      setRequireForm(settingsData.requireForm === true);
+      if (authData.user) {
+        setFormData((prev) => ({
+          ...prev,
+          email: authData.user.email || "",
+        }));
+      }
+    }).catch(() => {
+      setIsLoggedIn(false);
+      setRequireForm(false);
+    });
   }, []);
 
   const handleReveal = () => {
+    // Jeśli wymagany jest formularz (ustawienie włączone), zawsze pokaż formularz
+    if (requireForm === true) {
+      setShowForm(true);
+      return;
+    }
+
     // Jeśli użytkownik nie jest zalogowany, pokaż formularz
     if (isLoggedIn === false) {
       setShowForm(true);
       return;
     }
 
-    // Jeśli zalogowany lub status nieznany, od razu pokaż numer
+    // Jeśli zalogowany i formularz nie jest wymagany, od razu pokaż numer
     revealPhone();
   };
 
@@ -80,7 +91,7 @@ export const PhoneRevealButton = ({ phone, companyId }: Props) => {
     );
   }
 
-  if (showForm && isLoggedIn === false) {
+  if (showForm && (requireForm === true || isLoggedIn === false)) {
     // Formularz do zbierania danych dla niezalogowanych
     return (
       <form
