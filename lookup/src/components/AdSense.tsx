@@ -27,6 +27,9 @@ export function AdSense({
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Flaga zapobiegająca wielokrotnej inicjalizacji
+    let isInitialized = false
+
     // Funkcja sprawdzająca czy kontener ma szerokość > 0
     const checkAndInit = () => {
       if (!containerRef.current) return false
@@ -38,6 +41,17 @@ export function AdSense({
       return hasWidth && isVisible
     }
 
+    // Funkcja sprawdzająca czy reklama już została zainicjalizowana
+    const isAdInitialized = () => {
+      if (!containerRef.current) return false
+      const ins = containerRef.current.querySelector('.adsbygoogle')
+      if (!ins) return false
+      
+      // Sprawdź atrybut status (Google dodaje go po inicjalizacji)
+      const status = ins.getAttribute('data-adsbygoogle-status')
+      return status !== null && status !== ''
+    }
+
     // Opóźniona inicjalizacja - czekamy aż kontener będzie widoczny
     let retryCount = 0
     const maxRetries = 20 // Max 2 sekundy (20 * 100ms)
@@ -45,6 +59,11 @@ export function AdSense({
     const initAdSense = () => {
       try {
         if (typeof window === 'undefined') return
+
+        // Sprawdź czy już zainicjalizowane
+        if (isInitialized || isAdInitialized()) {
+          return
+        }
 
         // Sprawdź czy kontener ma szerokość
         if (!checkAndInit()) {
@@ -60,11 +79,17 @@ export function AdSense({
         }
 
         // @ts-ignore - adsbygoogle jest dodawany przez skrypt AdSense
-        if (window.adsbygoogle) {
+        if (window.adsbygoogle && !isAdInitialized()) {
           // @ts-ignore
           ;(window.adsbygoogle = window.adsbygoogle || []).push({})
+          isInitialized = true
         }
       } catch (err) {
+        // Ignoruj błąd "already have ads" - to oznacza że reklama już działa
+        if (err instanceof Error && err.message.includes('already have ads')) {
+          isInitialized = true
+          return
+        }
         console.error('AdSense error:', err)
       }
     }
@@ -76,12 +101,9 @@ export function AdSense({
     let resizeObserver: ResizeObserver | null = null
     if (typeof window !== 'undefined' && containerRef.current && 'ResizeObserver' in window) {
       resizeObserver = new ResizeObserver(() => {
-        if (checkAndInit() && containerRef.current) {
-          const ins = containerRef.current.querySelector('.adsbygoogle')
-          // Sprawdź czy reklama już nie została zainicjalizowana
-          if (ins && !ins.hasAttribute('data-adsbygoogle-status')) {
-            initAdSense()
-          }
+        // Tylko jeśli jeszcze nie zainicjalizowane
+        if (!isInitialized && !isAdInitialized() && checkAndInit() && containerRef.current) {
+          initAdSense()
         }
       })
       resizeObserver.observe(containerRef.current)
