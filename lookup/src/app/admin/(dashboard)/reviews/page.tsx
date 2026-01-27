@@ -2,8 +2,15 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { deleteReview } from "@/actions/adminActions";
-import { Star, Trash2, MessageSquare } from "lucide-react";
+import { Star, Trash2, MessageSquare, Bot } from "lucide-react";
 import Link from "next/link";
+
+// Funkcja sprawdzająca czy opinia jest od bota
+function isBotReview(review: { userPhone: string }): boolean {
+  // Bot używa numeru "000 000 000" (z różnymi formatami spacji/myślników)
+  const normalizedPhone = review.userPhone.replace(/[\s-]/g, '')
+  return normalizedPhone === '000000000' || normalizedPhone === '00000000'
+}
 
 export default async function AdminReviewsPage() {
   const reviews = await prisma.review.findMany({
@@ -26,13 +33,23 @@ export default async function AdminReviewsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {reviews.map((review) => (
+        {reviews.map((review) => {
+          const isBot = isBotReview(review)
+          return (
           <div
             key={review.id}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-6 items-start hover:shadow-md transition-shadow"
+            className={`bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row gap-6 items-start hover:shadow-md transition-shadow ${
+              isBot 
+                ? 'border-purple-200 bg-purple-50/30' 
+                : 'border-gray-200'
+            }`}
           >
             {/* OCENA */}
-            <div className="flex flex-col items-center justify-center bg-gray-50 p-4 rounded-xl min-w-[100px] text-center border border-gray-100">
+            <div className={`flex flex-col items-center justify-center p-4 rounded-xl min-w-[100px] text-center border ${
+              isBot 
+                ? 'bg-purple-100 border-purple-200' 
+                : 'bg-gray-50 border-gray-100'
+            }`}>
               <span className="text-3xl font-bold text-gray-900">
                 {review.rating}
               </span>
@@ -51,10 +68,16 @@ export default async function AdminReviewsPage() {
 
             {/* TREŚĆ */}
             <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="font-bold text-gray-900">
                   {review.userName}
                 </span>
+                {isBot && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full border border-purple-200">
+                    <Bot size={12} />
+                    BOT
+                  </span>
+                )}
                 <span className="text-gray-400 text-xs">•</span>
                 <Link 
                   href={`/firma/${review.company.slug}`}
@@ -69,13 +92,22 @@ export default async function AdminReviewsPage() {
 
               <div className="relative">
                 <MessageSquare
-                  className="absolute top-1 left-0 text-gray-100 -z-10"
+                  className={`absolute top-1 left-0 -z-10 ${
+                    isBot ? 'text-purple-100' : 'text-gray-100'
+                  }`}
                   size={40}
                 />
                 <p className="text-gray-600 text-sm leading-relaxed italic">
                   "{review.comment}"
                 </p>
               </div>
+              
+              {/* DODATKOWE INFO DLA BOTA */}
+              {isBot && (
+                <div className="mt-2 text-xs text-purple-600 font-medium">
+                  📞 Telefon: {review.userPhone} • 📧 Email: {review.userEmail}
+                </div>
+              )}
             </div>
 
             {/* AKCJE */}
@@ -90,7 +122,7 @@ export default async function AdminReviewsPage() {
               </form>
             </div>
           </div>
-        ))}
+        )})}
 
         {reviews.length === 0 && (
           <div className="text-center py-12 text-gray-400">
