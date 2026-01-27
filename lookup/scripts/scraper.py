@@ -195,25 +195,54 @@ def normalize_province(raw: str | None) -> str | None:
 # =========================
 # REQUESTS (retry + backoff)
 # =========================
-def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 20) -> requests.Response:
+def http_get_with_backoff(session: requests.Session, url: str, timeout: int = 30) -> requests.Response:
+    """Pobiera stronę z retry + backoff + lepsze headers"""
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+        'Referer': 'https://panoramafirm.pl/',
+    }
+    
     delay = HTTP_BACKOFF_INITIAL
     last_exc = None
-
+    
     for attempt in range(1, HTTP_MAX_RETRIES + 1):
         try:
-            resp = session.get(url, timeout=timeout)
-
+            resp = session.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+            
+            if resp.status_code == 403:
+                log(f"  ⚠️ 403 Forbidden on attempt {attempt}/{HTTP_MAX_RETRIES}")
+                if attempt < HTTP_MAX_RETRIES:
+                    wait_time = min(delay, HTTP_BACKOFF_MAX) + random.uniform(2, 5)
+                    log(f"  ⏳ Waiting {wait_time:.1f}s before retry...")
+                    time.sleep(wait_time)
+                    delay *= 2
+                    continue
+                else:
+                    raise RuntimeError(f"HTTP 403 after {HTTP_MAX_RETRIES} attempts")
+            
             if resp.status_code in (429, 500, 502, 503, 504):
                 raise RuntimeError(f"HTTP {resp.status_code}")
-
+            
             return resp
-
+            
         except Exception as e:
             last_exc = e
-            log(f"HTTP error attempt {attempt}/{HTTP_MAX_RETRIES} url={url}: {e}")
-            time.sleep(min(delay, HTTP_BACKOFF_MAX) + random.uniform(0, 1.0))
+            log(f"  ⚠️ HTTP error attempt {attempt}/{HTTP_MAX_RETRIES}: {e}")
+            time.sleep(min(delay, HTTP_BACKOFF_MAX) + random.uniform(0, 2))
             delay *= 2
-
+    
     log(f"PanoramaFirm seems down. Sleeping {AI_RETRY_CHECK_SECONDS}s, then retrying...")
     time.sleep(AI_RETRY_CHECK_SECONDS)
     raise RuntimeError(f"HTTP failed after retries: {last_exc}")
@@ -1951,261 +1980,206 @@ def create_stealth_browser(p):
 
 
 def scrape_category_listing_until_end(session: requests.Session, listing_url: str, page=None, context=None, browser=None):
-    """Scraper z obejściem bot detection
-    
-    Args:
-        session: requests.Session (nieużywane, dla kompatybilności)
-        listing_url: URL kategorii do scrapowania
-        page: Playwright page object (opcjonalne - jeśli None, tworzy nowy)
-        context: Playwright context (opcjonalne - jeśli None, tworzy nowy)
-        browser: Playwright browser (opcjonalne - jeśli None, tworzy nowy)
+    """
+    PRIMARY: Używa requests.Session z retry mechanism
+    FALLBACK: Playwright tylko jeśli requests nie działa (parametry page/context/browser dla kompatybilności)
     """
     results = []
     seen_urls = set()
-    should_close_browser = False
-    playwright = None
+    page_num = 1
+    consecutive_failures = 0
+    max_consecutive_failures = 3
     
-    # Jeśli nie przekazano page/context/browser, utwórz nowy (dla kompatybilności wstecznej)
-    if page is None or context is None or browser is None:
-        should_close_browser = True
-        playwright = sync_playwright().start()
-        browser, context = create_stealth_browser(playwright)
-        page = context.new_page()
-        
-        # Zastosuj playwright-stealth (jeśli dostępne)
-        if STEALTH_AVAILABLE:
-            stealth_sync(page)
-        else:
-            log("⚠️ Using basic anti-detection (playwright-stealth not available)")
-        
-        # Override navigator.webdriver
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            window.chrome = { runtime: {} };
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['pl-PL', 'pl', 'en-US', 'en']
-            });
-        """)
-        
-        # KROK 1: Inicjalizacja sesji (tylko jeśli tworzymy nowy browser)
-        log("🏠 Visiting homepage once to initialize session...")
+    # HEADERS - najważniejsze!
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
+    }
+    
+    # INICJALIZACJA - odwiedź homepage PRZEZ REQUESTS (tylko raz na początku, nie dla każdej kategorii)
+    # Uwaga: Ta inicjalizacja powinna być w main(), ale tutaj jako fallback
+    if not hasattr(session, '_homepage_visited'):
         try:
-            page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
-            page.wait_for_timeout(random.randint(3000, 5000))
+            log("🏠 Initializing session via requests (homepage)...")
+            resp = session.get("https://panoramafirm.pl", headers=headers, timeout=20, allow_redirects=True)
             
-            # Akceptuj cookies
-            try:
-                accept_btn = page.locator('button:has-text("Akceptuj"), button:has-text("Zgadzam")').first
-                if accept_btn.is_visible(timeout=2000):
-                    accept_btn.click()
-                    log("✅ Cookies accepted")
-            except:
-                pass
-            
-            # Scroll jak człowiek
-            page.evaluate("window.scrollTo({top: document.body.scrollHeight / 3, behavior: 'smooth'});")
-            page.wait_for_timeout(random.randint(1500, 2500))
-            
-            log("✅ Homepage visited, session initialized (cookies saved for all categories)")
+            if resp.status_code == 200:
+                log(f"✅ Homepage loaded, cookies: {len(session.cookies)} items")
+                time.sleep(random.uniform(2, 4))
+                session._homepage_visited = True
+            else:
+                log(f"⚠️ Homepage status: {resp.status_code}")
         except Exception as e:
             log(f"⚠️ Homepage init failed: {e}")
-    else:
-        # Używamy przekazanego browsera - nie odwiedzamy homepage ponownie
-        log("ℹ️ Using existing browser session (homepage already visited)")
+    
+    # LOOP przez strony
+    while True:
+        if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
+            break
         
-        # KROK 2: Scrapowanie kategorii
-        page_num = 1
-        consecutive_failures = 0
-        max_consecutive_failures = 3
+        if consecutive_failures >= max_consecutive_failures:
+            log(f"⚠️ Too many failures ({consecutive_failures}), stopping category")
+            break
         
-        while True:
-            if MAX_PAGES_PER_CATEGORY > 0 and page_num > MAX_PAGES_PER_CATEGORY:
-                break
-            
-            if consecutive_failures >= max_consecutive_failures:
-                log(f"⚠️ 403 Forbidden after {consecutive_failures} attempts - possible bot detection, skipping category")
-                break
-            
+        # Konstruuj URL
+        if page_num > 1:
+            url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
+        else:
+            url = listing_url.rstrip('/')
+        
+        log(f"  Listing page {page_num}: {url}")
+        
+        # OPÓŹNIENIE (krytyczne!)
+        if page_num > 1:
+            delay = random.uniform(8, 15)  # DŁUŻSZE opóźnienia
+            log(f"  ⏳ Waiting {delay:.1f}s...")
+            time.sleep(delay)
+        else:
+            # Dla pierwszej strony też dodaj opóźnienie
+            delay = random.uniform(3, 6)
+            time.sleep(delay)
+        
+        # POBIERZ stronę przez REQUESTS
+        try:
+            # Użyj referer dla kolejnych stron
             if page_num > 1:
-                url = f"{listing_url.rstrip('/')}/firmy,{page_num}.html"
+                headers['Referer'] = listing_url.rstrip('/') + f'/firmy,{page_num-1}.html' if page_num > 2 else listing_url.rstrip('/')
             else:
-                url = listing_url.rstrip('/')
+                headers['Referer'] = 'https://panoramafirm.pl/'
             
-            log(f"  Listing page {page_num}: {url}")
+            resp = session.get(url, headers=headers, timeout=30, allow_redirects=True)
             
-            # Losowe opóźnienie (jak człowiek) - zwiększone dla lepszego omijania detection
-            if page_num > 1:
-                delay = random.uniform(8, 15)  # Zwiększone z 5-10 do 8-15 sekund
-                log(f"  ⏳ Waiting {delay:.1f}s before next page...")
-                page.wait_for_timeout(int(delay * 1000))
-            else:
-                # Dla pierwszej strony też dodaj opóźnienie
-                delay = random.uniform(3, 6)
-                page.wait_for_timeout(int(delay * 1000))
-            
-            try:
-                # Nawigacja z retry mechanism
-                max_retries = 3
-                success = False
+            if resp.status_code == 403:
+                log(f"  ⚠️ 403 Forbidden - increasing delay and refreshing session")
                 
-                for attempt in range(1, max_retries + 1):
-                    try:
-                        response = page.goto(url, wait_until='networkidle', timeout=30000)
-                        
-                        # Sprawdź status code
-                        if response and response.status == 403:
-                            wait_time = (5 + attempt * 5)  # Zwiększone: 10s, 15s, 20s
-                            log(f"  ⚠️ HTTP 403 on attempt {attempt}/{max_retries}, waiting {wait_time}s before retry...")
-                            if attempt < max_retries:
-                                page.wait_for_timeout(wait_time * 1000)
-                                
-                                # Odśwież sesję - wróć na homepage i zachowuj się jak człowiek
-                                log("  🔄 Refreshing session via homepage...")
-                                page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
-                                
-                                # Symuluj czytanie strony
-                                page.wait_for_timeout(random.randint(5000, 8000))
-                                
-                                # Scroll jak człowiek
-                                page.evaluate("window.scrollTo({top: document.body.scrollHeight / 2, behavior: 'smooth'});")
-                                page.wait_for_timeout(random.randint(2000, 4000))
-                                
-                                # Kliknij gdzieś (symuluj interakcję)
-                                try:
-                                    page.mouse.move(random.randint(200, 800), random.randint(200, 600))
-                                    page.wait_for_timeout(random.randint(1000, 2000))
-                                except:
-                                    pass
-                                
-                                continue
-                            else:
-                                log(f"  ❌ HTTP 403 error for {url}")
-                                consecutive_failures += 1
-                                break
-                        elif response and response.status >= 400:
-                            log(f"  ⚠️ HTTP {response.status} error")
-                            consecutive_failures += 1
-                            break
-                        
-                        # Success
-                        consecutive_failures = 0
-                        success = True
-                        break
-                        
-                    except Exception as e:
-                        log(f"  ⚠️ Navigation error on attempt {attempt}/{max_retries}: {e}")
-                        if attempt >= max_retries:
-                            consecutive_failures += 1
-                            break
-                        page.wait_for_timeout(random.randint(3000, 5000))
-                
-                if not success:
-                    continue
-                
-                # Zachowuj się jak człowiek - więcej realistycznych zachowań
-                page.wait_for_timeout(random.randint(3000, 6000))  # Zwiększone z 2-4s do 3-6s
-                
-                # Symuluj ruch myszy (jeśli nie headless)
-                if not HEADLESS:
-                    try:
-                        page.mouse.move(random.randint(100, 500), random.randint(100, 500))
-                        page.wait_for_timeout(random.randint(500, 1000))
-                    except:
-                        pass
-                
-                # Random scroll - więcej scrollowań
-                for _ in range(random.randint(1, 3)):
-                    scroll_amount = random.randint(200, 1000)
-                    page.evaluate(f"window.scrollTo({{top: {scroll_amount}, behavior: 'smooth'}});")
-                    page.wait_for_timeout(random.randint(1500, 3000))
-                
-                # Ostatnie scrollowanie do dołu
-                page.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});")
-                page.wait_for_timeout(random.randint(2000, 4000))
-                
-                # Czekaj na załadowanie
+                # Refresh session - odwiedź homepage
                 try:
-                    page.wait_for_selector('a[href], h2, article', timeout=10000)
-                except PlaywrightTimeout:
-                    log(f"  ⚠️ Timeout waiting for content on page {page_num}")
-                    break
+                    session.get("https://panoramafirm.pl", headers=headers, timeout=20)
+                    time.sleep(random.uniform(10, 20))
+                except:
+                    pass
                 
-                html = page.content()
-                
-                if len(html) < 1000:
-                    log(f"  ⚠️ Page too short ({len(html)} bytes)")
-                    break
-                
-                soup = BeautifulSoup(html, "html.parser")
-                
-                # Sprawdź tytuł
-                page_title = soup.find("title")
-                if page_title:
-                    title_text = page_title.get_text().lower()
-                    if any(kw in title_text for kw in ["404", "błąd", "error", "access denied"]):
-                        log(f"  ⚠️ Error page: {title_text[:50]}")
-                        break
-                
-                # Zbierz linki
-                links = []
-                selectors = ["h2 a[href]", "a[class*='company']", "article a[href]", ".company-item a[href]"]
-                
-                for selector in selectors:
-                    links = soup.select(selector)
-                    if links:
-                        break
-                
-                if not links:
-                    log(f"  ⚠️ No company links found on page {page_num}")
-                    break
-                
-                # Przetwórz linki
-                new_count = 0
-                for link in links:
-                    href = link.get("href")
-                    name = normalize_text(link.get_text(strip=True))
-                    
-                    if not href or not name or len(name) < 2:
-                        continue
-                    
-                    full_href = href if href.startswith("http") else f"{BASE_URL}{href}"
-                    
-                    if full_href in seen_urls:
-                        continue
-                    
-                    seen_urls.add(full_href)
-                    results.append({"name": name, "url": full_href})
-                    new_count += 1
-                
-                log(f"  ✅ Found {new_count} new companies on page {page_num}")
-                
-                if new_count == 0:
-                    break
-                
-                page_num += 1
-                
-            except Exception as e:
-                log(f"  ❌ Error on page {page_num}: {e}")
                 consecutive_failures += 1
                 continue
-    
-    # Zamykaj browser tylko jeśli sam go utworzyliśmy
-    if should_close_browser:
-        if browser:
-            try:
-                browser.close()
-            except:
-                pass
-        if playwright:
-            try:
-                playwright.stop()
-            except:
-                pass
+            
+            if resp.status_code != 200:
+                log(f"  ⚠️ HTTP {resp.status_code}")
+                consecutive_failures += 1
+                continue
+            
+            # PARSUJ HTML
+            html = resp.text
+            
+            if len(html) < 1000:
+                log(f"  ⚠️ Page too short ({len(html)} bytes)")
+                break
+            
+            # Check for bot detection page
+            if "403 Forbidden" in html or "Access Denied" in html or "Cloudflare" in html or "challenge" in html.lower():
+                log(f"  ⚠️ Bot detection page detected")
+                consecutive_failures += 1
+                time.sleep(random.uniform(10, 20))
+                continue
+            
+            soup = BeautifulSoup(html, "html.parser")
+            
+            # Sprawdź czy to error page
+            page_title = soup.find("title")
+            if page_title:
+                title_text = page_title.get_text().lower()
+                if any(kw in title_text for kw in ["404", "błąd", "error", "access denied", "forbidden"]):
+                    log(f"  ⚠️ Error page: {title_text[:50]}")
+                    break
+            
+            # ZBIERZ linki firm - rozszerzone selektory
+            links = []
+            selectors = [
+                'a[href*="/firma/"]',  # Najbardziej specyficzny - linki do firm
+                'h2 a[href]',
+                'h3 a[href]',
+                'a[class*="company"]',
+                'article a[href]',
+                '.company-item a[href]',
+                '.result-item a[href]',
+                '.listing-item a[href]',
+            ]
+            
+            for selector in selectors:
+                found_links = soup.select(selector)
+                if found_links:
+                    # Filtruj tylko linki do firm (zawierają /firma/ w href)
+                    filtered = [l for l in found_links if l.get('href') and '/firma/' in l.get('href', '')]
+                    if filtered:
+                        links = filtered
+                        log(f"  ✅ Found {len(links)} company links via selector: {selector}")
+                        break
+            
+            # Fallback - wszystkie linki z /firma/
+            if not links:
+                all_firma_links = soup.select('a[href*="/firma/"]')
+                if all_firma_links:
+                    links = all_firma_links
+                    log(f"  ✅ Found {len(links)} company links via fallback")
+            
+            if not links:
+                log(f"  ⚠️ No company links found on page {page_num}")
+                # Diagnostyka
+                all_links = soup.select('a[href]')
+                log(f"  ℹ️  Total links on page: {len(all_links)}")
+                if all_links and page_num == 1:
+                    sample_links = [a.get('href', '')[:80] for a in all_links[:5]]
+                    log(f"  ℹ️  Sample links: {sample_links}")
+                break
+            
+            # Przetwórz linki
+            new_count = 0
+            for link in links:
+                href = link.get("href")
+                name = normalize_text(link.get_text(strip=True))
+                
+                if not href or not name or len(name) < 2:
+                    continue
+                
+                # Skip non-company links
+                if any(skip in href for skip in ["/firmy,", "/kategorie", "/dodaj-firme", "/kontakt", "/blog"]):
+                    continue
+                
+                # Tylko linki do firm
+                if '/firma/' not in href:
+                    continue
+                
+                full_href = href if href.startswith("http") else f"{BASE_URL}{href}"
+                
+                if full_href in seen_urls:
+                    continue
+                
+                seen_urls.add(full_href)
+                results.append({"name": name, "url": full_href})
+                new_count += 1
+            
+            log(f"  ✅ Found {new_count} new companies on page {page_num}")
+            
+            if new_count == 0:
+                break
+            
+            # Reset failures counter on success
+            consecutive_failures = 0
+            page_num += 1
+            
+        except Exception as e:
+            log(f"  ❌ Error: {e}")
+            consecutive_failures += 1
+            time.sleep(random.uniform(5, 10))
+            continue
     
     return results
 
@@ -2610,83 +2584,58 @@ def main():
     else:
         log("ℹ️  Running in GUI mode (local environment - better anti-detection)")
 
+    # KLUCZOWE - Usuń proxy ze środowiska (może blokować)
+    for proxy_var in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'no_proxy', 'NO_PROXY']:
+        if proxy_var in os.environ:
+            log(f"⚠️ Removing proxy variable: {proxy_var}={os.environ[proxy_var]}")
+            del os.environ[proxy_var]
+
     conn = connect_db()
     categories = scrape_all_categories()
     log(f"Kategorie: {len(categories)}")
 
+    # Utwórz session z lepszymi headers
     session = requests.Session()
-    session.headers.update(HEADERS)
-
-    # Utwórz JEDEN browser dla wszystkich kategorii (ważne dla omijania detection)
-    browser = None
-    context = None
-    page = None
-    playwright = None
     
+    # Lepsze headers dla requests
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
+    })
+    
+    # Inicjalizacja - odwiedź homepage przez requests (RAZ dla wszystkich kategorii)
+    log("🏠 Initializing session via requests (homepage)...")
     try:
-        log("🚀 Initializing browser session for all categories...")
-        playwright = sync_playwright().start()
-        browser, context = create_stealth_browser(playwright)
-        page = context.new_page()
-        
-        # Zastosuj playwright-stealth (jeśli dostępne)
-        if STEALTH_AVAILABLE:
-            stealth_sync(page)
+        resp = session.get("https://panoramafirm.pl", timeout=20)
+        if resp.status_code == 200:
+            log(f"✅ Homepage loaded, cookies: {len(session.cookies)} items")
+            time.sleep(random.uniform(2, 4))
+            session._homepage_visited = True
         else:
-            log("⚠️ Using basic anti-detection (playwright-stealth not available)")
-        
-        # Override navigator.webdriver
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            window.chrome = { runtime: {} };
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['pl-PL', 'pl', 'en-US', 'en']
-            });
-        """)
-        
-        # Odwiedź homepage RAZ na początku
-        log("🏠 Visiting homepage once to initialize session...")
-        try:
-            page.goto("https://panoramafirm.pl", wait_until='networkidle', timeout=30000)
-            page.wait_for_timeout(random.randint(3000, 5000))
-            
-            # Akceptuj cookies
-            try:
-                accept_btn = page.locator('button:has-text("Akceptuj"), button:has-text("Zgadzam")').first
-                if accept_btn.is_visible(timeout=2000):
-                    accept_btn.click()
-                    log("✅ Cookies accepted")
-            except:
-                pass
-            
-            # Scroll jak człowiek
-            page.evaluate("window.scrollTo({top: document.body.scrollHeight / 3, behavior: 'smooth'});")
-            page.wait_for_timeout(random.randint(1500, 2500))
-            
-            log("✅ Homepage visited, session initialized (cookies saved for all categories)")
-        except Exception as e:
-            log(f"⚠️ Homepage init failed: {e}, continuing anyway...")
-    
+            log(f"⚠️ Homepage status: {resp.status_code}")
     except Exception as e:
-        log(f"⚠️ Could not initialize browser: {e}, will create new browser for each category")
-        browser = None
-        context = None
-        page = None
-        playwright = None
+        log(f"⚠️ Homepage init failed: {e}, continuing anyway...")
 
+    # Używamy tylko requests.Session (PRIMARY) - Playwright jako fallback (opcjonalnie)
+    log("🚀 Using requests.Session as PRIMARY method (better anti-detection)")
+    
     try:
         for i, cat in enumerate(categories, 1):
             cat_name = normalize_text(cat["name"])
             cat_url = cat["url"]
             log(f"\n[{i}/{len(categories)}] Category: {cat_name} -> {cat_url}")
 
-            # Przekaż istniejący browser jeśli dostępny
-            companies = scrape_category_listing_until_end(session, cat_url, page=page, context=context, browser=browser)
+            # Użyj requests.Session (PRIMARY) - nie przekazujemy page/context/browser
+            companies = scrape_category_listing_until_end(session, cat_url)
             log(f"  Listing items: {len(companies)}")
             
             # Dłuższa przerwa między kategoriami (symuluj ludzkie zachowanie)
@@ -2710,17 +2659,6 @@ def main():
                 time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     finally:
-        # Zamknij browser jeśli został utworzony
-        if browser:
-            try:
-                browser.close()
-            except:
-                pass
-        if playwright:
-            try:
-                playwright.stop()
-            except:
-                pass
         conn.close()
 
     log(f"\nDONE. Inserted={total_inserted} | AI used={ai_usage_counter}")
