@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { Toaster } from 'react-hot-toast'
 // GoogleTagManager removed - using direct script implementation for better compatibility
 import { Providers } from '@/components/Providers'
+import { CookieConsent } from '@/components/CookieConsent'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -113,6 +114,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				/>
 
 				{/* 
+					Google Consent Mode v2 - WYMAGANE dla użytkowników z EOG
+					Ustaw domyślnie "denied" - zostanie zaktualizowane po wyrażeniu zgody
+					Funkcja gtag() zostanie zdefiniowana później w skrypcie GA4
+				*/}
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `
+window.gtag = window.gtag || function(){dataLayer.push(arguments);};
+window.gtag('consent', 'default', {
+  'analytics_storage': 'denied',
+  'ad_storage': 'denied',
+  'ad_user_data': 'denied',
+  'ad_personalization': 'denied',
+  'wait_for_update': 500
+});
+						`.trim(),
+					}}
+				/>
+
+				{/* 
 					⚠️ KRYTYCZNE: Google Tag Manager - Direct implementation
 					Nie zmieniaj tej implementacji - działa poprawnie z Tag Assistant
 					Kolejność: dataLayer → GTM → GA4
@@ -179,6 +200,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				<Providers>
 					{children}
 					<Toaster />
+					<CookieConsent />
 				</Providers>
 			</body>
 		</html>
