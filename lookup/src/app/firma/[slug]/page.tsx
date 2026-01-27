@@ -13,6 +13,7 @@ import { OpeningHoursDisplay } from '@/components/OpeningHoursDisplay'
 import type { OpeningHours } from '@/components/OpeningHoursEditor'
 import { ReviewSection } from '@/components/ReviewSection'
 import { PhoneRevealButton } from '@/components/PhoneRevealButton'
+import { AdSenseSidebar, AdSenseInContent } from '@/components/AdSense'
 import { Metadata } from 'next'
 import { safeDecode } from '@/lib/text'
 /* =========================================================
@@ -468,6 +469,9 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</div>
 					</section>
 
+					{/* Reklama między treścią */}
+					<AdSenseInContent />
+
 					{/* Sekcja Opinii */}
 					<ReviewSection reviews={company.reviews} companyId={company.id} companySlug={company.slug} companyName={company.name} />
 				</div>
@@ -489,7 +493,10 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</div>
 					</div>
 
-<OpeningHoursDisplay hours={company.openingHours as OpeningHours | null} />
+					<OpeningHoursDisplay hours={company.openingHours as OpeningHours | null} />
+
+					{/* Reklama w sidebarze */}
+					<AdSenseSidebar />
 				</aside>
 			</main>
 			<CityCrossLinks city={company.city || undefined} />

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { RecommendedBlogsCarousel } from "@/components/RecommendedBlogsCarousel";
+import { AdSenseInContent } from "@/components/AdSense";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { Metadata } from "next";
 
@@ -94,6 +95,9 @@ export default async function BlogPostPage({
               className="prose prose-lg prose-blue max-w-none"
             />
           </div>
+
+          {/* Reklama po treści artykułu */}
+          <AdSenseInContent className="my-8" />
         </article>
       </main>
 

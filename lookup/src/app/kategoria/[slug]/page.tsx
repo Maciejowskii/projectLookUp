@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
+import { AdSenseBanner, AdSenseInContent } from '@/components/AdSense'
 import { Metadata } from 'next/dist/lib/metadata/types/metadata-interface'
 import { safeDecode } from '@/lib/text'
 import { CategoryCompaniesList } from '@/components/CategoryCompaniesList'
@@ -66,8 +67,14 @@ export default async function CategoryDetailPage({ params }: { params: Promise<{
 					</p>
 				</div>
 
+				{/* Reklama przed listą firm */}
+				<AdSenseBanner className="mb-8" />
+
 				{/* LISTA FIRM - używamy zoptymalizowanego komponentu */}
 				<CategoryCompaniesList categoryId={category.id} totalCompanies={totalCompanies} />
+
+				{/* Reklama po liście firm */}
+				<AdSenseInContent className="mt-8" />
 			</main>
 
 			<Footer />
