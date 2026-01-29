@@ -13,7 +13,7 @@ import { OpeningHoursDisplay } from '@/components/OpeningHoursDisplay'
 import type { OpeningHours } from '@/components/OpeningHoursEditor'
 import { ReviewSection } from '@/components/ReviewSection'
 import { PhoneRevealButton } from '@/components/PhoneRevealButton'
-import { AdSenseSidebar, AdSenseInContent } from '@/components/AdSense'
+// import { AdSenseSidebar, AdSenseInContent } from '@/components/AdSense' // WYŁĄCZONE - AdSense nie działa
 import { Metadata } from 'next'
 import { safeDecode } from '@/lib/text'
 /* =========================================================
@@ -469,8 +469,8 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</div>
 					</section>
 
-					{/* Reklama między treścią */}
-					<AdSenseInContent />
+					{/* Reklama między treścią - WYŁĄCZONE */}
+					{/* <AdSenseInContent /> */}
 
 					{/* Sekcja Opinii */}
 					<ReviewSection reviews={company.reviews} companyId={company.id} companySlug={company.slug} companyName={company.name} />
@@ -495,8 +495,8 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
 					<OpeningHoursDisplay hours={company.openingHours as OpeningHours | null} />
 
-					{/* Reklama w sidebarze */}
-					<AdSenseSidebar />
+					{/* Reklama w sidebarze - WYŁĄCZONE */}
+					{/* <AdSenseSidebar /> */}
 				</aside>
 			</main>
 			<CityCrossLinks city={company.city || undefined} />

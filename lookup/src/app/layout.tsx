@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { Toaster } from 'react-hot-toast'
 // GoogleTagManager removed - using direct script implementation for better compatibility
 import { Providers } from '@/components/Providers'
-import { CookieConsent } from '@/components/CookieConsent'
+// import { CookieConsent } from '@/components/CookieConsent' // WYŁĄCZONE - AdSense nie działa
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -176,12 +176,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				)}
 				{/* End Google tag (gtag.js) */}
 
-				{/* Google AdSense */}
-				<script
+				{/* Google AdSense - WYŁĄCZONE */}
+				{/* <script
 					async
 					src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4373415012845424"
 					crossOrigin="anonymous"
-				/>
+				/> */}
 			</head>
 			<body className={inter.className}>
 				{/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
@@ -200,7 +200,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 				<Providers>
 					{children}
 					<Toaster />
-					<CookieConsent />
+					{/* CookieConsent - WYŁĄCZONE (było używane głównie dla AdSense) */}
+					{/* <CookieConsent /> */}
 				</Providers>
 			</body>
 		</html>

@@ -7,7 +7,7 @@ import { Footer } from '@/components/Footer'
 import { Navbar } from '@/components/Navbar'
 import { FeaturedCompanyCard } from '@/components/FeaturedCompanyCard'
 import { BottomNavigation } from '@/components/BottomNavigation'
-import { AdSenseBanner, AdSenseInContent } from '@/components/AdSense'
+// import { AdSenseBanner, AdSenseInContent } from '@/components/AdSense' // WYŁĄCZONE - AdSense nie działa
 
 export default async function LandingPage() {
 	// Pobieramy dane z bazy równolegle z error handling
@@ -90,8 +90,8 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* --- REKLAMA BANNER --- */}
-			<AdSenseBanner />
+			{/* --- REKLAMA BANNER - WYŁĄCZONE --- */}
+			{/* <AdSenseBanner /> */}
 
 			{/* --- WYRÓŻNIONA FIRMA (PROMOCJA) --- */}
 			{featuredCompany && (
@@ -135,8 +135,8 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* --- REKLAMA W TREŚCI --- */}
-			<AdSenseInContent />
+			{/* --- REKLAMA W TREŚCI - WYŁĄCZONE --- */}
+			{/* <AdSenseInContent /> */}
 
 			{/* --- OSTATNIO DODANE (DLA SEO) --- */}
 			<section className='py-12 md:py-16 lg:py-20 bg-white'>

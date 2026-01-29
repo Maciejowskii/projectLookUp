@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { RecommendedBlogsCarousel } from "@/components/RecommendedBlogsCarousel";
-import { AdSenseInContent } from "@/components/AdSense";
+// import { AdSenseInContent } from "@/components/AdSense"; // WYŁĄCZONE - AdSense nie działa
 import { ArrowLeft, Calendar } from "lucide-react";
 import { Metadata } from "next";
 
@@ -96,8 +96,8 @@ export default async function BlogPostPage({
             />
           </div>
 
-          {/* Reklama po treści artykułu */}
-          <AdSenseInContent className="my-8" />
+          {/* Reklama po treści artykułu - WYŁĄCZONE */}
+          {/* <AdSenseInContent className="my-8" /> */}
         </article>
       </main>
 
