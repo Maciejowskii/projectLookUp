@@ -34,3 +34,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pliki MD z podpowiedziami / dokumentacją z AI (nie trafiają do repo)
+lookup/docs/
+**/docs/podpowiedzi/
