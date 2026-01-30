@@ -4,10 +4,6 @@ import { NextRequest, NextResponse } from 'next/server'
 const COMPANIES_PER_PAGE = 50
 
 export async function GET(request: NextRequest) {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:7',message:'GET /api/companies called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-	// #endregion
-
 	try {
 		const searchParams = request.nextUrl.searchParams
 		const page = parseInt(searchParams.get('page') || '1', 10)
@@ -52,10 +48,6 @@ export async function GET(request: NextRequest) {
 			whereClause.categoryId = categoryId
 		}
 
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:45',message:'Before Prisma queries',data:{page,limit,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-		// #endregion
-
 		// Optymalizacja: select tylko potrzebne pola
 		const [companies, total] = await Promise.all([
 			prisma.company.findMany({
@@ -86,28 +78,17 @@ export async function GET(request: NextRequest) {
 						},
 					},
 				},
-				orderBy: [
-					{ isVerified: 'desc' },
-					{ logo: 'desc' },
-					{ name: 'asc' },
-				],
+				orderBy: [{ isVerified: 'desc' }, { logo: 'desc' }, { name: 'asc' }],
 				skip,
 				take: limit,
 			}),
 			prisma.company.count({ where: whereClause }),
 		])
 
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/companies/route.ts:75',message:'After Prisma queries',data:{companiesCount:companies.length,total,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-		// #endregion
-
 		// Oblicz ratingi
-		const companiesWithRating = companies.map((c) => {
+		const companiesWithRating = companies.map(c => {
 			const reviewCount = c.reviews.length
-			const averageRating =
-				reviewCount > 0
-					? c.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount
-					: 0
+			const averageRating = reviewCount > 0 ? c.reviews.reduce((acc, r) => acc + r.rating, 0) / reviewCount : 0
 			return {
 				...c,
 				reviewCount,
@@ -133,13 +114,10 @@ export async function GET(request: NextRequest) {
 				headers: {
 					'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300', // ISR: 60s cache, 300s stale-while-revalidate
 				},
-			}
+			},
 		)
 	} catch (error) {
 		console.error('Error fetching companies:', error)
-		return NextResponse.json(
-			{ error: 'Failed to fetch companies' },
-			{ status: 500 }
-		)
+		return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 })
 	}
 }

@@ -41,21 +41,23 @@ function extractIdFromSlug(slug: string): string | null {
 // (np. slug w URL: "com-komputery" -> slug w bazie: "com-komputery-3725a8d5")
 async function findCompanyBySlugPrefix(slug: string) {
 	// Szukaj firm gdzie slug zaczyna się od podanego slugu + "-"
-	const companies = await prisma.$queryRaw<Array<{
-		id: string
-		name: string
-		slug: string
-		city: string | null
-		description: string | null
-		logo: string | null
-		categoryId: string
-	}>>`
+	const companies = await prisma.$queryRaw<
+		Array<{
+			id: string
+			name: string
+			slug: string
+			city: string | null
+			description: string | null
+			logo: string | null
+			categoryId: string
+		}>
+	>`
 		SELECT id, name, slug, city, description, logo, "categoryId"
 		FROM "Company"
 		WHERE slug LIKE ${`${slug}-%`}
 		LIMIT 1
 	`
-	
+
 	if (companies.length > 0) {
 		const foundCompany = companies[0]
 		// Pobierz pełne dane firmy z relacjami
@@ -72,7 +74,7 @@ async function findCompanyBySlugPrefix(slug: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
 	const { slug } = await params
-	
+
 	// Najpierw szukaj po dokładnym slugu
 	let company = await prisma.company.findFirst({
 		where: { slug },
@@ -95,7 +97,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 		const idSuffix = extractIdFromSlug(slug)
 		if (idSuffix) {
 			// Szukaj firm gdzie ID kończy się na te 8 znaków (używamy surowego SQL)
-			const companies = await prisma.$queryRaw<Array<{ id: string; name: string; slug: string; city: string | null; description: string | null; logo: string | null }>>`
+			const companies = await prisma.$queryRaw<
+				Array<{
+					id: string
+					name: string
+					slug: string
+					city: string | null
+					description: string | null
+					logo: string | null
+				}>
+			>`
 				SELECT id, name, slug, city, description, logo
 				FROM "Company"
 				WHERE id LIKE ${`%${idSuffix}`}
@@ -144,10 +155,6 @@ const getInitial = (name?: string) => {
 export default async function CompanyProfilePage({ params }: { params: Promise<{ slug: string }> }) {
 	const { slug } = await params
 
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:113',message:'CompanyProfilePage called',data:{slug,slugLength:slug.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-	// #endregion
-
 	// Najpierw szukaj po dokładnym slugu
 	let company = await prisma.company.findFirst({
 		where: { slug },
@@ -157,30 +164,15 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		},
 	})
 
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:123',message:'After exact slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-	// #endregion
-
 	// Jeśli nie znaleziono, spróbuj znaleźć firmę gdzie slug w bazie ZACZYNA SIĘ od tego slugu
 	// (np. URL: "com-komputery" -> baza: "com-komputery-3725a8d5")
 	if (!company) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:145',message:'Trying to find company by slug prefix',data:{slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-		// #endregion
-
 		company = await findCompanyBySlugPrefix(slug)
-		
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:150',message:'After slug prefix search',data:{found:!!company,companySlug:company?.slug,requestedSlug:slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-		// #endregion
 	}
 
 	// Jeśli nadal nie znaleziono, spróbuj znormalizować slug (usuń ID na końcu jeśli istnieje)
 	if (!company) {
 		const normalizedSlug = normalizeSlug(slug)
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:157',message:'Trying normalized slug',data:{normalizedSlug,isDifferent:normalizedSlug!==slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-		// #endregion
 
 		if (normalizedSlug !== slug) {
 			company = await prisma.company.findFirst({
@@ -190,9 +182,6 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 					reviews: { orderBy: { createdAt: 'desc' } },
 				},
 			})
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:167',message:'After normalized slug search',data:{found:!!company,companySlug:company?.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-			// #endregion
 		}
 	}
 
@@ -201,15 +190,17 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		const idSuffix = extractIdFromSlug(slug)
 		if (idSuffix) {
 			// Szukaj firm gdzie ID kończy się na te 8 znaków (używamy surowego SQL)
-			const companies = await prisma.$queryRaw<Array<{
-				id: string
-				name: string
-				slug: string
-				city: string | null
-				description: string | null
-				logo: string | null
-				categoryId: string
-			}>>`
+			const companies = await prisma.$queryRaw<
+				Array<{
+					id: string
+					name: string
+					slug: string
+					city: string | null
+					description: string | null
+					logo: string | null
+					categoryId: string
+				}>
+			>`
 				SELECT id, name, slug, city, description, logo, "categoryId"
 				FROM "Company"
 				WHERE id LIKE ${`%${idSuffix}`}
@@ -231,10 +222,6 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
 	// Jeśli znaleziono firmę, ale slug się nie zgadza, zrób redirect do poprawnego URL
 	if (company && company.slug !== slug) {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firma/[slug]/page.tsx:170',message:'Redirecting to correct slug',data:{requestedSlug:slug,correctSlug:company.slug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-		// #endregion
-
 		const { permanentRedirect } = await import('next/navigation')
 		permanentRedirect(`/firma/${company.slug}`)
 	}
@@ -263,14 +250,20 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		reviewCount > 0
 			? (
 					company.reviews.reduce((acc: number, r: (typeof company.reviews)[number]) => acc + r.rating, 0) / reviewCount
-			  ).toFixed(1)
+				).toFixed(1)
 			: undefined
 
 	// Konwertuj godziny otwarcia na format Schema.org
 	const formatOpeningHoursForSchema = (hours: OpeningHours | null): string[] => {
 		if (!hours) return ['Mo-Fr 08:00-17:00']
 		const dayMap: Record<string, string> = {
-			mon: 'Mo', tue: 'Tu', wed: 'We', thu: 'Th', fri: 'Fr', sat: 'Sa', sun: 'Su'
+			mon: 'Mo',
+			tue: 'Tu',
+			wed: 'We',
+			thu: 'Th',
+			fri: 'Fr',
+			sat: 'Sa',
+			sun: 'Su',
 		}
 		const result: string[] = []
 		for (const [key, schedule] of Object.entries(hours)) {
@@ -300,15 +293,16 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 		category: company.category.name,
 		priceRange: 'PLN',
 		openingHours: formatOpeningHoursForSchema(company.openingHours as OpeningHours | null),
-		...(reviewCount > 0 && parseFloat(averageRating || '0') >= 3.5 && {
-			aggregateRating: {
-				'@type': 'AggregateRating',
-				ratingValue: averageRating,
-				bestRating: '5',
-				worstRating: '1',
-				reviewCount: reviewCount.toString(),
-			},
-		}),
+		...(reviewCount > 0 &&
+			parseFloat(averageRating || '0') >= 3.5 && {
+				aggregateRating: {
+					'@type': 'AggregateRating',
+					ratingValue: averageRating,
+					bestRating: '5',
+					worstRating: '1',
+					reviewCount: reviewCount.toString(),
+				},
+			}),
 	}
 
 	return (
@@ -334,7 +328,10 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						</Link>
 						<ChevronRight size={12} className='text-gray-400 flex-shrink-0' />
 
-						<Link href={`/kategoria/${company.category.slug}`} className='hover:text-blue-600 hover:underline truncate max-w-[150px] md:max-w-none'>
+						<Link
+							href={`/kategoria/${company.category.slug}`}
+							className='hover:text-blue-600 hover:underline truncate max-w-[150px] md:max-w-none'
+						>
 							{company.category.name}
 						</Link>
 
@@ -386,7 +383,8 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
 								{company.nip && (
 									<span className='bg-gray-50 px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold flex items-center gap-1 border border-gray-200 text-gray-600 whitespace-nowrap'>
-										<FileText size={10} className='md:w-3 md:h-3' /> <span className='hidden sm:inline'>NIP: </span>{company.nip}
+										<FileText size={10} className='md:w-3 md:h-3' /> <span className='hidden sm:inline'>NIP: </span>
+										{company.nip}
 									</span>
 								)}
 
@@ -397,12 +395,18 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 								)}
 							</div>
 
-							<h1 className='text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 md:mb-4 text-gray-900 leading-tight break-words'>{company.name}</h1>
+							<h1 className='text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 md:mb-4 text-gray-900 leading-tight break-words'>
+								{company.name}
+							</h1>
 
 							<div className='flex flex-wrap gap-3 md:gap-4 text-xs md:text-sm text-gray-600'>
 								{company.city && (
 									<div className='flex items-center gap-2 min-w-0'>
-										<MapPin size={14} className='text-gray-400 flex-shrink-0' /> <span className='truncate'>{company.city}{company.address ? `, ${company.address}` : ''}</span>
+										<MapPin size={14} className='text-gray-400 flex-shrink-0' />{' '}
+										<span className='truncate'>
+											{company.city}
+											{company.address ? `, ${company.address}` : ''}
+										</span>
 									</div>
 								)}
 								{company.website && (
@@ -426,12 +430,12 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 								href={company.email ? `mailto:${company.email}` : '/kontakt'}
 								className='group relative flex items-center justify-center gap-3 w-full bg-white text-gray-900 font-bold py-3 rounded-xl border-2 border-gray-300 hover:border-blue-600 hover:bg-blue-50 transition-all shadow-md shadow-gray-200 hover:shadow-lg hover:shadow-blue-200 overflow-hidden'
 							>
-								<span className="flex items-center gap-2 relative z-10">
-									<Mail size={18} className="group-hover:text-blue-600 transition-colors" /> 
-									<span className="group-hover:text-blue-600 transition-colors">Wyślij wiadomość</span>
+								<span className='flex items-center gap-2 relative z-10'>
+									<Mail size={18} className='group-hover:text-blue-600 transition-colors' />
+									<span className='group-hover:text-blue-600 transition-colors'>Wyślij wiadomość</span>
 								</span>
 								{/* Efekt shine - gradient overlay na hover */}
-								<div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
+								<div className='absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity'></div>
 							</a>
 
 							{!company.isVerified && (
@@ -473,7 +477,12 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 					{/* <AdSenseInContent /> */}
 
 					{/* Sekcja Opinii */}
-					<ReviewSection reviews={company.reviews} companyId={company.id} companySlug={company.slug} companyName={company.name} />
+					<ReviewSection
+						reviews={company.reviews}
+						companyId={company.id}
+						companySlug={company.slug}
+						companyName={company.name}
+					/>
 				</div>
 
 				{/* Sidebar */}
@@ -488,7 +497,8 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 						<div className='p-3 md:p-4'>
 							<p className='font-bold text-sm md:text-base text-gray-900 break-words'>{company.address}</p>
 							<p className='text-xs md:text-sm text-gray-500 break-words'>
-								{company.city}{company.zip ? `, ${company.zip}` : ''}
+								{company.city}
+								{company.zip ? `, ${company.zip}` : ''}
 							</p>
 						</div>
 					</div>

@@ -6,22 +6,6 @@ const globalForPrisma = globalThis as unknown as {
 
 // Konfiguracja Prisma Client z lepszą obsługą błędów i connection pooling
 const prismaClientSingleton = () => {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			location: 'prisma.ts:8',
-			message: 'PrismaClient singleton called',
-			data: { hasGlobalPrisma: !!globalForPrisma.prisma, nodeEnv: process.env.NODE_ENV },
-			timestamp: Date.now(),
-			sessionId: 'debug-session',
-			runId: 'run1',
-			hypothesisId: 'B',
-		}),
-	}).catch(() => {})
-	// #endregion
-
 	// Sprawdź czy DATABASE_URL jest ustawione
 	if (!process.env.DATABASE_URL) {
 		console.error('[PRISMA] DATABASE_URL nie jest ustawione w zmiennych środowiskowych!')
@@ -63,22 +47,6 @@ const prismaClientSingleton = () => {
 
 export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774', {
-	method: 'POST',
-	headers: { 'Content-Type': 'application/json' },
-	body: JSON.stringify({
-		location: 'prisma.ts:40',
-		message: 'Prisma instance exported',
-		data: { isReused: !!globalForPrisma.prisma, isNew: !globalForPrisma.prisma, nodeEnv: process.env.NODE_ENV },
-		timestamp: Date.now(),
-		sessionId: 'debug-session',
-		runId: 'run1',
-		hypothesisId: 'B',
-	}),
-}).catch(() => {})
-// #endregion
-
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 else globalForPrisma.prisma = prisma // Also cache in production to prevent multiple instances
 
@@ -86,21 +54,6 @@ else globalForPrisma.prisma = prisma // Also cache in production to prevent mult
 // REMOVED: $connect() holds a connection unnecessarily and can cause pool exhaustion
 // Connection will be established automatically on first query
 if (process.env.NODE_ENV === 'production') {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/6e6357e8-5a43-4878-9c23-91ef269cb774', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			location: 'prisma.ts:45',
-			message: 'Skipping $connect() to avoid holding connection',
-			data: {},
-			timestamp: Date.now(),
-			sessionId: 'debug-session',
-			runId: 'run1',
-			hypothesisId: 'E',
-		}),
-	}).catch(() => {})
-	// #endregion
 	console.log('[PRISMA] Prisma Client initialized (connection will be established on first query)')
 }
 
