@@ -24,7 +24,7 @@ async function getStats() {
 	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 	const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
-	// Równoległe zapytania dla wydajności
+	// Dwa batche, żeby nie przekraczać puli połączeń (layout + inne strony też używają Prisma)
 	const [
 		totalCompanies,
 		premiumCompanies,
@@ -32,29 +32,19 @@ async function getStats() {
 		totalLeads,
 		totalReviews,
 		pendingClaims,
-		// Statystyki przejęć
 		totalClaims,
 		approvedClaims,
 		rejectedClaims,
 		claimsLast30Days,
-		// Statystyki nowych firm (utworzonych przez formularz)
 		newCompaniesLast30Days,
-		// Dane z ostatnich 30 dni
 		companiesLast30Days,
 		leadsLast30Days,
 		reviewsLast30Days,
-		// Dane z poprzednich 30 dni (dla porównania)
 		companiesPrev30Days,
 		leadsPrev30Days,
-		// Dane do wykresów - ostatnie 6 miesięcy
 		monthlyData,
-		// Dane do wykresów leadów
 		leadsBySource,
 		leadsDailyData,
-		// Ostatnie aktywności
-		recentLeads,
-		recentClaims,
-		recentReviews,
 	] = await Promise.all([
 		prisma.company.count(),
 		prisma.company.count({ where: { plan: 'PREMIUM' } }),
@@ -62,36 +52,31 @@ async function getStats() {
 		prisma.lead.count(),
 		prisma.review.count(),
 		prisma.claimRequest.count({ where: { status: 'PENDING' } }),
-		// Statystyki przejęć
 		prisma.claimRequest.count(),
 		prisma.claimRequest.count({ where: { status: 'APPROVED' } }),
 		prisma.claimRequest.count({ where: { status: 'REJECTED' } }),
 		prisma.claimRequest.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-		// Nowe firmy utworzone przez formularz (mają ClaimRequest z message zawierającym "Nowa wizytówka")
 		prisma.claimRequest.count({
 			where: {
 				createdAt: { gte: thirtyDaysAgo },
 				message: { contains: 'Nowa wizytówka' },
 			},
 		}),
-		// Ostatnie 30 dni
 		prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
 		prisma.lead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
 		prisma.review.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-		// Poprzednie 30 dni
 		prisma.company.count({
 			where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
 		}),
 		prisma.lead.count({
 			where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
 		}),
-		// Dane miesięczne (ostatnie 6 miesięcy)
 		getMonthlyGrowthData(),
-		// Dane do wykresu leadów według źródła
 		getLeadsBySource(),
-		// Dane do wykresu leadów w czasie (ostatnie 30 dni)
 		getLeadsDailyData(),
-		// Ostatnie aktywności
+	])
+
+	const [recentLeads, recentClaims, recentReviews] = await Promise.all([
 		prisma.lead.findMany({
 			take: 5,
 			orderBy: { createdAt: 'desc' },
@@ -110,8 +95,12 @@ async function getStats() {
 	])
 
 	// Oblicz zmiany procentowe
-	const companiesChange = companiesPrev30Days > 0 ? Math.round(((companiesLast30Days - companiesPrev30Days) / companiesPrev30Days) * 100) : 100
-	const leadsChange = leadsPrev30Days > 0 ? Math.round(((leadsLast30Days - leadsPrev30Days) / leadsPrev30Days) * 100) : 100
+	const companiesChange =
+		companiesPrev30Days > 0
+			? Math.round(((companiesLast30Days - companiesPrev30Days) / companiesPrev30Days) * 100)
+			: 100
+	const leadsChange =
+		leadsPrev30Days > 0 ? Math.round(((leadsLast30Days - leadsPrev30Days) / leadsPrev30Days) * 100) : 100
 	const conversionRate = totalCompanies > 0 ? ((premiumCompanies / totalCompanies) * 100).toFixed(1) : '0'
 
 	return {
@@ -239,103 +228,103 @@ export default async function AdminDashboard() {
 	const stats = await getStats()
 
 	return (
-		<div className="space-y-8">
+		<div className='space-y-8'>
 			{/* HEADER */}
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+			<div className='flex flex-col md:flex-row justify-between items-start md:items-end gap-4'>
 				<div>
-					<h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-					<p className="text-slate-500 text-sm mt-1">Przegląd statystyk portalu w czasie rzeczywistym</p>
+					<h1 className='text-2xl font-bold text-slate-900'>Dashboard</h1>
+					<p className='text-slate-500 text-sm mt-1'>Przegląd statystyk portalu w czasie rzeczywistym</p>
 				</div>
-				<div className="flex gap-2">
-					<span className="text-xs text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+				<div className='flex gap-2'>
+					<span className='text-xs text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-200'>
 						Ostatnia aktualizacja: {new Date().toLocaleString('pl-PL')}
 					</span>
 					<Link
-						href="/admin/export"
-						className="text-xs text-indigo-600 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 transition-colors"
+						href='/admin/export'
+						className='text-xs text-indigo-600 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 transition-colors'
 					>
-						<FileDown className="w-3.5 h-3.5" />
+						<FileDown className='w-3.5 h-3.5' />
 						Eksport danych
 					</Link>
 				</div>
 			</div>
 
 			{/* KPI CARDS */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
 				<KPICard
-					title="Wszystkie Firmy"
+					title='Wszystkie Firmy'
 					value={stats.totalCompanies.toLocaleString('pl-PL')}
 					change={`${stats.companiesChange >= 0 ? '+' : ''}${stats.companiesChange}%`}
 					subtext={`+${stats.companiesLast30Days} w tym miesiącu`}
-					icon={<Building2 className="w-5 h-5" />}
-					color="blue"
+					icon={<Building2 className='w-5 h-5' />}
+					color='blue'
 				/>
 				<KPICard
-					title="Leady B2B"
+					title='Leady B2B'
 					value={stats.totalLeads.toLocaleString('pl-PL')}
 					change={`${stats.leadsChange >= 0 ? '+' : ''}${stats.leadsChange}%`}
 					subtext={`+${stats.leadsLast30Days} w tym miesiącu`}
-					icon={<Users className="w-5 h-5" />}
-					color="purple"
+					icon={<Users className='w-5 h-5' />}
+					color='purple'
 				/>
 				<KPICard
-					title="Premium Firmy"
+					title='Premium Firmy'
 					value={stats.premiumCompanies.toLocaleString('pl-PL')}
 					change={`${stats.conversionRate}%`}
-					subtext="Wskaźnik konwersji"
-					icon={<DollarSign className="w-5 h-5" />}
-					color="emerald"
+					subtext='Wskaźnik konwersji'
+					icon={<DollarSign className='w-5 h-5' />}
+					color='emerald'
 				/>
 				<KPICard
-					title="Zweryfikowane"
+					title='Zweryfikowane'
 					value={stats.verifiedCompanies.toLocaleString('pl-PL')}
 					change={`${stats.totalCompanies > 0 ? ((stats.verifiedCompanies / stats.totalCompanies) * 100).toFixed(1) : 0}%`}
-					subtext="Ze wszystkich firm"
-					icon={<ShieldCheck className="w-5 h-5" />}
-					color="amber"
+					subtext='Ze wszystkich firm'
+					icon={<ShieldCheck className='w-5 h-5' />}
+					color='amber'
 				/>
 			</div>
 
 			{/* STATYSTYKI PRZEJĘĆ I NOWYCH FIRM */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
 				<KPICard
-					title="Przejęcia (Wszystkie)"
+					title='Przejęcia (Wszystkie)'
 					value={stats.totalClaims.toLocaleString('pl-PL')}
 					change={`${stats.approvedClaims} zaakceptowanych`}
 					subtext={`${stats.claimsLast30Days} w ostatnich 30 dniach`}
-					icon={<ShieldCheck className="w-5 h-5" />}
-					color="blue"
+					icon={<ShieldCheck className='w-5 h-5' />}
+					color='blue'
 				/>
 				<KPICard
-					title="Zaakceptowane Przejęcia"
+					title='Zaakceptowane Przejęcia'
 					value={stats.approvedClaims.toLocaleString('pl-PL')}
 					change={`${stats.totalClaims > 0 ? ((stats.approvedClaims / stats.totalClaims) * 100).toFixed(1) : 0}%`}
-					subtext="Ze wszystkich przejęć"
-					icon={<CheckCircle2 className="w-5 h-5" />}
-					color="emerald"
+					subtext='Ze wszystkich przejęć'
+					icon={<CheckCircle2 className='w-5 h-5' />}
+					color='emerald'
 				/>
 				<KPICard
-					title="Odrzucone Przejęcia"
+					title='Odrzucone Przejęcia'
 					value={stats.rejectedClaims.toLocaleString('pl-PL')}
 					change={`${stats.totalClaims > 0 ? ((stats.rejectedClaims / stats.totalClaims) * 100).toFixed(1) : 0}%`}
-					subtext="Ze wszystkich przejęć"
-					icon={<XCircle className="w-5 h-5" />}
-					color="amber"
+					subtext='Ze wszystkich przejęć'
+					icon={<XCircle className='w-5 h-5' />}
+					color='amber'
 				/>
 				<KPICard
-					title="Nowe Wizytówki"
+					title='Nowe Wizytówki'
 					value={stats.newCompaniesLast30Days.toLocaleString('pl-PL')}
-					change="Ostatnie 30 dni"
-					subtext="Utworzone przez formularz"
-					icon={<Building2 className="w-5 h-5" />}
-					color="purple"
+					change='Ostatnie 30 dni'
+					subtext='Utworzone przez formularz'
+					icon={<Building2 className='w-5 h-5' />}
+					color='purple'
 				/>
 			</div>
 
 			{/* CHARTS & ACTIVITIES */}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
 				{/* CHARTS */}
-				<div className="lg:col-span-2 space-y-6">
+				<div className='lg:col-span-2 space-y-6'>
 					<AdminDashboardCharts
 						growthData={stats.monthlyData}
 						planData={[
@@ -349,117 +338,115 @@ export default async function AdminDashboard() {
 				</div>
 
 				{/* RECENT ACTIVITIES */}
-				<div className="space-y-6">
+				<div className='space-y-6'>
 					{/* Pending Claims Alert */}
 					{stats.pendingClaims > 0 && (
 						<Link
-							href="/admin/zgloszenia"
-							className="block bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors"
+							href='/admin/zgloszenia'
+							className='block bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors'
 						>
-							<div className="flex items-center gap-3">
-								<div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-									<Clock className="w-5 h-5 text-amber-600" />
+							<div className='flex items-center gap-3'>
+								<div className='w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center'>
+									<Clock className='w-5 h-5 text-amber-600' />
 								</div>
 								<div>
-									<p className="font-semibold text-amber-900">
-										{stats.pendingClaims} oczekujących zgłoszeń
-									</p>
-									<p className="text-xs text-amber-700">Kliknij aby przejść do weryfikacji</p>
+									<p className='font-semibold text-amber-900'>{stats.pendingClaims} oczekujących zgłoszeń</p>
+									<p className='text-xs text-amber-700'>Kliknij aby przejść do weryfikacji</p>
 								</div>
 							</div>
 						</Link>
 					)}
 
 					{/* Recent Leads */}
-					<div className="bg-white rounded-xl border border-slate-200 p-4">
-						<div className="flex items-center justify-between mb-4">
-							<h3 className="font-semibold text-slate-900 flex items-center gap-2">
-								<Users className="w-4 h-4 text-slate-400" />
+					<div className='bg-white rounded-xl border border-slate-200 p-4'>
+						<div className='flex items-center justify-between mb-4'>
+							<h3 className='font-semibold text-slate-900 flex items-center gap-2'>
+								<Users className='w-4 h-4 text-slate-400' />
 								Ostatnie Leady
 							</h3>
-							<Link href="/admin/leads" className="text-xs text-indigo-600 hover:underline">
+							<Link href='/admin/leads' className='text-xs text-indigo-600 hover:underline'>
 								Zobacz wszystkie
 							</Link>
 						</div>
-						<div className="space-y-3">
+						<div className='space-y-3'>
 							{stats.recentLeads.length > 0 ? (
-								stats.recentLeads.map((lead) => (
-									<div key={lead.id} className="flex items-center gap-3 text-sm">
-										<div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">
+								stats.recentLeads.map(lead => (
+									<div key={lead.id} className='flex items-center gap-3 text-sm'>
+										<div className='w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold'>
 											{lead.contactName.charAt(0)}
 										</div>
-										<div className="flex-1 min-w-0">
-											<p className="font-medium text-slate-900 truncate">{lead.contactName}</p>
-											<p className="text-xs text-slate-500 truncate">
-												{lead.company?.name || 'Firma usunięta'}
-											</p>
+										<div className='flex-1 min-w-0'>
+											<p className='font-medium text-slate-900 truncate'>{lead.contactName}</p>
+											<p className='text-xs text-slate-500 truncate'>{lead.company?.name || 'Firma usunięta'}</p>
 										</div>
-										<span className="text-xs text-slate-400">
+										<span className='text-xs text-slate-400'>
 											{new Date(lead.createdAt).toLocaleDateString('pl-PL')}
 										</span>
 									</div>
 								))
 							) : (
-								<p className="text-sm text-slate-400 text-center py-4">Brak leadów</p>
+								<p className='text-sm text-slate-400 text-center py-4'>Brak leadów</p>
 							)}
 						</div>
 					</div>
 
 					{/* Recent Claims */}
-					<div className="bg-white rounded-xl border border-slate-200 p-4">
-						<div className="flex items-center justify-between mb-4">
-							<h3 className="font-semibold text-slate-900 flex items-center gap-2">
-								<ShieldCheck className="w-4 h-4 text-slate-400" />
+					<div className='bg-white rounded-xl border border-slate-200 p-4'>
+						<div className='flex items-center justify-between mb-4'>
+							<h3 className='font-semibold text-slate-900 flex items-center gap-2'>
+								<ShieldCheck className='w-4 h-4 text-slate-400' />
 								Ostatnie Przejęcia
 							</h3>
-							<Link href="/admin/zgloszenia" className="text-xs text-indigo-600 hover:underline">
+							<Link href='/admin/zgloszenia' className='text-xs text-indigo-600 hover:underline'>
 								Zobacz wszystkie
 							</Link>
 						</div>
-						<div className="space-y-3">
+						<div className='space-y-3'>
 							{stats.recentClaims.length > 0 ? (
-								stats.recentClaims.map((claim) => (
-									<div key={claim.id} className="flex items-center gap-3 text-sm">
-										<div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-											claim.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
-											claim.status === 'REJECTED' ? 'bg-red-100 text-red-600' :
-											'bg-amber-100 text-amber-600'
-										}`}>
+								stats.recentClaims.map(claim => (
+									<div key={claim.id} className='flex items-center gap-3 text-sm'>
+										<div
+											className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+												claim.status === 'APPROVED'
+													? 'bg-emerald-100 text-emerald-600'
+													: claim.status === 'REJECTED'
+														? 'bg-red-100 text-red-600'
+														: 'bg-amber-100 text-amber-600'
+											}`}
+										>
 											{claim.status === 'APPROVED' ? '✓' : claim.status === 'REJECTED' ? '✗' : '⏱'}
 										</div>
-										<div className="flex-1 min-w-0">
-											<p className="font-medium text-slate-900 truncate">{claim.fullName}</p>
-											<p className="text-xs text-slate-500 truncate">
-												{claim.company?.name || 'Firma usunięta'}
-											</p>
+										<div className='flex-1 min-w-0'>
+											<p className='font-medium text-slate-900 truncate'>{claim.fullName}</p>
+											<p className='text-xs text-slate-500 truncate'>{claim.company?.name || 'Firma usunięta'}</p>
 										</div>
-										<span className="text-xs text-slate-400">
+										<span className='text-xs text-slate-400'>
 											{new Date(claim.createdAt).toLocaleDateString('pl-PL')}
 										</span>
 									</div>
 								))
 							) : (
-								<p className="text-sm text-slate-400 text-center py-4">Brak przejęć</p>
+								<p className='text-sm text-slate-400 text-center py-4'>Brak przejęć</p>
 							)}
 						</div>
 					</div>
 
 					{/* Recent Reviews */}
-					<div className="bg-white rounded-xl border border-slate-200 p-4">
-						<div className="flex items-center justify-between mb-4">
-							<h3 className="font-semibold text-slate-900 flex items-center gap-2">
-								<Star className="w-4 h-4 text-slate-400" />
+					<div className='bg-white rounded-xl border border-slate-200 p-4'>
+						<div className='flex items-center justify-between mb-4'>
+							<h3 className='font-semibold text-slate-900 flex items-center gap-2'>
+								<Star className='w-4 h-4 text-slate-400' />
 								Ostatnie Opinie
 							</h3>
-							<Link href="/admin/reviews" className="text-xs text-indigo-600 hover:underline">
+							<Link href='/admin/reviews' className='text-xs text-indigo-600 hover:underline'>
 								Zobacz wszystkie
 							</Link>
 						</div>
-						<div className="space-y-3">
+						<div className='space-y-3'>
 							{stats.recentReviews.length > 0 ? (
-								stats.recentReviews.map((review) => (
-									<div key={review.id} className="flex items-start gap-3 text-sm">
-										<div className="flex gap-0.5 mt-0.5">
+								stats.recentReviews.map(review => (
+									<div key={review.id} className='flex items-start gap-3 text-sm'>
+										<div className='flex gap-0.5 mt-0.5'>
 											{[...Array(5)].map((_, i) => (
 												<Star
 													key={i}
@@ -469,14 +456,14 @@ export default async function AdminDashboard() {
 												/>
 											))}
 										</div>
-										<div className="flex-1 min-w-0">
-											<p className="font-medium text-slate-900 truncate">{review.userName}</p>
-											<p className="text-xs text-slate-500 truncate">{review.company?.name}</p>
+										<div className='flex-1 min-w-0'>
+											<p className='font-medium text-slate-900 truncate'>{review.userName}</p>
+											<p className='text-xs text-slate-500 truncate'>{review.company?.name}</p>
 										</div>
 									</div>
 								))
 							) : (
-								<p className="text-sm text-slate-400 text-center py-4">Brak opinii</p>
+								<p className='text-sm text-slate-400 text-center py-4'>Brak opinii</p>
 							)}
 						</div>
 					</div>
@@ -507,16 +494,16 @@ function KPICard({ title, value, change, subtext, icon, color }: KPICardProps) {
 	const isPositive = change.startsWith('+') || (!change.startsWith('-') && parseFloat(change) >= 0)
 
 	return (
-		<div className="bg-white p-5 rounded-xl border border-slate-200 hover:shadow-md transition-shadow">
-			<div className="flex justify-between items-start mb-3">
+		<div className='bg-white p-5 rounded-xl border border-slate-200 hover:shadow-md transition-shadow'>
+			<div className='flex justify-between items-start mb-3'>
 				<div>
-					<p className="text-sm font-medium text-slate-500">{title}</p>
-					<h3 className="text-2xl font-bold text-slate-900 mt-1">{value}</h3>
+					<p className='text-sm font-medium text-slate-500'>{title}</p>
+					<h3 className='text-2xl font-bold text-slate-900 mt-1'>{value}</h3>
 				</div>
 				<div className={`p-2.5 rounded-lg border ${colors[color]}`}>{icon}</div>
 			</div>
 
-			<div className="flex items-center gap-2">
+			<div className='flex items-center gap-2'>
 				<span
 					className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
 						isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
@@ -524,7 +511,7 @@ function KPICard({ title, value, change, subtext, icon, color }: KPICardProps) {
 				>
 					{change}
 				</span>
-				<span className="text-xs text-slate-400">{subtext}</span>
+				<span className='text-xs text-slate-400'>{subtext}</span>
 			</div>
 		</div>
 	)
