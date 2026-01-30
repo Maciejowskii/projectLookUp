@@ -120,7 +120,7 @@ Struktura JSON odpowiedzi:
 				console.log('📷 Próbuję Pexels API...')
 				const res = await fetch(
 					`https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&per_page=5&orientation=landscape`,
-					{ headers: { Authorization: process.env.PEXELS_API_KEY } }
+					{ headers: { Authorization: process.env.PEXELS_API_KEY } },
 				)
 				const pexels = await res.json()
 				if (pexels.photos && pexels.photos.length > 0) {
@@ -377,4 +377,61 @@ export async function cancelScheduledPost(formData: FormData) {
 	if (!id) return
 	await prisma.scheduledPost.update({ where: { id }, data: { status: 'cancelled' } })
 	revalidatePath('/admin/blog')
+}
+
+/** Godziny publikacji w ciągu dnia (3 sloty). */
+const BULK_SCHEDULE_HOURS = [8, 12, 18]
+
+/**
+ * Dodaje masowo tematy do planera: N tematów planowanych na kolejne dni
+ * o 8:00, 12:00, 18:00 (3 wpisy dziennie). Start od jutra.
+ */
+export async function scheduleBulkTopics(formData: FormData) {
+	await checkAdminAuth()
+
+	const topicsText = (formData.get('topics') as string)?.trim() || ''
+	const countStr = (formData.get('count') as string)?.trim() || ''
+
+	let topics: string[] = []
+	if (topicsText) {
+		topics = topicsText
+			.split(/\r?\n/)
+			.map(s => s.trim())
+			.filter(Boolean)
+	} else if (countStr) {
+		const n = parseInt(countStr, 10)
+		if (isNaN(n) || n < 1 || n > 500) {
+			redirect('/admin/blog?error=' + encodeURIComponent('Liczba tematów musi być od 1 do 500.'))
+		}
+		topics = Array.from({ length: n }, (_, i) => `Temat ${i + 1}`)
+	}
+
+	if (topics.length === 0) {
+		redirect(
+			'/admin/blog?error=' + encodeURIComponent('Wpisz liczbę tematów LUB wklej listę tematów (jeden per linia).'),
+		)
+	}
+
+	// Start od jutra, północ (lokalna strefa)
+	const start = new Date()
+	start.setDate(start.getDate() + 1)
+	start.setHours(0, 0, 0, 0)
+
+	const data = topics.map((topic, i) => {
+		const dayOffset = Math.floor(i / BULK_SCHEDULE_HOURS.length)
+		const hourIndex = i % BULK_SCHEDULE_HOURS.length
+		const scheduledAt = new Date(start)
+		scheduledAt.setDate(start.getDate() + dayOffset)
+		scheduledAt.setHours(BULK_SCHEDULE_HOURS[hourIndex], 0, 0, 0)
+		return { topic, scheduledAt, status: 'scheduled' as const }
+	})
+
+	await prisma.scheduledPost.createMany({ data })
+	revalidatePath('/admin/blog')
+	redirect(
+		'/admin/blog?success=' +
+			encodeURIComponent(
+				`Zaplanowano ${topics.length} tematów (8:00, 12:00, 18:00 przez ${Math.ceil(topics.length / 3)} dni).`,
+			),
+	)
 }

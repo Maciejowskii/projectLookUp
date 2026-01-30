@@ -4,6 +4,7 @@ import {
 	createPost,
 	deletePost,
 	schedulePost,
+	scheduleBulkTopics,
 	generatePostAIForm,
 	publishScheduledPost,
 	cancelScheduledPost,
@@ -22,6 +23,7 @@ import {
 	CheckCircle,
 	AlertCircle,
 	RefreshCw,
+	Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { AIGeneratorForm } from '@/components/admin/AIGeneratorForm'
@@ -165,6 +167,48 @@ export default async function AdminBlogPage({
 						</button>
 					</form>
 
+					{/* Dodaj masowo tematy */}
+					<div className='mt-6 pt-6 border-t border-blue-100'>
+						<h3 className='font-semibold text-blue-900 flex items-center gap-2 mb-3'>
+							<Layers className='text-blue-600' size={18} /> Dodaj masowo tematy
+						</h3>
+						<p className='text-xs text-blue-700/80 mb-3'>
+							Tematy zostaną zaplanowane na 8:00, 12:00 i 18:00 w kolejnych dniach (3 wpisy dziennie). Start od jutra.
+						</p>
+						<form action={scheduleBulkTopics} className='space-y-3'>
+							<div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+								<div>
+									<label className='block text-xs font-medium text-blue-800 mb-1'>Liczba tematów</label>
+									<input
+										type='number'
+										name='count'
+										min={1}
+										max={500}
+										placeholder='np. 90'
+										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white'
+									/>
+								</div>
+								<div className='sm:col-span-2'>
+									<label className='block text-xs font-medium text-blue-800 mb-1'>
+										Lub wklej tematy (jeden per linia) — ma pierwszeństwo
+									</label>
+									<textarea
+										name='topics'
+										rows={4}
+										placeholder={'Jeden temat per linia\nnp. Jak naprawić kran\nSEO dla firm\n...'}
+										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white font-mono'
+									/>
+								</div>
+							</div>
+							<button
+								type='submit'
+								className='w-full bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-blue-800 transition-all flex items-center justify-center gap-2'
+							>
+								<Layers size={16} /> Zaplanuj masowo (8:00, 12:00, 18:00)
+							</button>
+						</form>
+					</div>
+
 					{/* Lista zaplanowanych postów */}
 					<div className='space-y-3'>
 						<h3 className='text-xs font-bold text-blue-600 uppercase tracking-wide flex items-center gap-2'>
@@ -275,8 +319,8 @@ export default async function AdminBlogPage({
 														s.status === 'done'
 															? 'bg-green-100 text-green-700'
 															: s.status === 'processing'
-															? 'bg-blue-100 text-blue-700'
-															: 'bg-red-100 text-red-700'
+																? 'bg-blue-100 text-blue-700'
+																: 'bg-red-100 text-red-700'
 													}`}
 												>
 													{s.status === 'done' ? 'OK' : s.status === 'processing' ? '...' : 'BŁĄD'}

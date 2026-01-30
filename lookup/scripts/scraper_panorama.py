@@ -98,6 +98,9 @@ DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))  # seconds
+DB_CONNECT_RETRIES = int(os.getenv("DB_CONNECT_RETRIES", "5"))
+DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "2.0"))
 
 BASE_URL = "https://panoramafirm.pl"
 
@@ -141,13 +144,33 @@ def log(msg: str):
 def connect_db():
     if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS]):
         raise RuntimeError("Brak DB creds w .env (DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS)")
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-    )
+    delay = DB_CONNECT_BACKOFF
+    last_exc = None
+    for attempt in range(1, DB_CONNECT_RETRIES + 1):
+        try:
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                connect_timeout=DB_CONNECT_TIMEOUT,
+            )
+            log(f"✅ DB connected ({DB_HOST}:{DB_PORT})")
+            return conn
+        except psycopg2.OperationalError as e:
+            last_exc = e
+            log(f"⚠️ DB connection attempt {attempt}/{DB_CONNECT_RETRIES} failed: {e}")
+            if attempt < DB_CONNECT_RETRIES:
+                log(f"   Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                delay = min(delay * 2, 60)
+            else:
+                raise RuntimeError(
+                    f"Nie udało się połączyć z PostgreSQL po {DB_CONNECT_RETRIES} próbach. "
+                    f"Sprawdź: (1) czy PostgreSQL działa: systemctl status postgresql / docker ps, "
+                    f"(2) port {DB_PORT} i host {DB_HOST}, (3) pg_hba.conf i logi serwera."
+                ) from last_exc
 
 
 def normalize_text(s: str) -> str:
