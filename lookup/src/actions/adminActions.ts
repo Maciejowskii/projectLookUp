@@ -438,34 +438,7 @@ export async function updateCategory(formData: FormData) {
 }
 
 // --- ZARZĄDZANIE FIRMAMI ---
-
-export async function deleteCompany(companyId: string) {
-	const admin = await checkAdminAuth()
-
-	const company = await prisma.company.findUnique({
-		where: { id: companyId },
-		select: { name: true, nip: true },
-	})
-
-	if (!company) throw new Error('Firma nie istnieje')
-
-	// Usuń powiązane dane
-	await prisma.$transaction([
-		prisma.lead.deleteMany({ where: { companyId } }),
-		prisma.review.deleteMany({ where: { companyId } }),
-		prisma.claimRequest.deleteMany({ where: { companyId } }),
-		prisma.companyUser.deleteMany({ where: { companyId } }),
-		prisma.company.delete({ where: { id: companyId } }),
-	])
-
-	// Audit log
-	await logAdminAction(admin.id, 'DELETE_COMPANY', companyId, {
-		name: company.name,
-		nip: company.nip,
-	})
-
-	revalidatePath('/admin/companies')
-}
+// deleteCompany jest zdefiniowane wyżej (po rejectClaim).
 
 export async function verifyCompany(companyId: string) {
 	const admin = await checkAdminAuth()
