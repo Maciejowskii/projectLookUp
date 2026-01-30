@@ -89,24 +89,29 @@ export default async function AdminBlogPage({
 						<PenTool className='text-gray-600' size={20} /> Dodaj ręcznie
 					</h2>
 					<form action={createPost} className='space-y-3'>
-						<input name='title' required placeholder='Tytuł' className='w-full p-2 border rounded-lg text-sm' />
+						<input
+							name='title'
+							required
+							placeholder='Tytuł'
+							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
+						/>
 						<input
 							name='excerpt'
 							required
 							placeholder='Krótki wstęp (zajawka)'
-							className='w-full p-2 border rounded-lg text-sm'
+							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
 						/>
 						<textarea
 							name='content'
 							required
 							placeholder='Treść HTML (<p>...)'
 							rows={3}
-							className='w-full p-2 border rounded-lg text-sm font-mono'
+							className='w-full p-2 border rounded-lg text-sm font-mono placeholder:text-gray-600'
 						/>
 						<input
 							name='image'
 							placeholder='URL obrazka (opcjonalne)'
-							className='w-full p-2 border rounded-lg text-sm'
+							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
 						/>
 						<button className='w-full bg-gray-900 text-white font-bold py-2 rounded-lg text-sm hover:bg-black'>
 							Zapisz
@@ -138,7 +143,7 @@ export default async function AdminBlogPage({
 							name='topic'
 							required
 							placeholder='Temat artykułu AI'
-							className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white'
+							className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white placeholder:text-gray-600'
 						/>
 						<div className='grid grid-cols-2 gap-2'>
 							<div className='relative'>
@@ -148,7 +153,7 @@ export default async function AdminBlogPage({
 									name='date'
 									required
 									min={new Date().toISOString().split('T')[0]}
-									className='w-full p-3 pl-9 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white'
+									className='w-full p-3 pl-9 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white placeholder:text-gray-600'
 								/>
 							</div>
 							<div className='relative'>
@@ -158,7 +163,7 @@ export default async function AdminBlogPage({
 									name='time'
 									required
 									defaultValue='08:00'
-									className='w-full p-3 pl-9 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white'
+									className='w-full p-3 pl-9 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white placeholder:text-gray-600'
 								/>
 							</div>
 						</div>
@@ -185,7 +190,7 @@ export default async function AdminBlogPage({
 										min={1}
 										max={500}
 										placeholder='np. 90'
-										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white'
+										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white placeholder:text-gray-600'
 									/>
 								</div>
 								<div className='sm:col-span-2'>
@@ -196,7 +201,7 @@ export default async function AdminBlogPage({
 										name='topics'
 										rows={4}
 										placeholder={'Jeden temat per linia\nnp. Jak naprawić kran\nSEO dla firm\n...'}
-										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white font-mono'
+										className='w-full p-3 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white font-mono placeholder:text-gray-600'
 									/>
 								</div>
 							</div>

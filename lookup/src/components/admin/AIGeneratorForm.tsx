@@ -40,11 +40,13 @@ export function AIGeneratorForm({ action }: AIGeneratorFormProps) {
 					name='topic'
 					required
 					placeholder='np. Jak wybrać dobrego hydraulika?'
-					className='w-full p-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-purple-400 outline-none'
+					className='w-full p-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-purple-400 outline-none placeholder:text-gray-600'
 				/>
 			</div>
 			<SubmitButton />
-			<p className='text-xs text-indigo-400 text-center'>To zajmie ok. 5-10 sekund. Artykuł pojawi się na liście poniżej.</p>
+			<p className='text-xs text-indigo-400 text-center'>
+				To zajmie ok. 5-10 sekund. Artykuł pojawi się na liście poniżej.
+			</p>
 		</form>
 	)
 }
