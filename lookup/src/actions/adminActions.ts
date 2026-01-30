@@ -152,13 +152,13 @@ export async function approveClaim(claimId: string) {
 				</html>
 			`
 
-			await resend.emails.send({
-				from: 'Katalogo <onboarding@resend.dev>',
-				to: claim.email,
-				subject: `✅ Wizytówka ${claim.company?.name || 'firmy'} została przejęta!`,
-				html: emailHtml,
-			})
-			console.log(`✅ Mail powitalny wysłany do: ${claim.email}`)
+				await resend.emails.send({
+					from: 'Katalogo <onboarding@resend.dev>',
+					to: claim.email,
+					subject: `✅ Wizytówka ${claim.company?.name || 'firmy'} została przejęta!`,
+					html: emailHtml,
+				})
+				console.log(`✅ Mail powitalny wysłany do: ${claim.email}`)
 			} catch (error) {
 				console.error(`❌ Błąd wysyłania maila powitalnego do ${claim.email}:`, error)
 			}
@@ -238,6 +238,39 @@ export async function rejectClaim(claimId: string) {
 	revalidatePath('/admin/zgloszenia')
 }
 
+/**
+ * Usuwa wizytówkę (firmę) z bazy. Tylko admin.
+ * Kasuje powiązane: leady, opinie, zgłoszenia przejęć, relacje CompanyUser, zeruje User.companyId, potem firmę.
+ */
+export async function deleteCompany(companyId: string) {
+	const admin = await checkAdminAuth()
+
+	const company = await prisma.company.findUnique({
+		where: { id: companyId },
+		select: { id: true, name: true },
+	})
+	if (!company) throw new Error('Nie znaleziono firmy')
+
+	await prisma.$transaction(async tx => {
+		await tx.lead.deleteMany({ where: { companyId } })
+		await tx.review.deleteMany({ where: { companyId } })
+		await tx.claimRequest.deleteMany({ where: { companyId } })
+		await tx.user.updateMany({ where: { companyId }, data: { companyId: null } })
+		await tx.companyUser.deleteMany({ where: { companyId } })
+		await tx.company.delete({ where: { id: companyId } })
+	})
+
+	await logAdminAction(admin.id, 'DELETE_COMPANY', companyId, {
+		companyName: company.name,
+	})
+
+	revalidatePath('/admin/companies')
+	revalidatePath('/admin/zgloszenia')
+	revalidatePath('/admin')
+	revalidatePath('/firma')
+	revalidatePath('/szukaj')
+}
+
 export async function deleteReview(reviewId: string, redirectUrl?: string) {
 	const admin = await checkAdminAuth()
 
@@ -259,7 +292,7 @@ export async function deleteReview(reviewId: string, redirectUrl?: string) {
 	})
 
 	revalidatePath('/admin/reviews')
-	
+
 	// Jeśli podano redirectUrl, przekieruj
 	if (redirectUrl) {
 		const { redirect } = await import('next/navigation')
@@ -496,7 +529,7 @@ export async function importLeadsCSV(formData: FormData) {
 	try {
 		const text = await file.text()
 		const lines = text.split('\n').filter(line => line.trim())
-		
+
 		if (lines.length < 2) {
 			return { success: false, message: 'Plik CSV jest pusty lub zawiera tylko nagłówek' }
 		}

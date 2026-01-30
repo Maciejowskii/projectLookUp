@@ -53,6 +53,30 @@ export function validateNIP(nip: string | null | undefined): { valid: boolean; e
 		}
 	}
 
+	// Odrzuć znane NIP-y testowe / fałszywe (mają poprawną sumę kontrolną, ale nie są realne)
+	const BLOCKED_NIPS = [
+		'0000000000',
+		'1111111111',
+		'2222222222',
+		'3333333333',
+		'4444444444',
+		'5555555555',
+		'6666666666',
+		'7777777777',
+		'8888888888',
+		'9999999999',
+		'1234567890',
+		'0123456789',
+		'9876543210',
+		'1111111118',
+	]
+	if (BLOCKED_NIPS.includes(cleanNIP)) {
+		return {
+			valid: false,
+			error: 'Ten NIP wygląda na testowy lub nieprawidłowy. Podaj prawdziwy NIP firmy.',
+		}
+	}
+
 	// WALIDACJA SUMY KONTROLNEJ
 	const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7]
 	let sum = 0

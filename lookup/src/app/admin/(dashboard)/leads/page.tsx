@@ -1,16 +1,37 @@
 export const dynamic = 'force-dynamic'
+
+const LEADS_PER_PAGE = 20
+const CHART_LEADS_LIMIT = 300
+
 import { prisma } from '@/lib/prisma'
-import { Mail, Phone, ArrowRight } from 'lucide-react'
+import { Mail, Phone, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { LeadsImportForm } from '@/components/admin/LeadsImportForm'
 import { LeadsCharts } from '@/components/admin/LeadsCharts'
 import { LeadsExportForm } from '@/components/admin/LeadsExportForm'
 
-export default async function LeadsPage() {
-	const leads = await prisma.lead.findMany({
-		orderBy: { createdAt: 'desc' },
-		include: { company: true },
-	})
+export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+	const params = await searchParams
+	const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+	const skip = (page - 1) * LEADS_PER_PAGE
+
+	const [totalCount, leads, chartLeads] = await Promise.all([
+		prisma.lead.count(),
+		prisma.lead.findMany({
+			orderBy: { createdAt: 'desc' },
+			take: LEADS_PER_PAGE,
+			skip,
+			include: { company: true },
+		}),
+		prisma.lead.findMany({
+			orderBy: { createdAt: 'desc' },
+			take: CHART_LEADS_LIMIT,
+			include: { company: true },
+		}),
+	])
+
+	const totalPages = Math.max(1, Math.ceil(totalCount / LEADS_PER_PAGE))
+	const currentPage = Math.min(page, totalPages)
 
 	return (
 		<div className='space-y-6'>
@@ -20,7 +41,12 @@ export default async function LeadsPage() {
 					<p className='text-sm text-gray-500'>Osoby, które próbowały skontaktować się z firmami przez Twój portal.</p>
 				</div>
 				<div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100'>
-					Total: {leads.length}
+					Total: {totalCount}
+					{totalPages > 1 && (
+						<span className='text-blue-600 font-normal ml-1'>
+							· Strona {currentPage}/{totalPages}
+						</span>
+					)}
 				</div>
 			</div>
 
@@ -30,8 +56,8 @@ export default async function LeadsPage() {
 				<LeadsImportForm />
 			</div>
 
-			{/* Wykresy i statystyki */}
-			{leads.length > 0 && <LeadsCharts leads={leads} />}
+			{/* Wykresy i statystyki (ostatnie 300 leadów) */}
+			{chartLeads.length > 0 && <LeadsCharts leads={chartLeads} />}
 
 			<div className='bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden'>
 				<table className='w-full text-left text-sm'>
@@ -92,7 +118,9 @@ export default async function LeadsPage() {
 												{lead.source === 'REGISTRATION' && 'Rejestracja'}
 												{lead.source === 'LOGIN' && 'Logowanie'}
 												{lead.source === 'CONTACT_FORM' && 'Formularz kontaktowy'}
-												{!['PHONE_REVEAL', 'PHONE_REVEAL_LOGGED_IN', 'REGISTRATION', 'LOGIN', 'CONTACT_FORM'].includes(lead.source) && lead.source}
+												{!['PHONE_REVEAL', 'PHONE_REVEAL_LOGGED_IN', 'REGISTRATION', 'LOGIN', 'CONTACT_FORM'].includes(
+													lead.source,
+												) && lead.source}
 											</span>
 										)}
 									</div>
@@ -119,6 +147,45 @@ export default async function LeadsPage() {
 					</tbody>
 				</table>
 			</div>
+
+			{/* Paginacja */}
+			{totalPages > 1 && (
+				<div className='flex items-center justify-between gap-4 flex-wrap'>
+					<p className='text-sm text-gray-500'>
+						Wyświetlono {(currentPage - 1) * LEADS_PER_PAGE + 1}–{Math.min(currentPage * LEADS_PER_PAGE, totalCount)} z{' '}
+						{totalCount} leadów
+					</p>
+					<nav className='flex items-center gap-2'>
+						{currentPage > 1 ? (
+							<Link
+								href={`/admin/leads?page=${currentPage - 1}`}
+								className='inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors'
+							>
+								<ChevronLeft size={18} /> Poprzednia
+							</Link>
+						) : (
+							<span className='inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-100 bg-gray-50 text-gray-400 text-sm font-medium cursor-not-allowed'>
+								<ChevronLeft size={18} /> Poprzednia
+							</span>
+						)}
+						<span className='px-4 py-2 text-sm font-medium text-gray-600'>
+							Strona {currentPage} z {totalPages}
+						</span>
+						{currentPage < totalPages ? (
+							<Link
+								href={`/admin/leads?page=${currentPage + 1}`}
+								className='inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors'
+							>
+								Następna <ChevronRight size={18} />
+							</Link>
+						) : (
+							<span className='inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-100 bg-gray-50 text-gray-400 text-sm font-medium cursor-not-allowed'>
+								Następna <ChevronRight size={18} />
+							</span>
+						)}
+					</nav>
+				</div>
+			)}
 		</div>
 	)
 }
