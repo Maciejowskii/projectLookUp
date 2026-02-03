@@ -3,7 +3,19 @@
 import React from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Search, MapPin, Star, Info } from 'lucide-react'
+import { Search, MapPin, Star, ArrowRight } from 'lucide-react'
+
+function getInitial(name: string) {
+	const trimmed = name.trim()
+	if (!trimmed) return '?'
+	const first = trimmed[0].toUpperCase()
+	const words = trimmed.split(/\s+/).filter(Boolean)
+	if (words.length >= 2) {
+		const second = words[1][0].toUpperCase()
+		return first + second
+	}
+	return first
+}
 import { CompanyGridSkeleton } from './CompanyListSkeleton'
 
 async function fetchSearchResults({
@@ -130,52 +142,51 @@ export function SearchResultsList({
 					<Link
 						key={company.id}
 						href={`/firma/${company.slug}`}
-						className="block bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all group"
+						className="group block bg-white rounded-2xl border border-gray-200/90 overflow-hidden hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-200"
 					>
-						<div className="flex justify-between items-start mb-4">
-							<div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
-								{company.category.name}
+						<div className="p-5 md:p-6">
+							{/* Nagłówek: avatar + kategoria */}
+							<div className="flex items-start gap-4 mb-4">
+								<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0 group-hover:scale-105 transition-transform duration-200">
+									{getInitial(company.name)}
+								</div>
+								<div className="min-w-0 flex-1">
+									<span className="inline-block text-xs font-medium text-blue-600 bg-blue-50/80 px-2.5 py-1 rounded-lg mb-1.5">
+										{company.category.name}
+									</span>
+									<h2 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+										{company.name}
+									</h2>
+								</div>
 							</div>
-						</div>
 
-						<h2 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-							{company.name}
-						</h2>
-						<p className="text-sm text-gray-500 mb-4 line-clamp-2">
-							{company.description || 'Brak opisu.'}
-						</p>
+							<p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-4">
+								{company.description || 'Brak opisu.'}
+							</p>
 
-						<div className="space-y-2 text-sm text-gray-600">
-							{company.city && (
-								<div className="flex items-center gap-2">
-									<MapPin size={14} className="text-gray-400" />
-									{company.city}
-								</div>
-							)}
-							{company.reviewCount > 0 && (
-								<div className="flex items-center gap-2 flex-wrap">
-									<span className="font-semibold text-gray-900">
-										{company.averageRating.toFixed(1).replace('.', ',')}
+							{/* Stopka: miasto + ocena */}
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-4 border-t border-gray-100 text-sm">
+								{company.city && (
+									<span className="flex items-center gap-1.5 text-gray-500">
+										<MapPin size={14} className="text-gray-400 shrink-0" />
+										<span className="truncate">{company.city}</span>
 									</span>
-									<div className="flex items-center gap-0.5">
-										{[1, 2, 3, 4, 5].map((i) => (
-											<Star
-												key={i}
-												size={16}
-												className={
-													i <= Math.round(company.averageRating)
-														? 'text-amber-400 fill-amber-400'
-														: 'text-gray-200'
-												}
-											/>
-										))}
-									</div>
-									<span className="text-gray-500">({company.reviewCount})</span>
-									<span title="Średnia ocena z opinii klientów">
-										<Info size={14} className="text-gray-400" />
+								)}
+								{company.reviewCount > 0 && (
+									<span className="flex items-center gap-1.5" title="Średnia ocena z opinii">
+										<Star size={14} className="text-amber-400 fill-amber-400 shrink-0" />
+										<span className="font-semibold text-gray-900">
+											{company.averageRating.toFixed(1).replace('.', ',')}
+										</span>
+										<span className="text-gray-400">({company.reviewCount})</span>
 									</span>
-								</div>
-							)}
+								)}
+							</div>
+
+							<div className="mt-4 flex items-center text-blue-600 font-semibold text-sm opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0">
+								Zobacz profil
+								<ArrowRight size={14} className="ml-1 shrink-0" />
+							</div>
 						</div>
 					</Link>
 				))}
