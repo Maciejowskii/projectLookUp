@@ -12,13 +12,22 @@ const inter = Inter({ subsets: ['latin'] })
 
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://katalogo.pl' // Zmień na HTTPS w produkcji
 
+// Sanityzacja wartości z bazy używanych w metadanych – zapobiega SyntaxError przy złośliwych/nieprawidłowych danych
+function safeMetadataString(value: string | undefined | null, fallback: string, maxLen = 80): string {
+	if (value == null || typeof value !== 'string') return fallback
+	const trimmed = value.trim().slice(0, maxLen)
+	// Usuń znaki mogące zepsuć serializację / template (nawiasy, backticki, backslash)
+	const safe = trimmed.replace(/[\\`(){}[\]<>]/g, '').trim()
+	return safe.length > 0 ? safe : fallback
+}
+
 export async function generateMetadata(): Promise<Metadata> {
 	// Podczas build time może nie być dostępu do bazy - użyj fallback
 	let siteName = 'Katalogo'
 	try {
 		const settings = await prisma.setting.findMany()
 		const get = (key: string) => settings.find(s => s.key === key)?.value
-		siteName = get('site_name') || 'Katalogo'
+		siteName = safeMetadataString(get('site_name'), 'Katalogo')
 	} catch (error: any) {
 		// Podczas build time baza może być niedostępna - użyj domyślnej wartości
 		console.warn('[METADATA] Could not fetch settings, using default:', error)
