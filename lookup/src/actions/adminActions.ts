@@ -512,9 +512,10 @@ export async function importLeadsCSV(formData: FormData) {
 		let imported = 0
 		let errors = 0
 
-		// Pobierz wszystkie firmy do mapowania nazw na ID
+		// Pobierz firmy do mapowania nazw na ID (limit 20k – oszczędność RAM)
 		const companies = await prisma.company.findMany({
 			select: { id: true, name: true, slug: true },
+			take: 20000,
 		})
 		const companyMap = new Map<string, string>()
 		companies.forEach(c => {

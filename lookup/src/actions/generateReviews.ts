@@ -180,8 +180,13 @@ export async function generateReviewsForCompanies() {
 
   const openai = new OpenAI({ apiKey: openaiApiKey })
 
-  // Pobierz wszystkie firmy
+  // Pobierz firmy w partii (limit 3000), żeby nie ładować dziesiątek tysięcy do RAM
+  const batchSize = Math.min(
+    parseInt(process.env.MAX_COMPANIES_FOR_REVIEWS || '3000', 10) || 3000,
+    5000
+  )
   const allCompanies = await prisma.company.findMany({
+    take: batchSize,
     include: {
       category: true
     }

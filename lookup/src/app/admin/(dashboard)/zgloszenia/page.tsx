@@ -8,6 +8,7 @@ export default async function AdminClaimsPage() {
 	const claims = await prisma.claimRequest.findMany({
 		orderBy: { createdAt: 'desc' },
 		include: { company: true },
+		take: 500,
 	})
 
 	const pendingClaims = claims.filter(c => c.status === 'PENDING')

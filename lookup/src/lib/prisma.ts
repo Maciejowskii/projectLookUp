@@ -12,9 +12,10 @@ const prismaClientSingleton = () => {
 		console.error('[PRISMA] Prisma Client nie może się połączyć z bazą danych.')
 	}
 
-	// Wymuś parametry puli połączeń (nawet gdy DATABASE_URL ma connection_limit=15)
-	// Zapobiega P2024 "Timed out fetching a new connection" przy wielu równoległych zapytaniach.
-	const CONNECTION_LIMIT = 30
+	// W produkcji używaj mniejszej puli, żeby nie zużywać RAM (każde połączenie = pamięć).
+	const CONNECTION_LIMIT = process.env.NODE_ENV === 'production'
+		? parseInt(process.env.PRISMA_CONNECTION_LIMIT || '10', 10)
+		: 30
 	const POOL_TIMEOUT = 45
 	const CONNECT_TIMEOUT = 10
 

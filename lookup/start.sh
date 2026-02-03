@@ -195,5 +195,9 @@ echo "Files in current directory: $(ls -la | head -10)"
 unset DEPLOYING
 unset SKIP_REVIEW_GENERATION
 
+# Ogranicz heap Node w produkcji – zapobiega ciągłemu 100% RAM na małym VPS (np. OVH).
+# Domyślnie 512MB; możesz nadpisać w panelu: NODE_OPTIONS="--max-old-space-size=768"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=512}"
+
 # Start the application
 exec npm run start

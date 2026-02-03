@@ -17,6 +17,8 @@ if (process.env.ANALYZE === 'true') {
 }
 
 const nextConfig: NextConfig = {
+	// Mniejszy footprint w produkcji – standalone = jeden katalog .next/standalone, mniej zużycia RAM
+	output: 'standalone',
 	images: {
 		remotePatterns: [
 			{

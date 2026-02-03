@@ -162,18 +162,12 @@ async function getMonthlyGrowthData() {
 	return months
 }
 
-// Dane leadów według źródła
+// Dane leadów według źródła – używamy groupBy zamiast findMany(), żeby nie ładować wszystkich leadów do RAM
 async function getLeadsBySource() {
-	// Pobierz wszystkie leady i pogrupuj ręcznie (source może być nullable)
-	const allLeads = await prisma.lead.findMany({})
-
-	// Grupuj ręcznie
-	const sourceCounts: Record<string, number> = {}
-	for (const lead of allLeads) {
-		// Używamy any ponieważ Prisma Client może nie mieć zaktualizowanych typów
-		const source = (lead as any).source || 'UNKNOWN'
-		sourceCounts[source] = (sourceCounts[source] || 0) + 1
-	}
+	const grouped = await prisma.lead.groupBy({
+		by: ['source'],
+		_count: { id: true },
+	})
 
 	const sourceLabels: Record<string, string> = {
 		PHONE_REVEAL: 'Kliknięcie telefonu',
@@ -185,10 +179,10 @@ async function getLeadsBySource() {
 		UNKNOWN: 'Nieznane',
 	}
 
-	return Object.entries(sourceCounts).map(([source, count]) => ({
-		name: sourceLabels[source] || source,
-		value: count,
-		source: source,
+	return grouped.map(({ source, _count }) => ({
+		name: sourceLabels[source ?? 'UNKNOWN'] || source ?? 'UNKNOWN',
+		value: _count.id,
+		source: source ?? 'UNKNOWN',
 	}))
 }
 
