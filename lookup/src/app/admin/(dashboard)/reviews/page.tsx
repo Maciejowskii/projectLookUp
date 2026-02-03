@@ -1,9 +1,9 @@
-
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { deleteReview } from "@/actions/adminActions";
 import { Star, Trash2, MessageSquare, Bot, User, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { CompanyReviewsFilter } from "@/components/admin/CompanyReviewsFilter";
 
 const REVIEWS_PER_PAGE = 25;
 
@@ -14,31 +14,43 @@ function isBotReview(review: { userPhone: string }): boolean {
   return normalizedPhone === '000000000' || normalizedPhone === '00000000'
 }
 
+function buildReviewsHref(base: string, tab: string, page?: number, companyId?: string) {
+  const params = new URLSearchParams();
+  params.set('tab', tab);
+  if (page && page > 1) params.set('page', String(page));
+  if (companyId) params.set('company', companyId);
+  return `${base}?${params.toString()}`;
+}
+
 export default async function AdminReviewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string }>
+  searchParams: Promise<{ tab?: string; page?: string; company?: string }>
 }) {
   const params = await searchParams;
   const activeTab = params.tab || 'all'; // 'all' | 'bot' | 'user'
   const currentPage = Math.max(1, parseInt(params.page || '1', 10));
+  const companyId = params.company ?? undefined;
   const skip = (currentPage - 1) * REVIEWS_PER_PAGE;
 
-  // Pobierz wszystkie opinie z filtrowaniem
-  const whereClause: any = {};
-  if (activeTab === 'bot') {
-    // Filtruj tylko opinie bota (telefon zaczyna się od "000")
-    whereClause.userPhone = {
-      startsWith: '000',
-    };
-  } else if (activeTab === 'user') {
-    // Filtruj tylko opinie użytkowników (telefon NIE zaczyna się od "000")
-    whereClause.NOT = {
-      userPhone: {
-        startsWith: '000',
-      },
-    };
+  // Filtr po firmie
+  const whereClause: { companyId?: string; userPhone?: { startsWith: string }; NOT?: { userPhone: { startsWith: string } } } = {};
+  if (companyId) {
+    whereClause.companyId = companyId;
   }
+  if (activeTab === 'bot') {
+    whereClause.userPhone = { startsWith: '000' };
+  } else if (activeTab === 'user') {
+    whereClause.NOT = { userPhone: { startsWith: '000' } };
+  }
+
+  // Nazwa firmy przy filtrze
+  const selectedCompany = companyId
+    ? await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true },
+      })
+    : null;
 
   // Pobierz opinie i całkowitą liczbę
   const [reviews, totalReviews] = await Promise.all([
@@ -55,17 +67,20 @@ export default async function AdminReviewsPage({
   ]);
 
   const totalPages = Math.ceil(totalReviews / REVIEWS_PER_PAGE);
-  
-  // Liczniki dla zakładek
+
+  // Liczniki dla zakładek (z uwzględnieniem filtra firmy)
+  const countWhereBase = companyId ? { companyId } : {};
   const [botCount, userCount, allCount] = await Promise.all([
     prisma.review.count({
-      where: { userPhone: { startsWith: '000' } },
+      where: { ...countWhereBase, userPhone: { startsWith: '000' } },
     }),
     prisma.review.count({
-      where: { NOT: { userPhone: { startsWith: '000' } } },
+      where: { ...countWhereBase, NOT: { userPhone: { startsWith: '000' } } },
     }),
-    prisma.review.count(),
+    prisma.review.count({ where: countWhereBase }),
   ]);
+
+  const basePath = '/admin/reviews';
 
   return (
     <div className="space-y-6">
@@ -80,10 +95,16 @@ export default async function AdminReviewsPage({
         </div>
       </div>
 
+      {/* FILTR PO FIRMIE – sprawdź opinie danej firmy */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <p className="text-sm font-medium text-gray-700 mb-3">Sprawdź opinie wybranej firmy</p>
+        <CompanyReviewsFilter selectedCompanyName={selectedCompany?.name ?? null} />
+      </div>
+
       {/* ZAKŁADKI */}
       <div className="bg-white rounded-xl border border-gray-200 p-1 flex gap-1">
         <Link
-          href="/admin/reviews?tab=all"
+          href={buildReviewsHref(basePath, 'all', undefined, companyId)}
           className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'all'
               ? 'bg-gray-900 text-white'
@@ -94,7 +115,7 @@ export default async function AdminReviewsPage({
           Wszystkie ({allCount})
         </Link>
         <Link
-          href="/admin/reviews?tab=bot"
+          href={buildReviewsHref(basePath, 'bot', undefined, companyId)}
           className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'bot'
               ? 'bg-purple-600 text-white'
@@ -105,7 +126,7 @@ export default async function AdminReviewsPage({
           Boty ({botCount})
         </Link>
         <Link
-          href="/admin/reviews?tab=user"
+          href={buildReviewsHref(basePath, 'user', undefined, companyId)}
           className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'user'
               ? 'bg-blue-600 text-white'
@@ -201,9 +222,7 @@ export default async function AdminReviewsPage({
                 action={deleteReview.bind(
                   null, 
                   review.id,
-                  currentPage === 1 
-                    ? `/admin/reviews?tab=${activeTab}`
-                    : `/admin/reviews?tab=${activeTab}&page=${currentPage}`
+                  buildReviewsHref(basePath, activeTab, currentPage === 1 ? undefined : currentPage, companyId)
                 )}
               >
                 <button
@@ -220,8 +239,12 @@ export default async function AdminReviewsPage({
 
         {reviews.length === 0 && (
           <div className="text-center py-12 text-gray-400">
-            {activeTab === 'bot' 
-              ? 'Brak opinii od botów.' 
+            {companyId
+              ? selectedCompany?.name
+                ? `Brak opinii dla firmy „${selectedCompany.name}".`
+                : 'Brak opinii dla wybranej firmy.'
+              : activeTab === 'bot'
+              ? 'Brak opinii od botów.'
               : activeTab === 'user'
               ? 'Brak opinii od użytkowników.'
               : 'Cisza i spokój. Brak opinii.'}
@@ -242,7 +265,7 @@ export default async function AdminReviewsPage({
             {/* Poprzednia strona */}
             {currentPage > 1 ? (
               <Link
-                href={`/admin/reviews?tab=${activeTab}${currentPage === 2 ? '' : `&page=${currentPage - 1}`}`}
+                href={buildReviewsHref(basePath, activeTab, currentPage === 2 ? undefined : currentPage - 1, companyId)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
               >
                 <ChevronLeft size={16} />
@@ -269,9 +292,7 @@ export default async function AdminReviewsPage({
                   pageNum = currentPage - 2 + i
                 }
 
-                const pageUrl = pageNum === 1 
-                  ? `/admin/reviews?tab=${activeTab}`
-                  : `/admin/reviews?tab=${activeTab}&page=${pageNum}`
+                const pageUrl = buildReviewsHref(basePath, activeTab, pageNum === 1 ? undefined : pageNum, companyId)
 
                 return (
                   <Link
@@ -296,7 +317,7 @@ export default async function AdminReviewsPage({
             {/* Następna strona */}
             {currentPage < totalPages ? (
               <Link
-                href={`/admin/reviews?tab=${activeTab}&page=${currentPage + 1}`}
+                href={buildReviewsHref(basePath, activeTab, currentPage + 1, companyId)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
               >
                 Następna

@@ -1,4 +1,6 @@
-FROM node:20-slim
+# Pin Node 20.15 to avoid kState/transformAlgorithm bug in 20.16+
+# https://github.com/vercel/next.js/issues/68319
+FROM node:20.15-slim
 
 WORKDIR /app
 
