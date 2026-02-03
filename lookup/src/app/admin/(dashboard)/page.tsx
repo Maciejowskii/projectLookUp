@@ -179,11 +179,14 @@ async function getLeadsBySource() {
 		UNKNOWN: 'Nieznane',
 	}
 
-	return grouped.map(({ source, _count }) => ({
-		name: sourceLabels[source ?? 'UNKNOWN'] || source ?? 'UNKNOWN',
-		value: _count.id,
-		source: source ?? 'UNKNOWN',
-	}))
+	return grouped.map(({ source, _count }) => {
+		const key = source ?? 'UNKNOWN'
+		return {
+			name: (sourceLabels[key] || key),
+			value: _count.id,
+			source: key,
+		}
+	})
 }
 
 // Dane leadów dziennie (ostatnie 30 dni)
