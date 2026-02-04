@@ -2,7 +2,7 @@
 import type { NextConfig } from 'next'
 
 // Bundle analyzer (opcjonalnie) - używamy dynamic import dla kompatybilności
-let withBundleAnalyzer: (config: NextConfig) => NextConfig = (config) => config
+let withBundleAnalyzer: (config: NextConfig) => NextConfig = config => config
 
 if (process.env.ANALYZE === 'true') {
 	try {
@@ -17,8 +17,8 @@ if (process.env.ANALYZE === 'true') {
 }
 
 const nextConfig: NextConfig = {
-	// Mniejszy footprint w produkcji – standalone = jeden katalog .next/standalone, mniej zużycia RAM
-	output: 'standalone',
+	// Nie używamy output: 'standalone' – wymaga uruchomienia "node .next/standalone/server.js"
+	// zamiast "next start", co komplikuje Docker/start.sh. next start działa z domyślnym buildem.
 	images: {
 		remotePatterns: [
 			{
