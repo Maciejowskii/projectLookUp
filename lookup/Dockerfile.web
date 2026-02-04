@@ -22,6 +22,11 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npx next build || (echo "Build fail
 
 EXPOSE 3000
 
+# Health check – Coolify/Traefik/Caddy mogą czekać, aż aplikacja odpowie, zanim skierują ruch.
+# start-period daje czas na migracje i start Next.js (start.sh).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
 # Nadajemy uprawnienia do wykonania skryptów (start.sh i coolify-post-deploy.sh są kopiowane przez COPY . .)
 RUN chmod +x /app/start.sh /app/coolify-post-deploy.sh
 
