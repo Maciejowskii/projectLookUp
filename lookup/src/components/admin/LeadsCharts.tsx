@@ -88,7 +88,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 
 	// Statystyki według daty - dynamiczne w zależności od wybranego zakresu
 	const now = new Date()
-	
+
 	const getDateRange = (range: TimeRange) => {
 		const ranges = {
 			week: { days: 7, step: 1, label: '7 dni' },
@@ -106,7 +106,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 	const dateStats = filteredLeads.reduce((acc, lead) => {
 		const date = new Date(lead.createdAt)
 		let dateKey: string
-		
+
 		if (timeRange === 'year') {
 			// Dla roku grupuj po tygodniach
 			const weekStart = new Date(date)
@@ -119,7 +119,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 			// Dla tygodnia i miesiąca - pojedyncze dni
 			dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
 		}
-		
+
 		acc[dateKey] = (acc[dateKey] || 0) + 1
 		return acc
 	}, {} as Record<string, number>)
@@ -127,11 +127,11 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 	// Generuj dane dla wykresu
 	const dateData: Array<{ date: string; leady: number }> = []
 	const step = rangeConfig.step
-	
+
 	for (let i = rangeConfig.days - 1; i >= 0; i -= step) {
 		const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
 		let dateKey: string
-		
+
 		if (timeRange === 'year') {
 			const weekStart = new Date(date)
 			weekStart.setDate(date.getDate() - date.getDay())
@@ -139,7 +139,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 		} else {
 			dateKey = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
 		}
-		
+
 		// Dla 3 miesięcy i roku, sumuj leady z całego okresu
 		if (timeRange === '3months' || timeRange === 'year') {
 			let total = 0
@@ -161,17 +161,18 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 	}
 
 	// Usuń duplikaty dla roku (grupowanie tygodniowe)
-	const uniqueDateData = timeRange === 'year' 
-		? dateData.reduce((acc, item) => {
-				const existing = acc.find(d => d.date === item.date)
-				if (existing) {
-					existing.leady += item.leady
-				} else {
-					acc.push({ ...item })
-				}
-				return acc
-			}, [] as typeof dateData)
-		: dateData
+	const uniqueDateData =
+		timeRange === 'year'
+			? dateData.reduce((acc, item) => {
+					const existing = acc.find(d => d.date === item.date)
+					if (existing) {
+						existing.leady += item.leady
+					} else {
+						acc.push({ ...item })
+					}
+					return acc
+			  }, [] as typeof dateData)
+			: dateData
 
 	// Statystyki według statusu
 	const statusStats = leads.reduce((acc, lead) => {
@@ -255,9 +256,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							<button
 								onClick={() => setTimeRange('week')}
 								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-									timeRange === 'week'
-										? 'bg-blue-600 text-white'
-										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+									timeRange === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
 								}`}
 							>
 								Tydzień
@@ -265,9 +264,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							<button
 								onClick={() => setTimeRange('month')}
 								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-									timeRange === 'month'
-										? 'bg-blue-600 text-white'
-										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+									timeRange === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
 								}`}
 							>
 								Miesiąc
@@ -275,9 +272,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							<button
 								onClick={() => setTimeRange('3months')}
 								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-									timeRange === '3months'
-										? 'bg-blue-600 text-white'
-										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+									timeRange === '3months' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
 								}`}
 							>
 								3 miesiące
@@ -285,17 +280,15 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							<button
 								onClick={() => setTimeRange('year')}
 								className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-									timeRange === 'year'
-										? 'bg-blue-600 text-white'
-										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+									timeRange === 'year' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
 								}`}
 							>
 								Rok
 							</button>
 						</div>
 					</div>
-					<div className='h-[300px]'>
-						<ResponsiveContainer width='100%' height='100%'>
+					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<LineChart data={uniqueDateData}>
 								<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#F1F5F9' />
 								<XAxis
@@ -336,8 +329,8 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<Users size={18} className='text-purple-600' />
 						Leady według źródła
 					</h3>
-					<div className='h-[300px]'>
-						<ResponsiveContainer width='100%' height='100%'>
+					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<PieChart>
 								<Pie
 									data={sourceData}
@@ -365,11 +358,16 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<Building2 size={18} className='text-green-600' />
 						Top 10 firm z największą liczbą leadów
 					</h3>
-					<div className='h-[300px]'>
-						<ResponsiveContainer width='100%' height='100%'>
+					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<BarChart data={companyData} layout='vertical'>
 								<CartesianGrid strokeDasharray='3 3' horizontal={true} vertical={false} stroke='#F1F5F9' />
-								<XAxis type='number' axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }} />
+								<XAxis
+									type='number'
+									axisLine={false}
+									tickLine={false}
+									tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }}
+								/>
 								<YAxis
 									dataKey='name'
 									type='category'
@@ -402,10 +400,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						{sourceData.map((item, index) => (
 							<div key={item.originalName} className='flex items-center justify-between'>
 								<div className='flex items-center gap-3'>
-									<div
-										className='w-4 h-4 rounded'
-										style={{ backgroundColor: COLORS[index % COLORS.length] }}
-									></div>
+									<div className='w-4 h-4 rounded' style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
 									<span className='text-sm text-gray-700'>{item.name}</span>
 								</div>
 								<div className='flex items-center gap-4'>

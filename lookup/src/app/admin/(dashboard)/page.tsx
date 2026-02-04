@@ -182,42 +182,47 @@ async function getLeadsBySource() {
 	return grouped.map(({ source, _count }) => {
 		const key = source ?? 'UNKNOWN'
 		return {
-			name: (sourceLabels[key] || key),
+			name: sourceLabels[key] || key,
 			value: _count.id,
 			source: key,
 		}
 	})
 }
 
-// Dane leadów dziennie (ostatnie 30 dni)
+// Dane leadów dziennie (ostatnie 30 dni) – jedno zapytanie zamiast 30, mniejsze obciążenie RAM/DB
 async function getLeadsDailyData() {
-	const days = []
 	const now = new Date()
+	const start = new Date(now)
+	start.setDate(start.getDate() - 29)
+	start.setHours(0, 0, 0, 0)
 
-	for (let i = 29; i >= 0; i--) {
-		const date = new Date(now)
-		date.setDate(date.getDate() - i)
-		date.setHours(0, 0, 0, 0)
+	type Row = { day: Date; count: bigint }
+	const rows = await prisma.$queryRaw<Row[]>`
+		SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+		FROM "Lead"
+		WHERE "createdAt" >= ${start} AND "createdAt" <= ${now}
+		GROUP BY date_trunc('day', "createdAt")
+		ORDER BY day
+	`
 
-		const nextDay = new Date(date)
-		nextDay.setDate(nextDay.getDate() + 1)
-
-		const count = await prisma.lead.count({
-			where: {
-				createdAt: {
-					gte: date,
-					lt: nextDay,
-				},
-			},
-		})
-
-		days.push({
-			name: date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
-			leady: count,
-			fullDate: date.toISOString(),
-		})
+	const countByDay = new Map<string, number>()
+	for (const r of rows) {
+		const key = new Date(r.day).toISOString().slice(0, 10)
+		countByDay.set(key, Number(r.count))
 	}
 
+	const days: { name: string; leady: number; fullDate: string }[] = []
+	for (let i = 29; i >= 0; i--) {
+		const d = new Date(now)
+		d.setUTCDate(d.getUTCDate() - i)
+		d.setUTCHours(0, 0, 0, 0)
+		const key = d.toISOString().slice(0, 10)
+		days.push({
+			name: d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
+			leady: countByDay.get(key) ?? 0,
+			fullDate: d.toISOString(),
+		})
+	}
 	return days
 }
 
@@ -275,7 +280,9 @@ export default async function AdminDashboard() {
 				<KPICard
 					title='Zweryfikowane'
 					value={stats.verifiedCompanies.toLocaleString('pl-PL')}
-					change={`${stats.totalCompanies > 0 ? ((stats.verifiedCompanies / stats.totalCompanies) * 100).toFixed(1) : 0}%`}
+					change={`${
+						stats.totalCompanies > 0 ? ((stats.verifiedCompanies / stats.totalCompanies) * 100).toFixed(1) : 0
+					}%`}
 					subtext='Ze wszystkich firm'
 					icon={<ShieldCheck className='w-5 h-5' />}
 					color='amber'
@@ -407,8 +414,8 @@ export default async function AdminDashboard() {
 												claim.status === 'APPROVED'
 													? 'bg-emerald-100 text-emerald-600'
 													: claim.status === 'REJECTED'
-														? 'bg-red-100 text-red-600'
-														: 'bg-amber-100 text-amber-600'
+													? 'bg-red-100 text-red-600'
+													: 'bg-amber-100 text-amber-600'
 											}`}
 										>
 											{claim.status === 'APPROVED' ? '✓' : claim.status === 'REJECTED' ? '✗' : '⏱'}
