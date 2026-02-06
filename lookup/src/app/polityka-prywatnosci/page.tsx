@@ -85,13 +85,52 @@ export default function PrivacyPolicyPage() {
               5. Profilowanie
             </h2>
             <p>
-              Profilowanie używane jest w Google Analytics, Google AdWords,
-              Facebook Pixel. W sytuacji wniesienia sprzeciwu wobec
-              profilowania, prosimy zoptymalizować odpowiednio przeglądarkę.
+              Profilowanie używane jest w Google Analytics, Google Tag Manager.
+              W sytuacji wniesienia sprzeciwu wobec profilowania, prosimy
+              zoptymalizować odpowiednio przeglądarkę lub zmienić ustawienia
+              zgody na pliki cookie.
             </p>
 
             <h2 className="text-xl font-bold text-gray-900 mt-6">
-              6. Czas przechowywania
+              6. Zarządzanie zgodą na pliki cookie (Consent Mode v2)
+            </h2>
+            <p>
+              W celu zapewnienia zgodności z wymogami RODO oraz rozporządzeniem
+              o prywatności i łączności elektronicznej, używamy Google Consent
+              Mode v2 do zarządzania zgodą użytkowników na pliki cookie.
+            </p>
+            <p>
+              <strong>Jak to działa:</strong>
+            </p>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>
+                Domyślnie wszystkie pliki cookie analityczne są wyłączone
+                (ustawione na "denied")
+              </li>
+              <li>
+                Pliki cookie analityczne (Google Analytics) są aktywowane
+                dopiero po wyrażeniu przez użytkownika wyraźnej zgody
+              </li>
+              <li>
+                Użytkownik może w każdej chwili zmienić swoje preferencje
+                dotyczące plików cookie poprzez banner zgody lub panel
+                ustawień
+              </li>
+              <li>
+                Zgoda jest dobrowolna - użytkownik może odrzucić wszystkie
+                pliki cookie analityczne
+              </li>
+            </ul>
+            <p>
+              Więcej informacji o zarządzaniu plikami cookie znajdziesz w{" "}
+              <a href="/cookies" className="text-blue-600 hover:underline">
+                Polityce Cookies
+              </a>
+              .
+            </p>
+
+            <h2 className="text-xl font-bold text-gray-900 mt-6">
+              7. Czas przechowywania
             </h2>
             <p>
               Pani/Pana dane osobowe będą przechowywane przez okres niezbędny do
@@ -99,7 +138,7 @@ export default function PrivacyPolicyPage() {
               do czasu wycofania zgody.
             </p>
 
-            <h2 className="text-xl font-bold text-gray-900 mt-6">7. Kontakt</h2>
+            <h2 className="text-xl font-bold text-gray-900 mt-6">8. Kontakt</h2>
             <p>
               W przypadku pytań dotyczących przetwarzania danych osobowych
               prosimy o kontakt z Administratorem pod adresem e-mail:
