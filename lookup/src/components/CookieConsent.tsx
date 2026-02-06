@@ -18,7 +18,6 @@ export function CookieConsent() {
   const [consentStatus, setConsentStatus] = useState<ConsentStatus>('pending')
   const [preferences, setPreferences] = useState({
     analytics: true,
-    ads: true,
   })
 
   useEffect(() => {
@@ -30,22 +29,21 @@ export function CookieConsent() {
     } else {
       const consent = JSON.parse(savedConsent)
       setConsentStatus(consent.status)
-      setPreferences(consent.preferences || { analytics: true, ads: true })
-      updateConsent(consent.status, consent.preferences || { analytics: true, ads: true })
+      setPreferences(consent.preferences || { analytics: true })
+      updateConsent(consent.status, consent.preferences || { analytics: true })
     }
   }, [])
 
-  const updateConsent = (status: ConsentStatus, prefs?: { analytics: boolean; ads: boolean }) => {
+  const updateConsent = (status: ConsentStatus, prefs?: { analytics: boolean }) => {
     const analytics = prefs?.analytics ?? (status === 'accepted')
-    const ads = prefs?.ads ?? (status === 'accepted')
 
     // Google Consent Mode v2
     if (typeof window !== 'undefined' && window.gtag) {
       window.gtag('consent', 'update', {
         analytics_storage: analytics ? 'granted' : 'denied',
-        ad_storage: ads ? 'granted' : 'denied',
-        ad_user_data: ads ? 'granted' : 'denied',
-        ad_personalization: ads ? 'granted' : 'denied',
+        ad_storage: 'denied', // Nie używamy reklam
+        ad_user_data: 'denied', // Nie używamy reklam
+        ad_personalization: 'denied', // Nie używamy reklam
       })
     }
 
@@ -54,7 +52,7 @@ export function CookieConsent() {
       'cookie_consent',
       JSON.stringify({
         status,
-        preferences: prefs || { analytics, ads },
+        preferences: prefs || { analytics },
         timestamp: new Date().toISOString(),
       })
     )
@@ -63,13 +61,13 @@ export function CookieConsent() {
   const handleAccept = () => {
     setConsentStatus('accepted')
     setShowBanner(false)
-    updateConsent('accepted', { analytics: true, ads: true })
+    updateConsent('accepted', { analytics: true })
   }
 
   const handleReject = () => {
     setConsentStatus('rejected')
     setShowBanner(false)
-    updateConsent('rejected', { analytics: false, ads: false })
+    updateConsent('rejected', { analytics: false })
   }
 
   const handleSaveSettings = () => {
@@ -161,7 +159,7 @@ export function CookieConsent() {
                     <div>
                       <h3 className="font-semibold text-gray-900">Pliki cookie analityczne</h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        Pomagają nam zrozumieć, jak użytkownicy korzystają z naszej strony
+                        Pomagają nam zrozumieć, jak użytkownicy korzystają z naszej strony (Google Analytics)
                       </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -177,35 +175,12 @@ export function CookieConsent() {
                     </label>
                   </div>
                 </div>
-
-                {/* Ads */}
-                <div className="border-2 border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Pliki cookie reklamowe</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Używane do wyświetlania spersonalizowanych reklam
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={preferences.ads}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, ads: e.target.checked })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => {
-                    setPreferences({ analytics: false, ads: false })
+                    setPreferences({ analytics: false })
                     handleReject()
                   }}
                   className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-colors"
@@ -214,7 +189,7 @@ export function CookieConsent() {
                 </button>
                 <button
                   onClick={() => {
-                    setPreferences({ analytics: true, ads: true })
+                    setPreferences({ analytics: true })
                     handleAccept()
                   }}
                   className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-colors"
