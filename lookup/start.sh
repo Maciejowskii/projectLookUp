@@ -195,9 +195,9 @@ echo "Files in current directory: $(ls -la | head -10)"
 unset DEPLOYING
 unset SKIP_REVIEW_GENERATION
 
-# Limit heap Node – zapobiega nieskończonemu wzrostowi RAM. 512MB było za mało (OOM przy dużym JSON).
-# Domyślnie 768MB; przy 2GB RAM VPS możesz dać 1024. Nadpisz w panelu: NODE_OPTIONS="--max-old-space-size=1024"
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+# Limit heap Node – zapobiega nieskończonemu wzrostowi RAM. Przy wejściu w admin panel 768MB nadal powodowało OOM.
+# Domyślnie 1024MB; przy 2GB RAM VPS zostawia ~1GB na system/DB. Nadpisz w panelu jeśli potrzeba: NODE_OPTIONS="--max-old-space-size=1536"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
 
 # Start the application
 exec npm run start

@@ -46,28 +46,37 @@ export async function GET(request: Request) {
       include: { company: true },
     })
 
-    // Nagłówki CSV
+    // Nagłówki CSV – Telefon firmy: wypełniony, gdy lead z odkrycia numeru (PHONE_REVEAL)
     const headers = [
       'Data',
       'Imię i Nazwisko',
       'Email',
       'Telefon',
       'Firma',
+      'Telefon firmy',
       'Opis',
       'Źródło',
       'Status',
     ]
 
+    const isPhoneReveal = (source: string | null) =>
+      source === 'PHONE_REVEAL' || source === 'PHONE_REVEAL_LOGGED_IN'
+
     // Konwersja danych do CSV
     const csvRows = [
       headers.join(','),
       ...leads.map((lead) => {
+        const companyPhone =
+          lead.company && isPhoneReveal(lead.source)
+            ? (lead.company.phone || '')
+            : ''
         const row = [
           new Date(lead.createdAt).toLocaleDateString('pl-PL'),
           `"${lead.contactName.replace(/"/g, '""')}"`,
           `"${lead.email.replace(/"/g, '""')}"`,
           `"${lead.phone.replace(/"/g, '""')}"`,
-          `"${lead.company?.name || 'N/A'}"`.replace(/"/g, '""'),
+          `"${(lead.company?.name || 'N/A').replace(/"/g, '""')}"`,
+          `"${companyPhone.replace(/"/g, '""')}"`,
           `"${(lead.description || '').replace(/"/g, '""')}"`,
           `"${lead.source || 'N/A'}"`,
           `"${lead.status}"`,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
 	BarChart,
 	Bar,
@@ -39,6 +39,13 @@ interface LeadsChartsProps {
 }
 
 const COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444']
+
+function ChartContainer({ children, className }: { children: React.ReactNode; className?: string }) {
+	const [mounted, setMounted] = useState(false)
+	useEffect(() => setMounted(true), [])
+	if (!mounted) return <div className={className} style={{ minHeight: 200, minWidth: 200 }} aria-hidden />
+	return <div className={className}>{children}</div>
+}
 
 const getSourceLabel = (source: string | null) => {
 	if (!source) return 'Nieznane'
@@ -287,7 +294,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 							</button>
 						</div>
 					</div>
-					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+					<ChartContainer className='h-[300px] min-h-[200px] w-full min-w-0'>
 						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<LineChart data={uniqueDateData}>
 								<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#F1F5F9' />
@@ -320,7 +327,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 								/>
 							</LineChart>
 						</ResponsiveContainer>
-					</div>
+					</ChartContainer>
 				</div>
 
 				{/* Wykres kołowy - Według źródła */}
@@ -329,7 +336,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<Users size={18} className='text-purple-600' />
 						Leady według źródła
 					</h3>
-					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+					<ChartContainer className='h-[300px] min-h-[200px] w-full min-w-0'>
 						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<PieChart>
 								<Pie
@@ -349,7 +356,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 								<Tooltip />
 							</PieChart>
 						</ResponsiveContainer>
-					</div>
+					</ChartContainer>
 				</div>
 
 				{/* Wykres słupkowy - Top 10 firm */}
@@ -358,7 +365,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 						<Building2 size={18} className='text-green-600' />
 						Top 10 firm z największą liczbą leadów
 					</h3>
-					<div className='h-[300px] min-h-[200px] w-full min-w-0'>
+					<ChartContainer className='h-[300px] min-h-[200px] w-full min-w-0'>
 						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<BarChart data={companyData} layout='vertical'>
 								<CartesianGrid strokeDasharray='3 3' horizontal={true} vertical={false} stroke='#F1F5F9' />
@@ -387,7 +394,7 @@ export function LeadsCharts({ leads }: LeadsChartsProps) {
 								<Bar dataKey='value' fill='#6366F1' radius={[0, 8, 8, 0]} name='Leady' />
 							</BarChart>
 						</ResponsiveContainer>
-					</div>
+					</ChartContainer>
 				</div>
 			</div>
 

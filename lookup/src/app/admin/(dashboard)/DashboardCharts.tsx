@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import {
 	LineChart,
 	Line,
@@ -16,6 +17,14 @@ import {
 	Legend,
 } from 'recharts'
 import { TrendingUp, Users } from 'lucide-react'
+
+/** Renderuje wykresy dopiero po mount – unika błędu Recharts width/height -1 przy SSR/hydracji */
+function ChartContainer({ children, className }: { children: React.ReactNode; className?: string }) {
+	const [mounted, setMounted] = useState(false)
+	useEffect(() => setMounted(true), [])
+	if (!mounted) return <div className={className} style={{ minHeight: 200, minWidth: 200 }} aria-hidden />
+	return <div className={className}>{children}</div>
+}
 
 interface GrowthData {
 	name: string
@@ -70,7 +79,7 @@ export function AdminDashboardCharts({
 						<TrendingUp className='w-4 h-4 text-indigo-600' />
 						Wzrost bazy firm i leadów
 					</h3>
-					<div className='h-[280px] min-h-[200px] w-full min-w-0'>
+					<ChartContainer className='h-[280px] min-h-[200px] w-full min-w-0'>
 						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 							<LineChart data={growthData}>
 								<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#F1F5F9' />
@@ -108,10 +117,10 @@ export function AdminDashboardCharts({
 									dot={{ r: 4, fill: '#A855F7', strokeWidth: 2, stroke: '#fff' }}
 									name='Leady (w miesiącu)'
 								/>
-							</LineChart>
-						</ResponsiveContainer>
-					</div>
-					<div className='mt-4 flex items-center justify-center gap-6'>
+						</LineChart>
+					</ResponsiveContainer>
+				</ChartContainer>
+				<div className='mt-4 flex items-center justify-center gap-6'>
 						<div className='flex items-center gap-2'>
 							<div className='w-3 h-3 rounded-full bg-indigo-500'></div>
 							<span className='text-sm text-slate-600'>Firmy</span>
@@ -129,32 +138,33 @@ export function AdminDashboardCharts({
 					<p className='text-sm text-slate-500 mb-4'>Free vs Premium</p>
 
 					<div className='h-[240px] min-h-[200px] w-full min-w-0 relative'>
-						<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
-							<PieChart>
-								<Pie
-									data={planData}
-									cx='50%'
-									cy='50%'
-									innerRadius={60}
-									outerRadius={80}
-									paddingAngle={5}
-									dataKey='value'
-								>
-									{planData.map((entry, index) => (
-										<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-									))}
-								</Pie>
-								<Tooltip
-									formatter={value => [typeof value === 'number' ? value.toLocaleString('pl-PL') : value, '']}
-									contentStyle={{
-										borderRadius: '8px',
-										border: 'none',
-										boxShadow: '0 2px 4px -1px rgb(0 0 0 / 0.1)',
-									}}
-								/>
-							</PieChart>
-						</ResponsiveContainer>
-
+						<ChartContainer className='absolute inset-0'>
+							<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
+								<PieChart>
+									<Pie
+										data={planData}
+										cx='50%'
+										cy='50%'
+										innerRadius={60}
+										outerRadius={80}
+										paddingAngle={5}
+										dataKey='value'
+									>
+										{planData.map((entry, index) => (
+											<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+										))}
+									</Pie>
+									<Tooltip
+										formatter={value => [typeof value === 'number' ? value.toLocaleString('pl-PL') : value, '']}
+										contentStyle={{
+											borderRadius: '8px',
+											border: 'none',
+											boxShadow: '0 2px 4px -1px rgb(0 0 0 / 0.1)',
+										}}
+									/>
+								</PieChart>
+							</ResponsiveContainer>
+						</ChartContainer>
 						{/* Center Text */}
 						<div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none'>
 							<span className='block text-2xl font-bold text-slate-900'>{conversionRate}%</span>
@@ -179,7 +189,6 @@ export function AdminDashboardCharts({
 						</div>
 					</div>
 				</div>
-			</div>
 
 			{/* Wykresy Leadów */}
 			{leadsBySource.length > 0 && (
@@ -190,7 +199,7 @@ export function AdminDashboardCharts({
 							<Users className='w-4 h-4 text-purple-600' />
 							Leady według źródła
 						</h3>
-						<div className='h-[280px] min-h-[200px] w-full min-w-0'>
+						<ChartContainer className='h-[280px] min-h-[200px] w-full min-w-0'>
 							<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 								<PieChart>
 									<Pie
@@ -217,7 +226,7 @@ export function AdminDashboardCharts({
 									/>
 								</PieChart>
 							</ResponsiveContainer>
-						</div>
+						</ChartContainer>
 						<div className='mt-4 grid grid-cols-2 gap-2'>
 							{leadsBySource.map((item, index) => (
 								<div key={item.source} className='flex items-center justify-between text-sm'>
@@ -241,7 +250,7 @@ export function AdminDashboardCharts({
 								<TrendingUp className='w-4 h-4 text-purple-600' />
 								Leady w czasie (ostatnie 30 dni)
 							</h3>
-							<div className='h-[280px] min-h-[200px] w-full min-w-0'>
+							<ChartContainer className='h-[280px] min-h-[200px] w-full min-w-0'>
 								<ResponsiveContainer width='100%' height='100%' minWidth={200} minHeight={200}>
 									<BarChart data={leadsDailyData}>
 										<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#F1F5F9' />
@@ -267,7 +276,7 @@ export function AdminDashboardCharts({
 										<Bar dataKey='leady' fill='#A855F7' radius={[8, 8, 0, 0]} name='Leady' />
 									</BarChart>
 								</ResponsiveContainer>
-							</div>
+							</ChartContainer>
 						</div>
 					)}
 				</div>
