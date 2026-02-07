@@ -70,9 +70,9 @@ export function AdminDashboardCharts({
 	leadsDailyData = [],
 }: AdminDashboardChartsProps) {
 	return (
-		<div className='space-y-6'>
+		<div className="space-y-6">
 			{/* Główne wykresy - Growth i Monetization */}
-			<div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
+			<div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 				{/* Line Chart - Growth */}
 				<div className='xl:col-span-2 bg-white p-6 rounded-xl border border-slate-200'>
 					<h3 className='font-semibold text-slate-900 mb-6 flex items-center gap-2'>
@@ -189,6 +189,7 @@ export function AdminDashboardCharts({
 						</div>
 					</div>
 				</div>
+			</div>
 
 			{/* Wykresy Leadów */}
 			{leadsBySource.length > 0 && (
