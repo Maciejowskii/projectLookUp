@@ -4,27 +4,29 @@ import { VOIVODESHIPS } from "@/lib/regions";
 import { ArrowRight, Mail, Phone } from "lucide-react";
 
 export const Footer = async () => {
-  // 1. Pobieramy 6 najpopularniejszych kategorii do stopki
-  const categories = await prisma.category.findMany({
-    take: 6,
-    include: { _count: { select: { companies: true } } },
-    orderBy: { companies: { _count: "desc" } },
-  });
+  let categories: { id: string; name: string; slug: string; _count: { companies: number } }[] = [];
+  let contactEmail: string | null = null;
+  let contactPhone: string | null = null;
 
-  // 2. Pobieramy ustawienia kontaktowe
-  const settings = await prisma.setting.findMany();
-  const getSetting = (key: string) => settings.find((s) => s.key === key)?.value || null;
-  const contactEmail = getSetting("contact_email");
-  const contactPhone = getSetting("contact_phone");
+  try {
+    categories = await prisma.category.findMany({
+      take: 6,
+      include: { _count: { select: { companies: true } } },
+      orderBy: { companies: { _count: "desc" } },
+    });
 
-  // 2. Generujemy "SEO Combo" - mieszamy kategorie z regionami
-  // To tworzy linki typu: "Mechanika (Mazowieckie)", "Budownictwo (Śląskie)"
+    const settings = await prisma.setting.findMany();
+    const getSetting = (key: string) => settings.find((s) => s.key === key)?.value || null;
+    contactEmail = getSetting("contact_email");
+    contactPhone = getSetting("contact_phone");
+  } catch (error) {
+    console.error("Błąd podczas pobierania danych do stopki:", error);
+  }
+
   const seoLinks = categories.slice(0, 5).map((cat, i) => {
-    // Przypisujemy region "na sztywno" cyklicznie, żeby było różnorodnie
     const region = VOIVODESHIPS[i % VOIVODESHIPS.length];
     return {
       label: `${cat.name} ${region.name}`,
-      // Linkujemy do wyszukiwarki z pre-filtrowaniem
       href: `/szukaj?q=${cat.name}&region=${region.slug}`,
     };
   });

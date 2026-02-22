@@ -20,10 +20,22 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function AddCompanyPage() {
-	const categories = await prisma.category.findMany({
-		orderBy: { name: 'asc' },
-	})
-	const defaultTenant = await prisma.tenant.findFirst()
+	let categories: Awaited<ReturnType<typeof prisma.category.findMany>> = []
+	let defaultTenant: Awaited<ReturnType<typeof prisma.tenant.findFirst>> = null
+
+	try {
+		categories = await prisma.category.findMany({
+			orderBy: { name: 'asc' },
+		})
+		defaultTenant = await prisma.tenant.findFirst()
+	} catch (error) {
+		console.error('Błąd podczas pobierania danych:', error)
+		return (
+			<div className='p-10 text-center text-red-600 font-sans'>
+				Błąd: Nie udało się połączyć z bazą danych. Spróbuj ponownie później.
+			</div>
+		)
+	}
 
 	if (!defaultTenant) {
 		return <div className='p-10 text-center text-red-600 font-sans'>Błąd: Brak konfiguracji tenanta.</div>
@@ -384,7 +396,7 @@ export default async function AddCompanyPage() {
 										required
 										maxLength={13}
 										placeholder='1234567890'
-										pattern='[0-9-]{0,13}'
+										pattern='[0-9\-]{0,13}'
 										className='w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm'
 										title='NIP musi składać się z 10 cyfr'
 									/>
