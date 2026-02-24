@@ -16,7 +16,13 @@ interface FormState {
 	citySuggestions: string[]
 }
 
-export function AddCompanyForm({ categories }: { categories: Category[] }) {
+export function AddCompanyForm({
+	categories,
+	loggedInEmail,
+}: {
+	categories: Category[]
+	loggedInEmail?: string | null
+}) {
 	const router = useRouter()
 	const [state, setState] = useState<FormState>({ error: null, citySuggestions: [] })
 	const [isSubmitting, setIsSubmitting] = useState(false)
@@ -193,9 +199,18 @@ export function AddCompanyForm({ categories }: { categories: Category[] }) {
 							name='email'
 							type='email'
 							required
+							defaultValue={loggedInEmail || ''}
+							readOnly={!!loggedInEmail}
 							placeholder='kontakt@twojafirma.pl'
-							className='w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-white text-gray-900 font-medium shadow-sm'
+							className={`w-full px-4 py-3.5 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-900 font-medium shadow-sm ${
+								loggedInEmail ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
+							}`}
 						/>
+						{loggedInEmail && (
+							<p className='text-xs text-blue-600 mt-1 ml-1'>
+								Firma zostanie dodana do Twojego istniejącego konta.
+							</p>
+						)}
 					</div>
 				</div>
 

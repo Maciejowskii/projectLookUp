@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { cookies } from 'next/headers'
 import { Search, TrendingUp, ShieldCheck } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
@@ -28,6 +29,21 @@ export default async function AddCompanyPage() {
 		return <div className='p-10 text-center text-red-600 font-sans'>Błąd: Brak konfiguracji tenanta.</div>
 	}
 
+	let loggedInEmail: string | null = null
+	try {
+		const cookieStore = await cookies()
+		const userId = cookieStore.get('session_user_id')?.value
+		if (userId) {
+			const user = await prisma.user.findUnique({
+				where: { id: userId },
+				select: { email: true },
+			})
+			if (user) loggedInEmail = user.email
+		}
+	} catch {
+		// ignore - user not logged in
+	}
+
 	return (
 		<div className='min-h-screen bg-[#F3F4F6] flex flex-col font-sans'>
 			<Navbar />
@@ -50,6 +66,7 @@ export default async function AddCompanyPage() {
 
 						<AddCompanyForm
 							categories={categories.map(c => ({ id: c.id, name: c.name }))}
+							loggedInEmail={loggedInEmail}
 						/>
 					</div>
 

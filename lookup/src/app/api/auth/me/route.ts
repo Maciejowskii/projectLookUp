@@ -20,6 +20,25 @@ export async function GET() {
 				email: true,
 				name: true,
 				image: true,
+				companies: {
+					include: {
+						company: {
+							select: {
+								id: true,
+								name: true,
+								slug: true,
+							},
+						},
+					},
+					orderBy: { createdAt: 'asc' },
+				},
+				company: {
+					select: {
+						id: true,
+						name: true,
+						slug: true,
+					},
+				},
 			},
 		})
 
@@ -27,8 +46,13 @@ export async function GET() {
 			return NextResponse.json({ user: null })
 		}
 
-		// Zwróć nazwę wyświetlaną (preferuj name, potem email)
-		const displayName = user.name || user.email.split('@')[0]
+		let userCompanies = user.companies.map(cu => cu.company)
+		if (userCompanies.length === 0 && user.company) {
+			userCompanies = [user.company]
+		}
+
+		const primaryCompany = userCompanies[0] || null
+		const displayName = primaryCompany?.name || user.name || user.email.split('@')[0]
 
 		return NextResponse.json({
 			user: {
@@ -36,6 +60,8 @@ export async function GET() {
 				email: user.email,
 				displayName,
 				image: user.image,
+				companies: userCompanies,
+				primaryCompany,
 			},
 		})
 	} catch (error) {

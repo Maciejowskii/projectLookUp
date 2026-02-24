@@ -162,6 +162,12 @@ export function DashboardContent({
 							<p className='font-bold text-sm'>Firma została pomyślnie przejęta!</p>
 						</div>
 					)}
+					{status === 'company_added' && (
+						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
+							<CheckCircle2 size={18} />
+							<p className='font-bold text-sm'>Nowa firma została dodana do Twojego konta!</p>
+						</div>
+					)}
 					{error && (
 						<div className='bg-red-50 border border-red-200 text-red-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
 							<AlertCircle size={18} />

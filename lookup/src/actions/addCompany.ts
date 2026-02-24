@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { cookies } from 'next/headers'
 import { getResend } from '@/lib/resend'
 import { getNotificationEmails } from '@/lib/notificationEmails'
 import {
@@ -74,13 +75,22 @@ export async function createCompanyAction(formData: FormData): Promise<AddCompan
 	const formattedZip = formatPostalCode(rawData.zip)
 	const normalizedCity = cityValidation.normalizedCity || rawData.city.trim()
 
-	const tempPassword = crypto.randomBytes(4).toString('hex')
-	const hashedPassword = await bcrypt.hash(tempPassword, 10)
-
 	const slug = rawData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000)
 
 	try {
-		let newCompanyId: string = ''
+		const existingUser = await prisma.user.findUnique({
+			where: { email: rawData.email },
+		})
+		const isNewUser = !existingUser
+
+		let tempPassword: string | null = null
+		let hashedPassword: string | null = null
+		if (isNewUser) {
+			tempPassword = crypto.randomBytes(4).toString('hex')
+			hashedPassword = await bcrypt.hash(tempPassword, 10)
+		}
+
+		let userId: string = ''
 
 		await prisma.$transaction(async tx => {
 			const newCompany = await tx.company.create({
@@ -97,43 +107,66 @@ export async function createCompanyAction(formData: FormData): Promise<AddCompan
 					isVerified: false,
 				},
 			})
-			newCompanyId = newCompany.id
 
-			const user = await tx.user.upsert({
-				where: { email: rawData.email },
-				update: {
-					password: hashedPassword,
+			if (isNewUser) {
+				const user = await tx.user.create({
+					data: {
+						email: rawData.email,
+						password: hashedPassword!,
+						companyId: newCompany.id,
+						emailVerified: new Date(),
+					},
+				})
+				userId = user.id
+			} else {
+				userId = existingUser.id
+			}
+
+			await tx.companyUser.create({
+				data: {
+					userId,
 					companyId: newCompany.id,
-					emailVerified: new Date(),
-				},
-				create: {
-					email: rawData.email,
-					password: hashedPassword,
-					companyId: newCompany.id,
-					emailVerified: new Date(),
+					role: 'OWNER',
 				},
 			})
 
 			await tx.claimRequest.create({
 				data: {
 					companyId: newCompany.id,
-					userId: user.id,
+					userId,
 					fullName: rawData.name,
 					email: rawData.email,
 					phone: rawData.phone || '-',
 					status: 'PENDING',
-					message: `Nowa wizytówka utworzona przez formularz rejestracji.`,
+					message: isNewUser
+						? 'Nowa wizytówka utworzona przez formularz rejestracji.'
+						: 'Kolejna wizytówka dodana do istniejącego konta.',
 				},
 			})
+		})
+
+		const cookieStore = await cookies()
+		cookieStore.set('session_user_id', userId, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			maxAge: 60 * 60 * 24 * 7,
+			path: '/',
 		})
 
 		sendAdminNotification(rawData, normalizedCity, formattedZip).catch(err => {
 			console.error('Error sending admin notification:', err)
 		})
 
+		if (isNewUser) {
+			return {
+				success: true,
+				redirectUrl: `/sukces-rejestracji?email=${encodeURIComponent(rawData.email)}&p=${encodeURIComponent(tempPassword!)}`,
+			}
+		}
+
 		return {
 			success: true,
-			redirectUrl: `/sukces-rejestracji?email=${encodeURIComponent(rawData.email)}&p=${encodeURIComponent(tempPassword)}`,
+			redirectUrl: '/dashboard?status=company_added',
 		}
 	} catch (error: unknown) {
 		console.error('Error creating company:', error)
