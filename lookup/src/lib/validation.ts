@@ -142,7 +142,7 @@ export function validatePostalCode(zip: string | null | undefined): { valid: boo
 export async function validateCityAndPostalCode(
 	city: string,
 	zip: string,
-): Promise<{ valid: boolean; error?: string; normalizedCity?: string }> {
+): Promise<CityPostalResult> {
 	if (!city || city.trim() === '') {
 		return {
 			valid: false,
@@ -181,9 +181,11 @@ export async function validateCityAndPostalCode(
 		const data = await response.json()
 
 		if (!data || data.length === 0) {
+			const fallbackSuggestions = await getCitiesForPostalCode(zip)
 			return {
 				valid: false,
 				error: `Nie znaleziono miasta "${city}" dla kodu pocztowego ${formattedZip}. Sprawdź czy miasto i kod pocztowy są poprawne.`,
+				suggestions: fallbackSuggestions,
 			}
 		}
 
@@ -198,9 +200,11 @@ export async function validateCityAndPostalCode(
 		// Sprawdź czy kod pocztowy w wyniku pasuje
 		const resultZip = result.address?.postcode || ''
 		if (resultZip && resultZip.replace(/\D/g, '') !== cleanZip) {
+			const fallbackSuggestions = await getCitiesForPostalCode(zip)
 			return {
 				valid: false,
 				error: `Kod pocztowy ${formattedZip} nie pasuje do miasta "${city}". Znaleziono kod: ${resultZip}`,
+				suggestions: fallbackSuggestions,
 			}
 		}
 
@@ -214,14 +218,15 @@ export async function validateCityAndPostalCode(
 			!cityLower.includes(resultCityLower) &&
 			!displayNameLower.includes(cityLower)
 		) {
-			// Jeśli nie ma dokładnego dopasowania, ale mamy wynik z Polski, pozwól (może być różnica w pisowni)
 			if (result.address?.country_code === 'pl') {
 				return { valid: true, normalizedCity }
 			}
 
+			const fallbackSuggestions = resultCity ? [resultCity] : await getCitiesForPostalCode(zip)
 			return {
 				valid: false,
 				error: `Nie znaleziono dokładnego dopasowania dla miasta "${city}" i kodu pocztowego ${formattedZip}. Znaleziono: ${displayName}`,
+				suggestions: fallbackSuggestions,
 			}
 		}
 
@@ -238,6 +243,102 @@ export type CityPostalResult = {
 	valid: boolean
 	error?: string
 	normalizedCity?: string
+	suggestions?: string[]
+}
+
+function extractCityNames(items: Record<string, unknown>[]): string[] {
+	const cityFieldNames = [
+		'Miejscowosc',
+		'Miejscowość',
+		'miejscowosc',
+		'miejscowość',
+		'MIEJSCOWOSC',
+		'city',
+		'name',
+		'town',
+		'village',
+	]
+
+	const cities: string[] = []
+
+	for (const item of items) {
+		let found = false
+		for (const fieldName of cityFieldNames) {
+			if (item[fieldName] && typeof item[fieldName] === 'string') {
+				cities.push(item[fieldName] as string)
+				found = true
+				break
+			}
+		}
+		if (!found) {
+			const lowerKey = Object.keys(item).find(
+				k =>
+					k.toLowerCase().includes('miejscow') ||
+					k.toLowerCase().includes('miasto') ||
+					k.toLowerCase().includes('city'),
+			)
+			if (lowerKey && typeof item[lowerKey] === 'string' && (item[lowerKey] as string).length > 1) {
+				cities.push(item[lowerKey] as string)
+			}
+		}
+	}
+
+	return [...new Set(cities.filter(Boolean))]
+}
+
+/**
+ * Pobiera listę miejscowości dla danego kodu pocztowego.
+ * Próbuje Intami API, fallback na Nominatim.
+ */
+export async function getCitiesForPostalCode(zip: string): Promise<string[]> {
+	const cleanZip = zip.replace(/\D/g, '')
+	if (cleanZip.length !== 5) return []
+
+	const formattedZip = `${cleanZip.slice(0, 2)}-${cleanZip.slice(2)}`
+
+	try {
+		const url = `https://kodpocztowy.intami.pl/api/${formattedZip}`
+		const response = await fetch(url, {
+			headers: { Accept: 'application/json' },
+			next: { revalidate: 86400 },
+		})
+
+		if (response.ok) {
+			const data = await response.json()
+			const items = Array.isArray(data) ? data : [data]
+			const cities = extractCityNames(items)
+
+			if (cities.length === 0 && items.length > 0) {
+				console.warn('[getCitiesForPostalCode] Intami returned data but no city names parsed. Raw:', JSON.stringify(items[0]))
+			}
+
+			if (cities.length > 0) return cities
+		}
+	} catch (error) {
+		console.error('[getCitiesForPostalCode] Intami error:', error)
+	}
+
+	try {
+		const url = `https://nominatim.openstreetmap.org/search?postalcode=${formattedZip}&country=Poland&format=json&addressdetails=1&limit=5`
+		const response = await fetch(url, {
+			headers: { 'User-Agent': 'Katalogo-Validation/1.0 (contact@katalogo.pl)' },
+		})
+
+		if (response.ok) {
+			const data = await response.json()
+			const cities = data
+				.map((r: Record<string, unknown>) => {
+					const addr = r.address as Record<string, string> | undefined
+					return addr?.city || addr?.town || addr?.village || ''
+				})
+				.filter(Boolean)
+			return [...new Set(cities)] as string[]
+		}
+	} catch (error) {
+		console.error('[getCitiesForPostalCode] Nominatim error:', error)
+	}
+
+	return []
 }
 
 /**
@@ -283,9 +384,13 @@ export async function validateCityAndPostalCodeIntami(city: string, zip: string)
 			}
 		}
 
-		const miejscowosci = items
-			.map((r: { Miejscowosc?: string; Miejscowość?: string }) => r.Miejscowosc ?? r.Miejscowość ?? '')
-			.filter(Boolean)
+		const miejscowosci = extractCityNames(items as Record<string, unknown>[])
+
+		if (miejscowosci.length === 0 && items.length > 0) {
+			console.warn('[validateCityAndPostalCodeIntami] Could not extract city names. Raw item keys:', Object.keys(items[0]))
+			return { valid: true, normalizedCity: cityNorm }
+		}
+
 		const match = miejscowosci.some((m: string) => {
 			const mLower = m.toLowerCase().trim()
 			return mLower === cityLower || mLower.includes(cityLower) || cityLower.includes(mLower)
@@ -294,9 +399,11 @@ export async function validateCityAndPostalCodeIntami(city: string, zip: string)
 			miejscowosci.find((m: string) => m.toLowerCase().trim().includes(cityLower)) ?? miejscowosci[0] ?? cityNorm
 
 		if (!match) {
+			const suggestionList = miejscowosci.slice(0, 5)
 			return {
 				valid: false,
-				error: `Miejscowość "${cityNorm}" nie pasuje do kodu ${formattedZip}. Dla tego kodu: ${miejscowosci.slice(0, 5).join(', ')}${miejscowosci.length > 5 ? '…' : ''}.`,
+				error: `Miejscowość "${cityNorm}" nie pasuje do kodu ${formattedZip}. Dla tego kodu: ${suggestionList.join(', ')}${miejscowosci.length > 5 ? '…' : ''}.`,
+				suggestions: suggestionList,
 			}
 		}
 
