@@ -48,7 +48,7 @@ export default async function CategoriesIndexPage() {
 	})
 
 	// Liczymy firmy dla każdej kategorii osobno (bardziej niezawodne)
-	const categories = await Promise.all(
+	const allCategories = await Promise.all(
 		categoriesRaw.map(async (cat) => {
 			const companyCount = await prisma.company.count({
 				where: {
@@ -63,6 +63,8 @@ export default async function CategoriesIndexPage() {
 			}
 		})
 	)
+
+	const categories = allCategories.filter(cat => cat._count.companies > 0)
 
 	return (
 		<div className='min-h-screen bg-gray-50 flex flex-col font-sans'>
