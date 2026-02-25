@@ -36,11 +36,45 @@ export default async function BlogIndexPage({
 			orderBy: { createdAt: 'desc' },
 			take: POSTS_PER_PAGE,
 			skip: skip,
+			select: {
+				id: true,
+				title: true,
+				slug: true,
+				excerpt: true,
+				image: true,
+				content: true,
+				createdAt: true,
+			},
 		}),
 		prisma.post.count({
 			where: { published: true },
 		}),
 	])
+
+	// Funkcja do wyciągnięcia pierwszego obrazka z HTML content
+	const getFirstImageFromContent = (content: string): string | null => {
+		if (!content) return null
+		// Szukaj pierwszego <img> tagu
+		const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i)
+		if (imgMatch && imgMatch[1]) {
+			return imgMatch[1]
+		}
+		// Szukaj obrazków w różnych formatach
+		const imgMatch2 = content.match(/src=["']([^"']+\.(jpg|jpeg|png|gif|webp|svg))["']/i)
+		if (imgMatch2 && imgMatch2[1]) {
+			return imgMatch2[1]
+		}
+		return null
+	}
+
+	// Dodaj obrazek do każdego posta (z pola image lub z content)
+	const postsWithImages = posts.map((post) => {
+		const imageFromContent = getFirstImageFromContent(post.content || '')
+		return {
+			...post,
+			displayImage: post.image || imageFromContent || null,
+		}
+	})
 
 	const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE)
 
@@ -55,19 +89,20 @@ export default async function BlogIndexPage({
 				</div>
 
 				<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'>
-					{posts.map((post: (typeof posts)[number]) => (
+					{postsWithImages.map((post) => (
 						<Link
 							key={post.id}
 							href={`/blog/${post.slug}`}
 							className='group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col'
 						>
 							<div className='h-56 bg-gray-200 relative overflow-hidden'>
-								{post.image ? (
+								{post.displayImage ? (
 									<Image
-										src={post.image}
+										src={post.displayImage}
 										alt={post.title}
 										fill
 										className='object-cover group-hover:scale-105 transition-transform duration-500'
+										sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
 									/>
 								) : (
 									<div className='w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-3xl opacity-90'>
@@ -92,7 +127,7 @@ export default async function BlogIndexPage({
 					))}
 				</div>
 
-				{posts.length === 0 && (
+				{postsWithImages.length === 0 && (
 					<div className='text-center py-20 text-gray-400'>Jeszcze nie ma żadnych wpisów. Wróć wkrótce!</div>
 				)}
 
