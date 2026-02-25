@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { processPostExecution } from '@/actions/blogActions' // Upewnij się, że ścieżka jest poprawna
+import { isPostgresAdminTermination, withPrismaRetry } from '@/lib/prismaRetry'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,19 +17,21 @@ export async function GET(request: Request) {
 
 	try {
 		// 2. Szukamy postów zaplanowanych, których czas już nadszedł
-		const jobsToRun = await prisma.scheduledPost.findMany({
-			where: {
-				status: 'scheduled',
-				scheduledAt: { lte: new Date() },
-			},
-		})
+		const jobsToRun = await withPrismaRetry(() =>
+			prisma.scheduledPost.findMany({
+				where: {
+					status: 'scheduled',
+					scheduledAt: { lte: new Date() },
+				},
+			}),
+		)
 
 		console.log(`Cron: Znaleziono ${jobsToRun.length} postów do przetworzenia.`)
 
 		// 3. Uruchamiamy publikację dla każdego znalezionego posta
 		// Robimy to sekwencyjnie (for...of), aby nie przeciążyć API Gemini
 		for (const job of jobsToRun) {
-			await processPostExecution(job.id)
+			await withPrismaRetry(() => processPostExecution(job.id))
 		}
 
 		return NextResponse.json({
@@ -36,6 +39,10 @@ export async function GET(request: Request) {
 			processed: jobsToRun.length,
 		})
 	} catch (error) {
+		if (isPostgresAdminTermination(error)) {
+			console.warn('Cron: chwilowy restart bazy (57P01). Próba zakończona bez przetwarzania.')
+			return NextResponse.json({ success: false, error: 'Database temporarily unavailable' }, { status: 503 })
+		}
 		console.error('Błąd podczas wykonywania Crona:', error)
 		return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 })
 	}
