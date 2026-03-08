@@ -6,10 +6,6 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { injectBacklinks } from '@/lib/backlinks'
 
-interface FormState {
-	message?: string
-}
-
 // --- GŁÓWNY GENERATOR AI (ULEPSZONA WERSJA) ---
 export async function generatePostAI(formData: FormData): Promise<string> {
 	const topic = formData.get('topic') as string
@@ -221,52 +217,73 @@ Struktura JSON odpowiedzi:
 
 // --- AKCJE DLA ADMINA (Z AUTORYZACJĄ) ---
 
-export async function createPost(formData: FormData) {
+export async function createPost(formData: FormData): Promise<{ error?: string } | void> {
 	try {
 		await checkAdminAuth()
-		const title = formData.get('title') as string
-		const content = formData.get('content') as string
-		const excerpt = formData.get('excerpt') as string
-		const image = formData.get('image') as string
+		const title = (formData.get('title') as string)?.trim()
+		const content = (formData.get('content') as string)?.trim()
+		const excerpt = (formData.get('excerpt') as string)?.trim()
+		const image = (formData.get('image') as string)?.trim()
 
-		const slug = title
-			.toLowerCase()
-			.normalize('NFD')
-			.replace(/[\u0300-\u036f]/g, '')
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/-+/g, '-')
+		if (!title) return { error: 'Tytuł jest wymagany!' }
+		if (!content) return { error: 'Treść jest wymagana!' }
+
+		const slug =
+			title
+				.toLowerCase()
+				.normalize('NFD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/-+/g, '-')
+				.replace(/(^-|-$)/g, '') +
+			'-' +
+			Math.random().toString(36).substring(2, 7)
 
 		await prisma.post.create({
-			data: { title, slug, content, excerpt, image, published: true },
+			data: { title, slug, content, excerpt: excerpt || null, image: image || null, published: true },
 		})
 
 		revalidatePath('/admin/blog')
 		revalidatePath('/blog')
 	} catch (err: any) {
 		console.error('BŁĄD createPost:', err.message)
-		throw err
+		return { error: err.message || 'Błąd tworzenia posta' }
 	}
+
+	redirect('/admin/blog?success=' + encodeURIComponent('Post został utworzony!'))
 }
 
-export async function updatePost(_prevState: FormState, formData: FormData): Promise<FormState> {
+export async function updatePost(formData: FormData): Promise<{ error?: string; success?: string }> {
 	const id = formData.get('id')?.toString()
-	if (!id) return { message: '❌ Brak ID posta!' }
+	if (!id) return { error: 'Brak ID posta!' }
 
 	try {
+		await checkAdminAuth()
+
+		const title = formData.get('title')?.toString()?.trim()
+		const excerpt = formData.get('excerpt')?.toString()?.trim()
+		const content = formData.get('content')?.toString()?.trim()
+		const image = formData.get('image')?.toString()?.trim()
+
+		if (!title) return { error: 'Tytuł jest wymagany!' }
+		if (!content) return { error: 'Treść jest wymagana!' }
+
 		await prisma.post.update({
 			where: { id },
 			data: {
-				title: formData.get('title')?.toString() ?? '',
-				excerpt: formData.get('excerpt')?.toString() ?? '',
-				content: formData.get('content')?.toString() ?? '',
+				title,
+				excerpt: excerpt || null,
+				content,
+				image: image || null,
 			},
 		})
+
 		revalidatePath('/admin/blog')
 		revalidatePath('/blog')
-		return { message: '✅ Zmiany zapisane!' }
+		return { success: 'Zmiany zostały zapisane!' }
 	} catch (err: any) {
 		console.error('BŁĄD updatePost:', err.message)
-		return { message: '❌ Błąd zapisu!' }
+		return { error: err.message || 'Błąd zapisu!' }
 	}
 }
 
@@ -280,20 +297,24 @@ export async function deletePost(id: string) {
 export async function generatePostAIForm(formData: FormData) {
 	await checkAdminAuth()
 
-	// Sprawdź klucz API przed próbą generowania
 	if (!process.env.OPENAI_API_KEY) {
 		console.error('❌ BRAK OPENAI_API_KEY w zmiennych środowiskowych!')
 		redirect('/admin/blog?error=' + encodeURIComponent('Brak klucza OPENAI_API_KEY w zmiennych środowiskowych!'))
 	}
 
+	let success = false
 	try {
 		await generatePostAI(formData)
 		revalidatePath('/admin/blog')
 		revalidatePath('/blog')
-		redirect('/admin/blog?success=' + encodeURIComponent('Post został wygenerowany!'))
+		success = true
 	} catch (error: any) {
 		console.error('❌ BŁĄD generowania posta AI:', error.message)
 		redirect('/admin/blog?error=' + encodeURIComponent(error.message || 'Wystąpił błąd podczas generowania posta'))
+	}
+
+	if (success) {
+		redirect('/admin/blog?success=' + encodeURIComponent('Post został wygenerowany!'))
 	}
 }
 

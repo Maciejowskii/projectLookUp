@@ -35,16 +35,16 @@ export function AIGeneratorForm({ action }: AIGeneratorFormProps) {
 	return (
 		<form action={action} className='space-y-4'>
 			<div>
-				<label className='block text-xs font-bold text-indigo-400 uppercase mb-1'>Temat artykułu</label>
+				<label className='block text-xs font-bold text-indigo-700 uppercase mb-1'>Temat artykułu</label>
 				<input
 					name='topic'
 					required
 					placeholder='np. Jak wybrać dobrego hydraulika?'
-					className='w-full p-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-purple-400 outline-none placeholder:text-gray-600'
+					className='w-full p-3 rounded-xl border border-indigo-200 text-gray-900 focus:ring-2 focus:ring-purple-400 outline-none placeholder:text-gray-500'
 				/>
 			</div>
 			<SubmitButton />
-			<p className='text-xs text-indigo-400 text-center'>
+			<p className='text-xs text-indigo-600 text-center'>
 				To zajmie ok. 5-10 sekund. Artykuł pojawi się na liście poniżej.
 			</p>
 		</form>

@@ -149,7 +149,7 @@ export default function BlogPostView({ post, postId }: BlogPostViewProps) {
 				{/* MAIN CONTENT */}
 				<main className='lg:col-span-3 bg-white p-8 rounded-3xl shadow-sm border border-gray-100'>
 					<div
-						className='prose prose-lg prose-blue max-w-none text-gray-700 leading-relaxed'
+						className='blog-content max-w-none text-gray-700 leading-relaxed'
 						dangerouslySetInnerHTML={{ __html: post.content }}
 					/>
 				</main>

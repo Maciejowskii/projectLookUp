@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
 import {
-	createPost,
 	deletePost,
 	schedulePost,
 	scheduleBulkTopics,
@@ -83,40 +82,31 @@ export default async function AdminBlogPage({
 					<AIGeneratorForm action={generatePostAIForm} />
 				</div>
 
-				{/* KARTA 2: DODAJ RĘCZNIE (Uproszczona) */}
-				<div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-sm'>
+				{/* KARTA 2: DODAJ RĘCZNIE */}
+				<div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col'>
 					<h2 className='font-bold text-gray-900 flex items-center gap-2 mb-4'>
 						<PenTool className='text-gray-600' size={20} /> Dodaj ręcznie
 					</h2>
-					<form action={createPost} className='space-y-3'>
-						<input
-							name='title'
-							required
-							placeholder='Tytuł'
-							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
-						/>
-						<input
-							name='excerpt'
-							required
-							placeholder='Krótki wstęp (zajawka)'
-							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
-						/>
-						<textarea
-							name='content'
-							required
-							placeholder='Treść HTML (<p>...)'
-							rows={3}
-							className='w-full p-2 border rounded-lg text-sm font-mono placeholder:text-gray-600'
-						/>
-						<input
-							name='image'
-							placeholder='URL obrazka (opcjonalne)'
-							className='w-full p-2 border rounded-lg text-sm placeholder:text-gray-600'
-						/>
-						<button className='w-full bg-gray-900 text-white font-bold py-2 rounded-lg text-sm hover:bg-black'>
-							Zapisz
-						</button>
-					</form>
+					<p className='text-sm text-gray-500 mb-3 grow'>
+						Stwórz wpis blogowy ręcznie z pełnym edytorem HTML i podglądem na żywo.
+					</p>
+					<ul className='text-xs text-gray-500 space-y-1.5 mb-6'>
+						<li className='flex items-center gap-2'>
+							<Eye size={12} className='text-blue-500' /> Podgląd HTML w czasie rzeczywistym
+						</li>
+						<li className='flex items-center gap-2'>
+							<PenTool size={12} className='text-blue-500' /> Gotowe snippety HTML do wstawienia
+						</li>
+						<li className='flex items-center gap-2'>
+							<Pencil size={12} className='text-blue-500' /> Podzielony widok edytor + podgląd
+						</li>
+					</ul>
+					<Link
+						href='/admin/blog/new'
+						className='w-full bg-gray-900 text-white font-bold py-3 rounded-xl text-sm hover:bg-black transition-colors flex items-center justify-center gap-2'
+					>
+						<PenTool size={16} /> Otwórz edytor
+					</Link>
 				</div>
 
 				{/* ✅ KARTA 3: PLANER WPISÓW AI - ULEPSZONY */}
@@ -290,9 +280,9 @@ export default async function AdminBlogPage({
 
 							{scheduled.filter(s => s.status === 'scheduled').length === 0 && (
 								<div className='text-center py-8'>
-									<Calendar className='mx-auto text-blue-200 mb-2' size={32} />
-									<p className='text-gray-400 text-sm'>Brak zaplanowanych wpisów</p>
-									<p className='text-gray-300 text-xs'>Użyj formularza powyżej, aby zaplanować artykuł AI</p>
+									<Calendar className='mx-auto text-blue-300 mb-2' size={32} />
+									<p className='text-gray-500 text-sm'>Brak zaplanowanych wpisów</p>
+									<p className='text-gray-500 text-xs'>Użyj formularza powyżej, aby zaplanować artykuł AI</p>
 								</div>
 							)}
 						</div>
@@ -330,7 +320,7 @@ export default async function AdminBlogPage({
 												>
 													{s.status === 'done' ? 'OK' : s.status === 'processing' ? '...' : 'BŁĄD'}
 												</span>
-												<span className='text-xs text-gray-400'>
+												<span className='text-xs text-gray-500'>
 													{new Date(s.executedAt || s.scheduledAt).toLocaleDateString('pl-PL')}
 												</span>
 											</div>
@@ -366,7 +356,7 @@ export default async function AdminBlogPage({
 							<tr key={post.id} className='hover:bg-gray-50'>
 								<td className='p-4 font-medium text-gray-900'>
 									{post.title}
-									<span className='block text-xs text-gray-400 font-normal truncate max-w-xs'>{post.slug}</span>
+									<span className='block text-xs text-gray-500 font-normal truncate max-w-xs'>{post.slug}</span>
 								</td>
 								<td className='p-4 text-gray-500'>{new Date(post.createdAt).toLocaleDateString()}</td>
 								<td className='p-4 text-right flex justify-end gap-2'>
@@ -377,7 +367,7 @@ export default async function AdminBlogPage({
 										<Pencil size={18} />
 									</Link>
 									<form action={deletePost.bind(null, post.id)} className='inline'>
-										<button className='text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors'>
+										<button className='text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors'>
 											<Trash2 size={18} />
 										</button>
 									</form>
@@ -386,7 +376,7 @@ export default async function AdminBlogPage({
 						))}
 						{posts.length === 0 && (
 							<tr>
-								<td colSpan={3} className='p-8 text-center text-gray-400'>
+								<td colSpan={3} className='p-8 text-center text-gray-500'>
 									Brak postów. Użyj generatora AI powyżej!
 								</td>
 							</tr>
