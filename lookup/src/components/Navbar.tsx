@@ -83,7 +83,7 @@ export const Navbar = () => {
           paddingTop: `calc(0.75rem + var(--safe-area-inset-top))`,
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-4 overflow-hidden" suppressHydrationWarning>
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-4" suppressHydrationWarning>
           {/* --- LOGO (Left) --- */}
           <Link
             href="/"

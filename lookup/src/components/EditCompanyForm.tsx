@@ -87,9 +87,8 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 		}
 	}
 
-	// Sprawdzamy czy Premium jest aktywne
 	const isPremiumActive =
-		company.plan === 'PREMIUM' && company.premiumUntil && new Date(company.premiumUntil) > new Date()
+		company.plan === 'PREMIUM' && (!company.premiumUntil || new Date(company.premiumUntil) > new Date())
 
 	return (
 		<div className='space-y-8'>

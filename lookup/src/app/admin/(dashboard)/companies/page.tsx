@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
-import { deleteCompany } from '@/actions/adminActions'
+import { deleteCompany, setCompanyPremium } from '@/actions/adminActions'
 import { DeleteCompanyButton } from '@/components/admin/DeleteCompanyButton'
+import { PremiumToggleButton } from '@/components/admin/PremiumToggleButton'
 import { ShieldCheck, MapPin, Search, MoreHorizontal, Globe } from 'lucide-react'
 import Link from 'next/link'
 
@@ -59,7 +60,6 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
 								<tr key={company.id} className='hover:bg-gray-50/80 transition-colors group'>
 									<td className='px-6 py-4'>
 										<div className='flex items-center gap-4'>
-											{/* Logo Placeholder - Initials */}
 											<div className='w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0'>
 												{company.name.charAt(0)}
 											</div>
@@ -89,11 +89,13 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
 												</span>
 											)}
 
-											{company.plan === 'PREMIUM' && (
-												<span className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100'>
-													PREMIUM
-												</span>
-											)}
+											<PremiumToggleButton
+												companyId={company.id}
+												companyName={company.name}
+												isPremium={company.plan === 'PREMIUM'}
+												premiumUntil={company.premiumUntil}
+												action={setCompanyPremium}
+											/>
 										</div>
 									</td>
 									<td className='px-6 py-4'>

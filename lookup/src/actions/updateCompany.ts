@@ -71,8 +71,7 @@ export async function updateCompanyAction(formData: FormData) {
 
   const isPremiumActive =
     company?.plan === "PREMIUM" &&
-    company?.premiumUntil &&
-    new Date(company.premiumUntil) > new Date();
+    (!company?.premiumUntil || new Date(company.premiumUntil) > new Date());
 
   const updateData: {
     description: string;

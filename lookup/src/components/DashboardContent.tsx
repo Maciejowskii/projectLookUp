@@ -26,9 +26,10 @@ import {
 	FileText,
 	Link2,
 	BarChart3,
-	BookOpen,
 	TrendingUp,
 	ExternalLink,
+	ChevronRight,
+	Eye,
 } from 'lucide-react'
 
 type CompanyWithStats = {
@@ -62,6 +63,8 @@ interface DashboardContentProps {
 	error?: string
 }
 
+type Tab = 'edit' | 'premium' | 'password'
+
 export function DashboardContent({
 	user,
 	companies,
@@ -76,10 +79,12 @@ export function DashboardContent({
 	const [upgradingToPremium, setUpgradingToPremium] = useState(false)
 	const [claimingCompany, setClaimingCompany] = useState(false)
 	const [claimSlug, setClaimSlug] = useState('')
+	const [activeTab, setActiveTab] = useState<Tab>('edit')
+	const [showClaimForm, setShowClaimForm] = useState(false)
 
 	const isPremium = selectedCompany?.plan === 'PREMIUM'
-	const premiumExpired =
-		isPremium && selectedCompany?.premiumUntil ? new Date(selectedCompany.premiumUntil) < new Date() : false
+	const isPremiumActive =
+		isPremium && (!selectedCompany?.premiumUntil || new Date(selectedCompany.premiumUntil) > new Date())
 
 	async function handleManageSubscription() {
 		if (!selectedCompany) return
@@ -127,51 +132,44 @@ export function DashboardContent({
 			const formData = new FormData()
 			formData.append('companySlug', claimSlug.trim())
 			await claimCompanyAction(formData)
-			// If we reach here, redirect was not called (shouldn't happen)
-			// But if it does, refresh the page
 			router.refresh()
 			setClaimSlug('')
 		} catch (error: any) {
-			// Next.js redirect() throws a RedirectError internally
-			// We need to check if this is a redirect error and let it propagate
 			if (error && typeof error === 'object' && 'digest' in error) {
-				// This is likely a Next.js redirect error - let it propagate
-				// The redirect will happen automatically
 				throw error
 			}
-			// For other errors, show the error message
 			alert(error.message || 'Wystąpił błąd podczas przejmowania firmy')
 			setClaimingCompany(false)
 		}
 	}
 
 	return (
-		<div className='max-w-6xl mx-auto space-y-6'>
-			{/* Komunikaty */}
+		<div className='max-w-7xl mx-auto'>
+			{/* Status messages */}
 			{(status || error) && (
-				<div className='space-y-3'>
+				<div className='mb-6 space-y-3'>
 					{status === 'password_updated' && (
-						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
+						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-xl flex items-center gap-3'>
 							<CheckCircle2 size={18} />
-							<p className='font-bold text-sm'>Hasło zostało zaktualizowane</p>
+							<p className='font-semibold text-sm'>Hasło zostało zaktualizowane</p>
 						</div>
 					)}
 					{status === 'claimed_successfully' && (
-						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
+						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-xl flex items-center gap-3'>
 							<CheckCircle2 size={18} />
-							<p className='font-bold text-sm'>Firma została pomyślnie przejęta!</p>
+							<p className='font-semibold text-sm'>Firma została pomyślnie przejęta!</p>
 						</div>
 					)}
 					{status === 'company_added' && (
-						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
+						<div className='bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-xl flex items-center gap-3'>
 							<CheckCircle2 size={18} />
-							<p className='font-bold text-sm'>Nowa firma została dodana do Twojego konta!</p>
+							<p className='font-semibold text-sm'>Nowa firma została dodana do Twojego konta!</p>
 						</div>
 					)}
 					{error && (
-						<div className='bg-red-50 border border-red-200 text-red-700 px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-sm'>
+						<div className='bg-red-50 border border-red-200 text-red-700 px-5 py-3.5 rounded-xl flex items-center gap-3'>
 							<AlertCircle size={18} />
-							<p className='font-bold text-sm'>
+							<p className='font-semibold text-sm'>
 								{error === 'wrong_old_password' && 'Obecne hasło jest nieprawidłowe'}
 								{error === 'password_too_short' && 'Nowe hasło musi mieć min. 8 znaków'}
 								{error === 'passwords_not_matching' && 'Podane hasła nie są identyczne'}
@@ -182,383 +180,445 @@ export function DashboardContent({
 			)}
 
 			{/* Header */}
-			<div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-4'>
+			<div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8'>
 				<div>
-					<h1 className='text-3xl font-black text-gray-900'>Witaj, {user.email}</h1>
-					<p className='text-gray-500 font-medium text-sm'>Zarządzaj swoimi firmami</p>
+					<h1 className='text-2xl font-bold text-gray-900'>Panel zarządzania</h1>
+					<p className='text-gray-500 text-sm mt-0.5'>{user.email}</p>
 				</div>
 				<form action={logoutAction}>
-					<button className='flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-all font-bold text-sm shadow-sm'>
+					<button className='flex items-center gap-2 text-gray-500 hover:text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 transition-all text-sm font-medium'>
 						<LogOut size={16} /> Wyloguj
 					</button>
 				</form>
 			</div>
 
-			{/* Lista firm */}
-			<div className='bg-white p-8 rounded-3xl border border-gray-100 shadow-sm'>
-				<div className='flex items-center justify-between mb-6'>
-					<div>
-						<h2 className='text-xl font-black text-gray-900 flex items-center gap-2'>
-							<Building2 size={24} /> Twoje firmy
-						</h2>
-						<p className='text-gray-500 text-sm mt-1'>Wybierz firmę do zarządzania</p>
-					</div>
-					<Link
-						href='/dodaj-firme'
-						className='flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-all font-bold text-sm'
-					>
-						<Plus size={16} /> Dodaj firmę
-					</Link>
-				</div>
-
-				{companies.length > 0 ? (
-					<div className='space-y-3 mb-6'>
-						{companies.map(company => (
-							<Link
-								key={company.id}
-								href={`/dashboard?companyId=${company.id}`}
-								className={`block p-4 rounded-xl border-2 transition-all ${
-									selectedCompany?.id === company.id
-										? 'border-blue-500 bg-blue-50'
-										: 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-								}`}
-							>
-								<div className='flex items-center justify-between'>
-									<div className='flex items-center gap-4'>
-										<div
-											className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-												company.plan === 'PREMIUM' &&
-												company.premiumUntil &&
-												new Date(company.premiumUntil) > new Date()
-													? 'bg-gradient-to-br from-amber-400 to-orange-500'
-													: 'bg-gray-100'
-											}`}
-										>
-											{company.plan === 'PREMIUM' &&
-											company.premiumUntil &&
-											new Date(company.premiumUntil) > new Date() ? (
-												<Crown size={24} className='text-white' />
-											) : (
-												<Building2 size={24} className='text-gray-400' />
-											)}
-										</div>
-										<div>
-											<h3 className='font-black text-gray-900'>{company.name}</h3>
-											<p className='text-sm text-gray-500'>{company.category.name}</p>
-										</div>
-									</div>
-									<div className='flex items-center gap-4'>
-										<div className='text-right'>
-											<p className='text-xs text-gray-500'>Opinie</p>
-											<p className='font-bold text-gray-900'>{company._count.reviews}</p>
-										</div>
-										<ArrowRight
-											size={20}
-											className={selectedCompany?.id === company.id ? 'text-blue-600' : 'text-gray-400'}
-										/>
-									</div>
-								</div>
-							</Link>
-						))}
-					</div>
-				) : (
-					<div className='text-center py-12 border-2 border-dashed border-gray-200 rounded-xl mb-6'>
-						<Building2 size={48} className='text-gray-300 mx-auto mb-4' />
-						<p className='text-gray-500 font-medium mb-4'>Nie masz jeszcze żadnych firm</p>
-						<Link
-							href='/dodaj-firme'
-							className='inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all font-bold'
-						>
-							<Plus size={16} /> Dodaj pierwszą firmę
-						</Link>
-					</div>
-				)}
-
-				{/* Claimowanie firmy */}
-				<div className='border-t border-gray-100 pt-6'>
-					<h3 className='font-bold text-gray-900 mb-3 flex items-center gap-2'>
-						<Search size={18} /> Przejmij istniejącą firmę
-					</h3>
-					<form onSubmit={handleClaimCompany} className='flex gap-3'>
-						<input
-							type='text'
-							value={claimSlug}
-							onChange={e => setClaimSlug(e.target.value)}
-							placeholder='Wprowadź nazwę firmy'
-							className='flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
-						/>
-						<button
-							type='submit'
-							disabled={claimingCompany || !claimSlug.trim()}
-							className='px-6 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-black transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed'
-						>
-							{claimingCompany ? 'Przetwarzanie...' : 'Przejmij'}
-						</button>
-					</form>
-					<p className='text-xs text-gray-500 mt-2'>
-						Wprowadź slug firmy, którą chcesz przejąć. Zgłoszenie będzie wymagało weryfikacji administratora.
-					</p>
-				</div>
-			</div>
-
-			{/* Wybrana firma - szczegóły */}
-			{selectedCompany ? (
-				<>
-					{/* Premium Status & Stats */}
-					<div className='grid lg:grid-cols-3 gap-6'>
-						{/* Lewa kolumna - Premium & Stats */}
-						<div className='lg:col-span-1 space-y-6'>
-							{/* Premium Card */}
-							<div
-								className={`p-6 rounded-3xl border-2 shadow-sm ${
-									isPremium && !premiumExpired
-										? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200'
-										: 'bg-white border-gray-200'
-								}`}
-							>
-								<div className='flex items-center gap-3 mb-4'>
-									<div
-										className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-											isPremium && !premiumExpired
-												? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
-												: 'bg-gray-100 text-gray-400'
-										}`}
-									>
-										<Crown size={20} />
-									</div>
-									<div>
-										<p className='font-black text-gray-900 text-lg'>
-											{isPremium && !premiumExpired ? 'Premium' : 'Plan FREE'}
-										</p>
-										{isPremium && selectedCompany.premiumUntil && (
-											<p className='text-xs text-gray-600 font-medium flex items-center gap-1.5'>
-												<Calendar size={12} />
-												Ważny do {new Date(selectedCompany.premiumUntil).toLocaleDateString('pl-PL')}
-											</p>
-										)}
-									</div>
-								</div>
-
-								{isPremium && !premiumExpired && selectedCompany.stripeCustomerId ? (
-									<button
-										onClick={handleManageSubscription}
-										disabled={managingSubscription}
-										className='w-full bg-white border-2 border-amber-200 text-gray-900 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50'
-									>
-										<Settings size={16} />
-										{managingSubscription ? 'Ładowanie...' : 'Zarządzaj planem'}
-									</button>
-								) : isPremium && !premiumExpired ? (
-									<div className='text-xs text-gray-600 text-center p-3 bg-amber-50 rounded-xl border border-amber-200'>
-										Premium aktywne (jednorazowa płatność)
-									</div>
-								) : (
-									<button
-										onClick={handleUpgradeToPremium}
-										disabled={upgradingToPremium}
-										className='w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 rounded-xl font-black text-sm hover:from-amber-600 hover:to-orange-600 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50'
-									>
-										<Sparkles size={16} />
-										{upgradingToPremium ? 'Ładowanie...' : 'Wykup Premium'}
-									</button>
-								)}
+			<div className='grid lg:grid-cols-[320px_1fr] gap-6'>
+				{/* ===== LEFT SIDEBAR ===== */}
+				<div className='space-y-4'>
+					{/* Company list */}
+					<div className='bg-white rounded-2xl border border-gray-200 shadow-sm'>
+						<div className='p-4 border-b border-gray-100'>
+							<div className='flex items-center justify-between'>
+								<h2 className='text-sm font-semibold text-gray-900'>Twoje firmy</h2>
+								<Link
+									href='/dodaj-firme'
+									className='flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors'
+								>
+									<Plus size={14} /> Dodaj
+								</Link>
 							</div>
+						</div>
 
-							{/* Stats */}
-							<div className='bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-5'>
-								<h3 className='font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2'>
-									<ShieldCheck size={16} className='text-blue-500' /> Statystyki
-								</h3>
-								<div className='space-y-4'>
-									<div className='flex items-center justify-between'>
-										<div className='flex items-center gap-3'>
-											<div className='w-8 h-8 bg-green-50 rounded-xl flex items-center justify-center'>
-												<ShieldCheck size={16} className='text-green-600' />
-											</div>
-											<span className='text-sm font-bold text-gray-600'>Status</span>
-										</div>
-										<span
-											className={`text-sm font-black ${
-												selectedCompany.isVerified ? 'text-green-600' : 'text-amber-600'
-											}`}
-										>
-											{selectedCompany.isVerified ? 'Zweryfikowany' : 'W trakcie'}
-										</span>
-									</div>
-									<div className='flex items-center justify-between'>
-										<div className='flex items-center gap-3'>
-											<div className='w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center'>
-												<Phone size={16} className='text-blue-600' />
-											</div>
-											<span className='text-sm font-bold text-gray-600'>Odsłonięcia</span>
-										</div>
-										<span className='text-xl font-black text-gray-900'>{selectedCompany._count.leads}</span>
-									</div>
-									<div className='flex items-center justify-between'>
-										<div className='flex items-center gap-3'>
-											<div className='w-8 h-8 bg-amber-50 rounded-xl flex items-center justify-center'>
-												<Star size={16} className='text-amber-600' />
-											</div>
-											<span className='text-sm font-bold text-gray-600'>Opinie</span>
-										</div>
-										<span className='text-xl font-black text-gray-900'>{selectedCompany._count.reviews}</span>
-									</div>
+						<div className='p-2'>
+							{companies.length > 0 ? (
+								<div className='space-y-1'>
+									{companies.map(company => {
+										const isSelected = selectedCompany?.id === company.id
+										const companyPremiumActive =
+											company.plan === 'PREMIUM' &&
+											(!company.premiumUntil || new Date(company.premiumUntil) > new Date())
+										return (
+											<Link
+												key={company.id}
+												href={`/dashboard?companyId=${company.id}`}
+												className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+													isSelected
+														? 'bg-blue-50 border border-blue-200'
+														: 'hover:bg-gray-50 border border-transparent'
+												}`}
+											>
+												<div
+													className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+														companyPremiumActive
+															? 'bg-gradient-to-br from-amber-400 to-orange-500'
+															: 'bg-gray-100'
+													}`}
+												>
+													{companyPremiumActive ? (
+														<Crown size={18} className='text-white' />
+													) : (
+														<Building2 size={18} className='text-gray-400' />
+													)}
+												</div>
+												<div className='min-w-0 flex-1'>
+													<p
+														className={`text-sm font-semibold truncate ${
+															isSelected ? 'text-blue-700' : 'text-gray-900'
+														}`}
+													>
+														{company.name}
+													</p>
+													<p className='text-xs text-gray-500 truncate'>{company.category.name}</p>
+												</div>
+												{isSelected && (
+													<ChevronRight size={16} className='text-blue-400 flex-shrink-0' />
+												)}
+											</Link>
+										)
+									})}
 								</div>
-								<div className='pt-4 border-t border-gray-100'>
+							) : (
+								<div className='p-6 text-center'>
+									<Building2 size={32} className='text-gray-300 mx-auto mb-3' />
+									<p className='text-sm text-gray-500 mb-3'>Brak firm</p>
 									<Link
-										href={`/firma/${selectedCompany.slug}`}
-										target='_blank'
-										className='flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors'
+										href='/dodaj-firme'
+										className='inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700'
 									>
-										Zobacz profil publiczny
-										<ExternalLink size={14} />
+										<Plus size={14} /> Dodaj pierwszą firmę
 									</Link>
 								</div>
-							</div>
+							)}
 						</div>
 
-						{/* Prawa kolumna - Edycja */}
-						<div className='lg:col-span-2'>
-							<div className='bg-white p-8 rounded-3xl border border-gray-100 shadow-sm'>
-								<div className='flex items-center gap-4 mb-6 pb-6 border-b border-gray-100'>
-									<div className='w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center'>
-										<Building2 size={24} />
+						{/* Claim section */}
+						<div className='border-t border-gray-100 p-3'>
+							{showClaimForm ? (
+								<form onSubmit={handleClaimCompany} className='space-y-2'>
+									<input
+										type='text'
+										value={claimSlug}
+										onChange={e => setClaimSlug(e.target.value)}
+										placeholder='Nazwa firmy...'
+										className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
+									/>
+									<div className='flex gap-2'>
+										<button
+											type='submit'
+											disabled={claimingCompany || !claimSlug.trim()}
+											className='flex-1 px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-black transition-colors'
+										>
+											{claimingCompany ? 'Przetwarzanie...' : 'Przejmij'}
+										</button>
+										<button
+											type='button'
+											onClick={() => {
+												setShowClaimForm(false)
+												setClaimSlug('')
+											}}
+											className='px-3 py-2 text-gray-500 hover:text-gray-700 text-xs font-medium'
+										>
+											Anuluj
+										</button>
 									</div>
-									<div>
-										<h2 className='text-xl font-black text-gray-900'>Dane wizytówki</h2>
-										<p className='text-gray-500 text-sm font-medium'>Edytuj dane kontaktowe i branżę</p>
-									</div>
-								</div>
-								<EditCompanyForm company={selectedCompany as any} />
-							</div>
+									<p className='text-[11px] text-gray-400 leading-tight'>
+										Zgłoszenie wymaga weryfikacji administratora.
+									</p>
+								</form>
+							) : (
+								<button
+									onClick={() => setShowClaimForm(true)}
+									className='flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors'
+								>
+									<Search size={14} />
+									<span className='font-medium'>Przejmij istniejącą firmę</span>
+								</button>
+							)}
 						</div>
 					</div>
 
-					{/* Sekcja Premium - funkcje premium */}
-					{isPremium && !premiumExpired && (
-						<div className='bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 p-8 rounded-3xl shadow-sm'>
-							<div className='flex items-center gap-4 mb-6'>
-								<div className='w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center'>
-									<Crown size={24} className='text-white' />
+					{/* Stats card - only when company selected */}
+					{selectedCompany && (
+						<div className='bg-white rounded-2xl border border-gray-200 shadow-sm p-4'>
+							<h3 className='text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4'>
+								Statystyki
+							</h3>
+							<div className='space-y-3'>
+								<div className='flex items-center justify-between'>
+									<div className='flex items-center gap-2.5'>
+										<div className='w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center'>
+											<ShieldCheck size={15} className='text-green-600' />
+										</div>
+										<span className='text-sm text-gray-600'>Status</span>
+									</div>
+									<span
+										className={`text-xs font-semibold px-2 py-1 rounded-full ${
+											selectedCompany.isVerified
+												? 'bg-green-50 text-green-700'
+												: 'bg-amber-50 text-amber-700'
+										}`}
+									>
+										{selectedCompany.isVerified ? 'Zweryfikowany' : 'W trakcie'}
+									</span>
 								</div>
-								<div>
-									<h2 className='text-xl font-black text-gray-900'>Funkcje Premium</h2>
-									<p className='text-gray-600 text-sm'>Wykorzystaj wszystkie możliwości pakietu Pro</p>
+								<div className='flex items-center justify-between'>
+									<div className='flex items-center gap-2.5'>
+										<div className='w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center'>
+											<Eye size={15} className='text-blue-600' />
+										</div>
+										<span className='text-sm text-gray-600'>Odsłonięcia</span>
+									</div>
+									<span className='text-sm font-bold text-gray-900'>
+										{selectedCompany._count.leads}
+									</span>
+								</div>
+								<div className='flex items-center justify-between'>
+									<div className='flex items-center gap-2.5'>
+										<div className='w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center'>
+											<Star size={15} className='text-amber-600' />
+										</div>
+										<span className='text-sm text-gray-600'>Opinie</span>
+									</div>
+									<span className='text-sm font-bold text-gray-900'>
+										{selectedCompany._count.reviews}
+									</span>
 								</div>
 							</div>
-
-							<div className='grid md:grid-cols-2 lg:grid-cols-4 gap-4'>
-								<PremiumFeatureCard
-									icon={<Link2 />}
-									title='Dodatkowe podstrony'
-									desc='Oferta, Kontakt, Usługi'
-									action='Zarządzaj'
-									href={`/dashboard/premium/pages?companyId=${selectedCompany.id}`}
-								/>
-								<PremiumFeatureCard
-									icon={<FileText />}
-									title='Artykuły blogowe'
-									desc='2 artykuły z promocją'
-									action='Dodaj artykuł'
-									href={`/dashboard/premium/articles?companyId=${selectedCompany.id}`}
-								/>
-								<PremiumFeatureCard
-									icon={<BarChart3 />}
-									title='Raport roczny'
-									desc='Statystyki i analityka'
-									action='Zobacz raport'
-									href={`/dashboard/premium/report?companyId=${selectedCompany.id}`}
-								/>
-								<PremiumFeatureCard
-									icon={<TrendingUp />}
-									title='Top kategorii'
-									desc='Wyróżnienie na 30 dni'
-									action='Sprawdź status'
-									href={`/dashboard/premium/top?companyId=${selectedCompany.id}`}
-								/>
+							<div className='mt-4 pt-3 border-t border-gray-100'>
+								<Link
+									href={`/firma/${selectedCompany.slug}`}
+									target='_blank'
+									className='flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors'
+								>
+									Profil publiczny <ExternalLink size={13} />
+								</Link>
 							</div>
 						</div>
 					)}
 
-					{/* Zmiana hasła */}
-					<div className='bg-white p-8 rounded-3xl border border-gray-100 shadow-sm'>
-						<div className='flex items-center gap-4 mb-6 pb-6 border-b border-gray-100'>
-							<div className='w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center'>
-								<KeyRound size={24} />
+					{/* Premium card */}
+					{selectedCompany && (
+						<div
+							className={`rounded-2xl border shadow-sm p-4 ${
+								isPremiumActive
+									? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200'
+									: 'bg-white border-gray-200'
+							}`}
+						>
+							<div className='flex items-center gap-3 mb-3'>
+								<div
+									className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+										isPremiumActive
+											? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
+											: 'bg-gray-100 text-gray-400'
+									}`}
+								>
+									<Crown size={18} />
+								</div>
+								<div>
+									<p className='text-sm font-bold text-gray-900'>
+										{isPremiumActive ? 'Premium' : 'Plan FREE'}
+									</p>
+									{isPremium && selectedCompany.premiumUntil && (
+										<p className='text-[11px] text-gray-500 flex items-center gap-1'>
+											<Calendar size={10} />
+											do {new Date(selectedCompany.premiumUntil).toLocaleDateString('pl-PL')}
+										</p>
+									)}
+								</div>
 							</div>
-							<div>
-								<h2 className='text-xl font-black text-gray-900'>Zmiana hasła</h2>
-								<p className='text-gray-500 text-sm font-medium'>Zabezpiecz dostęp do panelu</p>
+
+							{isPremiumActive && selectedCompany.stripeCustomerId ? (
+								<button
+									onClick={handleManageSubscription}
+									disabled={managingSubscription}
+									className='w-full bg-white border border-amber-200 text-gray-800 px-3 py-2 rounded-lg font-semibold text-xs hover:bg-amber-50 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50'
+								>
+									<Settings size={13} />
+									{managingSubscription ? 'Ładowanie...' : 'Zarządzaj planem'}
+								</button>
+							) : isPremiumActive ? (
+								<div className='text-xs text-gray-600 text-center p-2 bg-amber-100/50 rounded-lg'>
+									Aktywne (jednorazowa płatność)
+								</div>
+							) : (
+								<button
+									onClick={handleUpgradeToPremium}
+									disabled={upgradingToPremium}
+									className='w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-2.5 rounded-lg font-bold text-xs hover:from-amber-600 hover:to-orange-600 transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50'
+								>
+									<Sparkles size={13} />
+									{upgradingToPremium ? 'Ładowanie...' : 'Wykup Premium'}
+								</button>
+							)}
+						</div>
+					)}
+				</div>
+
+				{/* ===== MAIN CONTENT ===== */}
+				<div>
+					{selectedCompany ? (
+						<div className='space-y-6'>
+							{/* Tabs */}
+							<div className='bg-white rounded-2xl border border-gray-200 shadow-sm'>
+								<div className='flex border-b border-gray-100'>
+									<button
+										onClick={() => setActiveTab('edit')}
+										className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors relative ${
+											activeTab === 'edit'
+												? 'text-blue-600'
+												: 'text-gray-500 hover:text-gray-700'
+										}`}
+									>
+										<Building2 size={16} />
+										Dane wizytówki
+										{activeTab === 'edit' && (
+											<span className='absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full' />
+										)}
+									</button>
+									{isPremiumActive && (
+										<button
+											onClick={() => setActiveTab('premium')}
+											className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors relative ${
+												activeTab === 'premium'
+													? 'text-amber-600'
+													: 'text-gray-500 hover:text-gray-700'
+											}`}
+										>
+											<Crown size={16} />
+											Funkcje Premium
+											{activeTab === 'premium' && (
+												<span className='absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-t-full' />
+											)}
+										</button>
+									)}
+									<button
+										onClick={() => setActiveTab('password')}
+										className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors relative ${
+											activeTab === 'password'
+												? 'text-blue-600'
+												: 'text-gray-500 hover:text-gray-700'
+										}`}
+									>
+										<KeyRound size={16} />
+										Hasło
+										{activeTab === 'password' && (
+											<span className='absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full' />
+										)}
+									</button>
+								</div>
+
+								<div className='p-6'>
+									{/* Edit tab */}
+									{activeTab === 'edit' && (
+										<EditCompanyForm company={selectedCompany as any} />
+									)}
+
+									{/* Premium tab */}
+									{activeTab === 'premium' && isPremiumActive && (
+										<div>
+											<p className='text-sm text-gray-500 mb-6'>
+												Wykorzystaj wszystkie możliwości pakietu Premium.
+											</p>
+											<div className='space-y-3'>
+												<PremiumFeatureCard
+													icon={<Link2 size={18} />}
+													title='Dodatkowe podstrony'
+													desc='Oferta, Kontakt, Usługi'
+													action='Zarządzaj'
+													href={`/dashboard/premium/pages?companyId=${selectedCompany.id}`}
+												/>
+												<PremiumFeatureCard
+													icon={<FileText size={18} />}
+													title='Artykuły blogowe'
+													desc='2 artykuły z promocją'
+													action='Dodaj artykuł'
+													href={`/dashboard/premium/articles?companyId=${selectedCompany.id}`}
+												/>
+												<PremiumFeatureCard
+													icon={<BarChart3 size={18} />}
+													title='Raport roczny'
+													desc='Statystyki i analityka'
+													action='Zobacz raport'
+													href={`/dashboard/premium/report?companyId=${selectedCompany.id}`}
+												/>
+												<PremiumFeatureCard
+													icon={<TrendingUp size={18} />}
+													title='Top kategorii'
+													desc='Wyróżnienie na 30 dni'
+													action='Sprawdź status'
+													href={`/dashboard/premium/top?companyId=${selectedCompany.id}`}
+												/>
+											</div>
+										</div>
+									)}
+
+									{/* Password tab */}
+									{activeTab === 'password' && (
+										<div>
+											<p className='text-sm text-gray-500 mb-6'>
+												Zmień hasło dostępu do panelu zarządzania.
+											</p>
+											<form action={changePasswordAction} className='max-w-lg space-y-4'>
+												<div>
+													<label className='block text-sm font-medium text-gray-700 mb-1.5'>
+														Obecne hasło
+													</label>
+													<div className='relative'>
+														<Lock
+															className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
+															size={16}
+														/>
+														<input
+															name='oldPassword'
+															type='password'
+															required
+															className='w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm'
+														/>
+													</div>
+												</div>
+												<div>
+													<label className='block text-sm font-medium text-gray-700 mb-1.5'>
+														Nowe hasło
+													</label>
+													<div className='relative'>
+														<Lock
+															className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
+															size={16}
+														/>
+														<input
+															name='newPassword'
+															type='password'
+															required
+															placeholder='Min. 8 znaków'
+															className='w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm'
+														/>
+													</div>
+												</div>
+												<div>
+													<label className='block text-sm font-medium text-gray-700 mb-1.5'>
+														Powtórz nowe hasło
+													</label>
+													<div className='relative'>
+														<Lock
+															className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
+															size={16}
+														/>
+														<input
+															name='confirmPassword'
+															type='password'
+															required
+															className='w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm'
+														/>
+													</div>
+												</div>
+												<button className='bg-gray-900 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-black transition-all flex items-center gap-2 text-sm mt-2'>
+													Zmień hasło
+													<ArrowRight size={15} />
+												</button>
+											</form>
+										</div>
+									)}
+								</div>
 							</div>
 						</div>
-
-						<form action={changePasswordAction} className='max-w-2xl'>
-							<div className='grid md:grid-cols-3 gap-4 mb-6'>
-								<div>
-									<label className='block text-xs font-black text-gray-400 uppercase tracking-wider mb-2'>
-										Obecne hasło
-									</label>
-									<div className='relative'>
-										<Lock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' size={16} />
-										<input
-											name='oldPassword'
-											type='password'
-											required
-											className='w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all text-sm'
-										/>
-									</div>
-								</div>
-								<div>
-									<label className='block text-xs font-black text-gray-400 uppercase tracking-wider mb-2'>
-										Nowe hasło
-									</label>
-									<div className='relative'>
-										<Lock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' size={16} />
-										<input
-											name='newPassword'
-											type='password'
-											required
-											placeholder='Min. 8 znaków'
-											className='w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm'
-										/>
-									</div>
-								</div>
-								<div>
-									<label className='block text-xs font-black text-gray-400 uppercase tracking-wider mb-2'>
-										Powtórz hasło
-									</label>
-									<div className='relative'>
-										<Lock className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' size={16} />
-										<input
-											name='confirmPassword'
-											type='password'
-											required
-											className='w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm'
-										/>
-									</div>
-								</div>
-							</div>
-
-							<button className='bg-gray-900 text-white px-8 py-3 rounded-xl font-black hover:bg-black transition-all shadow-lg active:scale-95 flex items-center gap-2 text-sm'>
-								Zmień hasło
-								<ArrowRight size={16} />
-							</button>
-						</form>
-					</div>
-				</>
-			) : (
-				<div className='bg-white p-12 rounded-3xl border-2 border-dashed border-gray-200 text-center'>
-					<Building2 size={64} className='text-gray-300 mx-auto mb-4' />
-					<h3 className='text-xl font-black text-gray-900 mb-2'>Wybierz firmę do zarządzania</h3>
-					<p className='text-gray-500 mb-6'>Lub dodaj nową firmę, aby rozpocząć</p>
-					<Link
-						href='/dodaj-firme'
-						className='inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all font-bold'
-					>
-						<Plus size={16} /> Dodaj firmę
-					</Link>
+					) : (
+						<div className='bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center'>
+							<Building2 size={48} className='text-gray-300 mx-auto mb-4' />
+							<h3 className='text-lg font-bold text-gray-900 mb-2'>Wybierz firmę do zarządzania</h3>
+							<p className='text-gray-500 text-sm mb-6'>
+								Wybierz firmę z listy po lewej lub dodaj nową.
+							</p>
+							<Link
+								href='/dodaj-firme'
+								className='inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all font-semibold text-sm'
+							>
+								<Plus size={16} /> Dodaj firmę
+							</Link>
+						</div>
+					)}
 				</div>
-			)}
+			</div>
 		</div>
 	)
 }
@@ -579,15 +639,17 @@ function PremiumFeatureCard({
 	return (
 		<Link
 			href={href}
-			className='bg-white p-6 rounded-2xl border border-amber-200 hover:border-amber-300 hover:shadow-md transition-all group'
+			className='flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/30 transition-all group'
 		>
-			<div className='w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform'>
+			<div className='w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center text-white flex-shrink-0 group-hover:scale-105 transition-transform'>
 				{icon}
 			</div>
-			<h3 className='font-black text-gray-900 mb-1'>{title}</h3>
-			<p className='text-xs text-gray-600 mb-4'>{desc}</p>
-			<span className='text-sm font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1'>
-				{action} <ArrowRight size={14} className='group-hover:translate-x-1 transition-transform' />
+			<div className='flex-1 min-w-0'>
+				<h3 className='font-semibold text-gray-900 text-sm'>{title}</h3>
+				<p className='text-xs text-gray-500'>{desc}</p>
+			</div>
+			<span className='text-xs font-semibold text-blue-600 group-hover:text-blue-700 flex items-center gap-1 flex-shrink-0 whitespace-nowrap'>
+				{action} <ArrowRight size={12} className='group-hover:translate-x-0.5 transition-transform' />
 			</span>
 		</Link>
 	)

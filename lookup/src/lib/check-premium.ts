@@ -14,15 +14,12 @@ export async function checkPremium(): Promise<boolean> {
 
 	if (!user?.company) return false
 
-	// Sprawdź czy plan to PREMIUM i czy nie wygasł
-	if (user.company.plan === 'PREMIUM') {
-		if (!user.company.premiumUntil) return false
+	if (user.company.plan !== 'PREMIUM') return false
 
-		const now = new Date()
-		return user.company.premiumUntil > now
-	}
+	// null premiumUntil = bezterminowe premium
+	if (!user.company.premiumUntil) return true
 
-	return false
+	return user.company.premiumUntil > new Date()
 }
 
 // Hook do użycia w komponentach
