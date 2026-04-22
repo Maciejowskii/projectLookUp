@@ -29,6 +29,7 @@ import {
 	TrendingUp,
 	ExternalLink,
 	ChevronRight,
+	ChevronDown,
 	Eye,
 } from 'lucide-react'
 
@@ -81,6 +82,7 @@ export function DashboardContent({
 	const [claimSlug, setClaimSlug] = useState('')
 	const [activeTab, setActiveTab] = useState<Tab>('edit')
 	const [showClaimForm, setShowClaimForm] = useState(false)
+	const [isCompanyListOpen, setIsCompanyListOpen] = useState(!selectedCompany)
 
 	const isPremium = selectedCompany?.plan === 'PREMIUM'
 	const isPremiumActive =
@@ -197,78 +199,88 @@ export function DashboardContent({
 				<div className='space-y-4'>
 					{/* Company list */}
 					<div className='bg-white rounded-2xl border border-gray-200 shadow-sm'>
-						<div className='p-4 border-b border-gray-100'>
+						<div 
+							className='p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors rounded-t-2xl'
+							onClick={() => setIsCompanyListOpen(!isCompanyListOpen)}
+						>
 							<div className='flex items-center justify-between'>
-								<h2 className='text-sm font-semibold text-gray-900'>Twoje firmy</h2>
+								<h2 className='text-sm font-semibold text-gray-900 flex items-center gap-2'>
+									Twoje firmy
+									<ChevronDown size={16} className={`text-gray-400 transition-transform duration-200 ${isCompanyListOpen ? 'rotate-180' : ''}`} />
+								</h2>
 								<Link
 									href='/dodaj-firme'
 									className='flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors'
+									onClick={(e) => e.stopPropagation()}
 								>
 									<Plus size={14} /> Dodaj
 								</Link>
 							</div>
 						</div>
 
-						<div className='p-2'>
-							{companies.length > 0 ? (
-								<div className='space-y-1'>
-									{companies.map(company => {
-										const isSelected = selectedCompany?.id === company.id
-										const companyPremiumActive =
-											company.plan === 'PREMIUM' &&
-											(!company.premiumUntil || new Date(company.premiumUntil) > new Date())
-										return (
-											<Link
-												key={company.id}
-												href={`/dashboard?companyId=${company.id}`}
-												className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-													isSelected
-														? 'bg-blue-50 border border-blue-200'
-														: 'hover:bg-gray-50 border border-transparent'
-												}`}
-											>
-												<div
-													className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-														companyPremiumActive
-															? 'bg-gradient-to-br from-amber-400 to-orange-500'
-															: 'bg-gray-100'
+						<div className={`transition-all duration-200 overflow-hidden ${isCompanyListOpen ? 'opacity-100' : 'max-h-0 opacity-0'}`}>
+							<div className='p-2 max-h-[350px] overflow-y-auto custom-scrollbar'>
+								{companies.length > 0 ? (
+									<div className='space-y-1'>
+										{companies.map(company => {
+											const isSelected = selectedCompany?.id === company.id
+											const companyPremiumActive =
+												company.plan === 'PREMIUM' &&
+												(!company.premiumUntil || new Date(company.premiumUntil) > new Date())
+											return (
+												<Link
+													key={company.id}
+													href={`/dashboard?companyId=${company.id}`}
+													className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+														isSelected
+															? 'bg-blue-50 border border-blue-200'
+															: 'hover:bg-gray-50 border border-transparent'
 													}`}
 												>
-													{companyPremiumActive ? (
-														<Crown size={18} className='text-white' />
-													) : (
-														<Building2 size={18} className='text-gray-400' />
-													)}
-												</div>
-												<div className='min-w-0 flex-1'>
-													<p
-														className={`text-sm font-semibold truncate ${
-															isSelected ? 'text-blue-700' : 'text-gray-900'
+													<div
+														className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+															companyPremiumActive
+																? 'bg-gradient-to-br from-amber-400 to-orange-500'
+																: 'bg-gray-100'
 														}`}
 													>
-														{company.name}
-													</p>
-													<p className='text-xs text-gray-500 truncate'>{company.category.name}</p>
-												</div>
-												{isSelected && (
-													<ChevronRight size={16} className='text-blue-400 flex-shrink-0' />
-												)}
-											</Link>
-										)
-									})}
-								</div>
-							) : (
-								<div className='p-6 text-center'>
-									<Building2 size={32} className='text-gray-300 mx-auto mb-3' />
-									<p className='text-sm text-gray-500 mb-3'>Brak firm</p>
-									<Link
-										href='/dodaj-firme'
-										className='inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700'
-									>
-										<Plus size={14} /> Dodaj pierwszą firmę
-									</Link>
-								</div>
-							)}
+														{companyPremiumActive ? (
+															<Crown size={18} className='text-white' />
+														) : (
+															<Building2 size={18} className='text-gray-400' />
+														)}
+													</div>
+													<div className='min-w-0 flex-1 overflow-hidden'>
+														<p
+															className={`text-sm font-semibold truncate ${
+																isSelected ? 'text-blue-700' : 'text-gray-900'
+															}`}
+															title={company.name}
+														>
+															{company.name}
+														</p>
+														<p className='text-xs text-gray-500 truncate' title={company.category.name}>{company.category.name}</p>
+													</div>
+													{isSelected && (
+														<ChevronRight size={16} className='text-blue-400 flex-shrink-0' />
+													)}
+												</Link>
+											)
+										})}
+									</div>
+								) : (
+									<div className='p-6 text-center'>
+										<Building2 size={32} className='text-gray-300 mx-auto mb-3' />
+										<p className='text-sm text-gray-500 mb-3'>Brak firm</p>
+										<Link
+											href='/dodaj-firme'
+											className='inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700'
+										>
+											<Plus size={14} /> Dodaj pierwszą firmę
+										</Link>
+									</div>
+								)}
+							</div>
 						</div>
 
 						{/* Claim section */}
