@@ -11,13 +11,10 @@ COPY prisma ./prisma/
 
 RUN npm install
 
-# Generujemy Prisma Client (nie wymaga DB)
 RUN npx prisma generate
 
 COPY . .
 
-# Zwiększ pamięć TYLKO podczas buildu (zapobiega SIGSEGV). W runtime używamy limitu ze start.sh.
-# Nie ustawiaj NODE_OPTIONS globalnie – w przeciwnym razie Node w produkcji rezerwuje 4GB heap i zużywa 100% RAM na małym VPS.
 RUN NODE_OPTIONS="--max-old-space-size=4096" npx next build || (echo "Build failed, retrying..." && sleep 5 && NODE_OPTIONS="--max-old-space-size=4096" npx next build)
 
 EXPOSE 3000

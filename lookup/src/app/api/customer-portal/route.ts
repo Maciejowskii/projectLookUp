@@ -59,9 +59,10 @@ export async function POST(req: Request) {
 		}
 
 		// Utwórz sesję Customer Portal
+		const baseUrl = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin
 		const portalSession = await stripe.billingPortal.sessions.create({
 			customer: company.stripeCustomerId,
-			return_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?companyId=${company.id}`,
+			return_url: `${baseUrl}/dashboard?companyId=${company.id}`,
 		})
 
 		console.log('Customer Portal URL:', portalSession.url)

@@ -56,12 +56,14 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: 'Company not found or access denied' }, { status: 404 })
 		}
 
+		const baseUrl = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin
+
 		// Handle different payment methods
 		if (paymentMethod === 'przelewy24') {
-			// Redirect to Przelewy24 API route which will handle the payment
-			return NextResponse.redirect(
-				new URL(`/api/checkout/przelewy24?companyId=${company.id}`, req.url)
-			)
+			// Return JSON with URL to match what frontend expects
+			return NextResponse.json({
+				url: new URL(`/api/checkout/przelewy24?companyId=${company.id}`, baseUrl).toString()
+			})
 		}
 
 		if (paymentMethod === 'payu') {
@@ -102,8 +104,8 @@ export async function POST(req: Request) {
 			// Create order
 			const extOrderId = `premium-${company.id}-${Date.now()}`
 			const orderData = {
-				notifyUrl: `${process.env.NEXT_PUBLIC_URL}/api/webhooks/payu`,
-				continueUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard?companyId=${company.id}&payment=success`,
+				notifyUrl: `${baseUrl}/api/webhooks/payu`,
+				continueUrl: `${baseUrl}/dashboard?companyId=${company.id}&payment=success`,
 				customerIp: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '127.0.0.1',
 				merchantPosId: PAYU_POS_ID,
 				description: `Pakiet Premium - ${company.name}`,
@@ -195,8 +197,8 @@ export async function POST(req: Request) {
 				userId: user.id,
 				companyId: company.id,
 			},
-			success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?companyId=${company.id}&payment=success`,
-			cancel_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?companyId=${company.id}&payment=cancelled`,
+			success_url: `${baseUrl}/dashboard?companyId=${company.id}&payment=success`,
+			cancel_url: `${baseUrl}/dashboard?companyId=${company.id}&payment=cancelled`,
 		})
 
 		return NextResponse.json({ url: session.url })
