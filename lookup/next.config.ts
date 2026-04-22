@@ -18,7 +18,7 @@ if (process.env.ANALYZE === 'true') {
 
 const nextConfig: NextConfig = {
 	// Nie używamy output: 'standalone' – wymaga uruchomienia "node .next/standalone/server.js"
-	// zamiast "next start", co komplikuje Docker/start.sh. next start działa z domyślnym buildem.
+	// zamiast "next start", co komplikuje Docker/start.sh. next start działa z domyślnym buildema.
 	images: {
 		remotePatterns: [
 			{
