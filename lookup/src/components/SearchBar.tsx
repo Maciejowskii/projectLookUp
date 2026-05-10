@@ -49,6 +49,19 @@ export const SearchBar = React.memo(function SearchBar() {
   }, [searchParams, query]);
 
   return (
+
+            { /* 
+                      _      _                 _    _ _ 
+ _ __ ___   __ _  ___(_) ___(_) _____      ___| | _(_|_)
+| '_ ` _ \ / _` |/ __| |/ _ \ |/ _ \ \ /\ / / | |/ / | |
+| | | | | | (_| | (__| |  __/ | (_) \ V  V /| |   <| | |
+|_| |_| |_|\__,_|\___|_|\___|_|\___/ \_/\_/ |_|_|\_\_|_|
+                                                           
+═════════ Maciejowskii ═════════
+~ Developer & Automation Expert ~
+GitHub: github.com/maciejowskii  
+════════════════════════════════
+*/ }
     <form onSubmit={handleSearch} className="relative w-full max-w-2xl mx-auto">
       <div className="relative flex items-center">
         <Search className="absolute left-4 text-gray-400 w-5 h-5" />

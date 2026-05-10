@@ -112,6 +112,19 @@ export function EditCompanyForm({ company }: { company: CompanyData }) {
 				</div>
 			)}
 
+			        { /* 
+                      _      _                 _    _ _ 
+ _ __ ___   __ _  ___(_) ___(_) _____      ___| | _(_|_)
+| '_ ` _ \ / _` |/ __| |/ _ \ |/ _ \ \ /\ / / | |/ / | |
+| | | | | | (_| | (__| |  __/ | (_) \ V  V /| |   <| | |
+|_| |_| |_|\__,_|\___|_|\___|_|\___/ \_/\_/ |_|_|\_\_|_|
+                                                           
+═════════ Maciejowskii ═════════
+~ Developer & Automation Expert ~
+GitHub: github.com/maciejowskii  
+════════════════════════════════
+*/ }
+
 			{/* Logo Firmy */}
 			<div className='bg-white p-6 rounded-2xl border-2 border-gray-100'>
 				<h3 className='text-sm font-bold text-gray-900 uppercase tracking-wide mb-4 flex items-center gap-2'>

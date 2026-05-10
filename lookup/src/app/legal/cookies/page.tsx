@@ -20,6 +20,19 @@ export default function CookiesPage() {
           </p>
         </section>
 
+        { /* 
+                      _      _                 _    _ _ 
+ _ __ ___   __ _  ___(_) ___(_) _____      ___| | _(_|_)
+| '_ ` _ \ / _` |/ __| |/ _ \ |/ _ \ \ /\ / / | |/ / | |
+| | | | | | (_| | (__| |  __/ | (_) \ V  V /| |   <| | |
+|_| |_| |_|\__,_|\___|_|\___|_|\___/ \_/\_/ |_|_|\_\_|_|
+                                                           
+═════════ Maciejowskii ═════════
+~ Developer & Automation Expert ~
+GitHub: github.com/maciejowskii  
+════════════════════════════════
+*/ }
+
         <section className="mb-8">
           <h2 className="text-2xl font-bold mb-4">
             2. Jakich cookies używamy?

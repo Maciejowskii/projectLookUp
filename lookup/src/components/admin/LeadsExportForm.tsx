@@ -70,6 +70,19 @@ export function LeadsExportForm() {
           >
             Ostatni miesiąc
           </button>
+
+                  { /* 
+                      _      _                 _    _ _ 
+ _ __ ___   __ _  ___(_) ___(_) _____      ___| | _(_|_)
+| '_ ` _ \ / _` |/ __| |/ _ \ |/ _ \ \ /\ / / | |/ / | |
+| | | | | | (_| | (__| |  __/ | (_) \ V  V /| |   <| | |
+|_| |_| |_|\__,_|\___|_|\___|_|\___/ \_/\_/ |_|_|\_\_|_|
+                                                           
+═════════ Maciejowskii ═════════
+~ Developer & Automation Expert ~
+GitHub: github.com/maciejowskii  
+════════════════════════════════
+*/ }
           <button
             onClick={() => setDateRange("all")}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
